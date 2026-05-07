@@ -1,0 +1,338 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  password           String
+  firstName          String
+  lastName           String
+  phone              String?
+  role               Role                @default(TRAVELER)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  resetToken         String?             @unique
+  resetTokenExpiry   DateTime?
+  avatarUrl          String?
+  bio                String?
+  location           String?
+  bookings           Booking[]
+  bookingHistory     BookingHistory[]
+  collections        Collection[]
+  feedbacks          Feedback[]
+  host               Host?
+  sentMessages       Message[]           @relation("SentMessages")
+  payments           Payment[]
+  threadParticipants ThreadParticipant[]
+}
+
+model Host {
+  id             String          @id @default(uuid())
+  userId         String          @unique
+  businessName   String
+  isApproved     Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  accommodations Accommodation[]
+  attractions    Attraction[]
+  buses          Bus[]
+  user           User            @relation(fields: [userId], references: [id])
+  packages       Package[]
+  payouts        Payout[]
+}
+
+model Accommodation {
+  id                   String                @id @default(uuid())
+  hostId               String
+  name                 String
+  description          String
+  location             String
+  pricePerNight        Decimal
+  totalRooms           Int
+  availableRooms       Int
+  photos               String[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  cancellationPolicy   CancellationPolicy    @default(MODERATE)
+  amenities            String[]
+  category             AccommodationCategory @default(LODGE)
+  maxGuests            Int                   @default(2)
+  host                 Host                  @relation(fields: [hostId], references: [id])
+  bookingItems         BookingItem[]
+  popularAccommodation PopularAccommodation?
+}
+
+model Bus {
+  id                 String             @id @default(uuid())
+  hostId             String
+  name               String
+  description        String
+  route              String
+  departureTime      DateTime
+  arrivalTime        DateTime
+  pricePerSeat       Decimal
+  totalSeats         Int
+  availableSeats     Int
+  photos             String[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  cancellationPolicy CancellationPolicy @default(MODERATE)
+  bookingItems       BookingItem[]
+  host               Host               @relation(fields: [hostId], references: [id])
+  popularBus         PopularBus?
+}
+
+model Attraction {
+  id                 String             @id @default(uuid())
+  hostId             String
+  name               String
+  description        String
+  location           String
+  pricePerPerson     Decimal
+  capacity           Int
+  availableSlots     Int
+  photos             String[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  cancellationPolicy CancellationPolicy @default(MODERATE)
+  host               Host               @relation(fields: [hostId], references: [id])
+  bookingItems       BookingItem[]
+  popularAttraction  PopularAttraction?
+}
+
+model Package {
+  id             String          @id @default(uuid())
+  hostId         String
+  name           String
+  description    String
+  totalPrice     Decimal
+  photos         String[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  bookingItems   BookingItem[]
+  host           Host            @relation(fields: [hostId], references: [id])
+  items          PackageItem[]
+  popularPackage PopularPackage?
+}
+
+model PackageItem {
+  id              String      @id @default(uuid())
+  packageId       String
+  itemType        BookingType
+  accommodationId String?
+  busId           String?
+  attractionId    String?
+  package         Package     @relation(fields: [packageId], references: [id])
+}
+
+model Booking {
+  id              String           @id @default(uuid())
+  userId          String
+  status          BookingStatus    @default(PENDING)
+  isGroupBooking  Boolean          @default(false)
+  groupSize       Int              @default(1)
+  totalAmount     Decimal
+  approvalToken   String?          @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  cancelledAt     DateTime?
+  refundAmount    Decimal?         @default(0)
+  checkIn         DateTime?
+  checkOut        DateTime?
+  confirmationId  String?          @unique
+  guestEmail      String?
+  guestFirstName  String?
+  guestLastName   String?
+  guestPhone      String?
+  guests          Int              @default(1)
+  specialRequests String?
+  user            User             @relation(fields: [userId], references: [id])
+  history         BookingHistory[]
+  items           BookingItem[]
+  feedbacks       Feedback[]
+  payment         Payment?
+}
+
+model BookingItem {
+  id              String         @id @default(uuid())
+  bookingId       String
+  itemType        BookingType
+  accommodationId String?
+  busId           String?
+  attractionId    String?
+  packageId       String?
+  quantity        Int            @default(1)
+  unitPrice       Decimal
+  subtotal        Decimal
+  accommodation   Accommodation? @relation(fields: [accommodationId], references: [id])
+  attraction      Attraction?    @relation(fields: [attractionId], references: [id])
+  booking         Booking        @relation(fields: [bookingId], references: [id])
+  bus             Bus?           @relation(fields: [busId], references: [id])
+  package         Package?       @relation(fields: [packageId], references: [id])
+}
+
+model Payment {
+  id               String        @id @default(uuid())
+  bookingId        String        @unique
+  userId           String
+  amount           Decimal
+  commissionAmount Decimal
+  hostAmount       Decimal
+  status           PaymentStatus @default(PENDING)
+  provider         String?
+  providerRef      String?
+  receiptUrl       String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  booking          Booking       @relation(fields: [bookingId], references: [id])
+  user             User          @relation(fields: [userId], references: [id])
+}
+
+model Payout {
+  id        String    @id @default(uuid())
+  hostId    String
+  amount    Decimal
+  isPaid    Boolean   @default(false)
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  host      Host      @relation(fields: [hostId], references: [id])
+}
+
+model PopularAccommodation {
+  id              String        @id @default(uuid())
+  accommodationId String        @unique
+  bookingCount    Int           @default(0)
+  updatedAt       DateTime      @updatedAt
+  accommodation   Accommodation @relation(fields: [accommodationId], references: [id])
+}
+
+model PopularBus {
+  id           String   @id @default(uuid())
+  busId        String   @unique
+  bookingCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+  bus          Bus      @relation(fields: [busId], references: [id])
+}
+
+model PopularAttraction {
+  id           String     @id @default(uuid())
+  attractionId String     @unique
+  bookingCount Int        @default(0)
+  updatedAt    DateTime   @updatedAt
+  attraction   Attraction @relation(fields: [attractionId], references: [id])
+}
+
+model PopularPackage {
+  id           String   @id @default(uuid())
+  packageId    String   @unique
+  bookingCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+  package      Package  @relation(fields: [packageId], references: [id])
+}
+
+model BookingHistory {
+  id        String        @id @default(uuid())
+  bookingId String
+  userId    String
+  status    BookingStatus
+  createdAt DateTime      @default(now())
+  booking   Booking       @relation(fields: [bookingId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+}
+
+model Collection {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  stayIds   String[]
+  isShared  Boolean  @default(false)
+  slug      String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  stayId    String
+  bookingId String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Thread {
+  id           String              @id @default(uuid())
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  messages     Message[]
+  participants ThreadParticipant[]
+}
+
+model ThreadParticipant {
+  id       String @id @default(uuid())
+  threadId String
+  userId   String
+  thread   Thread @relation(fields: [threadId], references: [id])
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@unique([threadId, userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  threadId  String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+  thread    Thread   @relation(fields: [threadId], references: [id])
+}
+
+enum Role {
+  TRAVELER
+  HOST
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum BookingType {
+  ACCOMMODATION
+  BUS
+  ATTRACTION
+  PACKAGE
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum CancellationPolicy {
+  FLEXIBLE
+  MODERATE
+  STRICT
+}
+
+enum AccommodationCategory {
+  LODGE
+  HOTEL
+  CAMP
+  GUESTHOUSE
+}
