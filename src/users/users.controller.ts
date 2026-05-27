@@ -1,31 +1,45 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AuthService } from '../auth/auth.service';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { User } from '@prisma/client';
 
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(
-    private usersService: UsersService,
-    private authService: AuthService,
-  ) {}
+  constructor(private usersService: UsersService) {}
 
-  @ApiOperation({ summary: 'Get current user profile' })
-  @Get('me')
-  me(@CurrentUser() user: User) {
-    return this.authService.sanitize(user);
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  @ApiOperation({ summary: 'Current user profile' })
+  profile(@CurrentUser() user: User) {
+    return this.usersService.getProfile(user.id);
   }
 
-  @ApiOperation({ summary: 'Update current user profile' })
-  @Patch('me')
+  @Get(':id')
+  @ApiOperation({ summary: 'Any user profile (public)' })
+  findOne(@Param('id') id: string) {
+    return this.usersService.getPublicProfile(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  @ApiOperation({ summary: 'Update own profile' })
   update(@CurrentUser() user: User, @Body() dto: UpdateUserDto) {
-    return this.usersService.updateUser(user.id, dto, user.role);
+    return this.usersService.updateProfile(user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('profile/avatar')
+  @ApiOperation({ summary: 'Upload avatar' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('avatar'))
+  uploadAvatar(@CurrentUser() user: User, @UploadedFile() file: Express.Multer.File) {
+    const url = (file as any).location ?? `/uploads/${(file as any).filename}`;
+    return this.usersService.updateProfile(user.id, { avatar: url });
   }
 }

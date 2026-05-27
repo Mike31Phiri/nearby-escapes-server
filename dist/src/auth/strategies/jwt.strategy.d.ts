@@ -14,17 +14,20 @@ export declare class JwtStrategy extends JwtStrategy_base {
         id: string;
         email: string;
         resetToken: string | null;
+        name: string;
         password: string;
-        firstName: string;
-        lastName: string;
         phone: string | null;
-        avatarUrl: string | null;
-        location: string | null;
-        bio: string | null;
+        avatar: string | null;
         role: import("@prisma/client").$Enums.Role;
+        homeCity: string | null;
+        bio: string | null;
+        isVerified: boolean;
+        verificationStatus: import("@prisma/client").$Enums.VerificationStatus;
         resetTokenExpiry: Date | null;
+        refreshToken: string | null;
         createdAt: Date;
         updatedAt: Date;
+        deletedAt: Date | null;
     } | null>;
 }
 export {};

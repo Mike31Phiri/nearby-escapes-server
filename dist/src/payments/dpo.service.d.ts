@@ -1,20 +1,24 @@
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CreateTokenDto } from './dto/create-token.dto';
+import type { User } from '@prisma/client';
 export declare class DpoService {
     private config;
     private prisma;
     private notifications;
     private readonly logger;
-    private dpoBaseUrl;
-    private serviceCode;
-    private returnUrl;
-    private securityHash;
+    private readonly dpoApiUrl;
+    private readonly companyToken;
+    private readonly serviceTypeId;
     constructor(config: ConfigService, prisma: PrismaService, notifications: NotificationsService);
-    initiatePayment(amount: number, userId: string, bookingId: string, currency?: string): Promise<{
-        transactionId: string;
-        checkoutUrl: string;
+    createPaymentToken(user: User, dto: CreateTokenDto): Promise<{
+        success: boolean;
+        transToken: any;
+        paymentUrl: string;
+        bookingRef: string;
+        message: string;
     }>;
+    verifyPayment(transToken: string): Promise<any>;
     handleCallback(payload: any): Promise<void>;
-    validateTransaction(transactionId: string): Promise<any>;
 }

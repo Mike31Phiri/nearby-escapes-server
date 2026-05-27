@@ -1,15 +1,18 @@
-import type { Request } from 'express';
 import { DpoService } from './dpo.service';
-import { PaymentIntentDto } from './dto/payment-intent.dto';
+import { CreateTokenDto } from './dto/create-token.dto';
+import type { User } from '@prisma/client';
 export declare class PaymentsController {
     private dpoService;
     constructor(dpoService: DpoService);
-    createIntent(user: any, dto: PaymentIntentDto): Promise<{
-        intentId: string;
-        checkoutUrl: string;
-        status: string;
+    createToken(user: User, dto: CreateTokenDto): Promise<{
+        success: boolean;
+        transToken: any;
+        paymentUrl: string;
+        bookingRef: string;
+        message: string;
     }>;
-    handleDpoWebhook(req: Request): Promise<{
+    verifyPayment(transToken: string): Promise<any>;
+    handleWebhook(payload: any): Promise<{
         status: string;
     }>;
 }

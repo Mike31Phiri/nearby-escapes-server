@@ -1,10 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   const existing = await prisma.user.findUnique({ where: { email: 'mike.phiri@nearbyescapes.com' } });
@@ -18,8 +20,7 @@ async function main() {
     data: {
       email: 'mike.phiri@nearbyescapes.com',
       password: hashed,
-      firstName: 'Mike',
-      lastName: 'Phiri',
+      name: 'Mike Phiri',
       role: 'ADMIN',
     },
   });

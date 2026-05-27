@@ -11,13 +11,14 @@ const common_1 = require("@nestjs/common");
 const users_service_1 = require("./users.service");
 const users_controller_1 = require("./users.controller");
 const auth_module_1 = require("../auth/auth.module");
+const s3_service_1 = require("../uploads/s3.service");
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
         imports: [(0, common_1.forwardRef)(() => auth_module_1.AuthModule)],
-        providers: [users_service_1.UsersService],
+        providers: [users_service_1.UsersService, s3_service_1.S3Service],
         controllers: [users_controller_1.UsersController],
         exports: [users_service_1.UsersService],
     })

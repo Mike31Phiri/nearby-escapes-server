@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Role } from '@prisma/client';
+import { S3Service } from '../uploads/s3.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private s3?: S3Service,
+  ) {}
 
   findById(id: string) {
     return this.prisma.user.findUnique({ where: { id } });
@@ -15,33 +18,72 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
-  async updateUser(id: string, dto: UpdateUserDto, role: Role) {
+  async getProfile(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { host: true, bookings: { take: 5, orderBy: { createdAt: 'desc' } } },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const reviewStats = await this.prisma.review.aggregate({
+      where: { guestId: id },
+      _count: { id: true },
+    });
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      avatar: user.avatar,
+      role: user.role.toLowerCase(),
+      homeCity: user.homeCity,
+      bio: user.bio,
+      joinedAt: user.createdAt,
+      stats: {
+        totalBookings: user.bookings.length,
+        totalReviews: reviewStats._count.id,
+        memberSince: user.createdAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      },
+    };
+  }
+
+  async getPublicProfile(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        avatar: true,
+        role: true,
+        homeCity: true,
+        bio: true,
+        createdAt: true,
+        host: { select: { businessName: true, isApproved: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return {
+      ...user,
+      role: user.role.toLowerCase(),
+      joinedAt: user.createdAt,
+    };
+  }
+
+  async updateProfile(id: string, dto: UpdateUserDto) {
     const data: Record<string, any> = {};
 
-    if (dto.fullName) {
-      const [firstName, ...rest] = dto.fullName.trim().split(' ');
-      data.firstName = firstName;
-      data.lastName = rest.join(' ') || '';
-    }
+    if (dto.name !== undefined) data.name = dto.name;
     if (dto.phone !== undefined) data.phone = dto.phone;
-    if (dto.avatarUrl !== undefined) data.avatarUrl = dto.avatarUrl;
+    if (dto.avatar !== undefined) data.avatar = dto.avatar;
+    if (dto.homeCity !== undefined) data.homeCity = dto.homeCity;
+    if (dto.bio !== undefined) data.bio = dto.bio;
 
-    // location: TRAVELER + HOST only
-    if (dto.location !== undefined && role !== Role.ADMIN) {
-      data.location = dto.location;
+    if (Object.keys(data).length === 0) {
+      return this.getProfile(id);
     }
 
-    // bio: HOST only
-    if (dto.bio !== undefined && role === Role.HOST) {
-      data.bio = dto.bio;
-    }
-
-    const user = await this.prisma.user.update({ where: { id }, data });
-    const { password, resetToken, resetTokenExpiry, ...rest } = user;
-    return {
-      ...rest,
-      fullName: `${user.firstName} ${user.lastName}`.trim(),
-      role: user.role.toLowerCase().replace('traveler', 'guest'),
-    };
+    await this.prisma.user.update({ where: { id }, data });
+    return this.getProfile(id);
   }
 }

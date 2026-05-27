@@ -1,43 +1,49 @@
-import {
-  IsDateString, IsEmail, IsInt, IsOptional,
-  IsString, IsUUID, Min, ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsInt, Min, IsDateString, IsIn } from 'class-validator';
 
-export class GuestInfoDto {
+export class CreateBookingDto {
   @IsString()
-  firstName: string;
+  listingId: string;
 
   @IsString()
-  lastName: string;
+  @IsIn(['stay', 'experience', 'transport'])
+  listingType: string;
 
-  @IsEmail()
-  email: string;
+  // For stays
+  @IsOptional()
+  @IsDateString()
+  checkIn?: string;
+
+  // For stays
+  @IsOptional()
+  @IsDateString()
+  checkOut?: string;
+
+  // For experiences / transport
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsInt()
+  @Min(1)
+  guests: number;
+
+  @IsString()
+  customerName: string;
+
+  @IsString()
+  customerPhone: string;
 
   @IsOptional()
   @IsString()
-  phone?: string;
+  customerEmail?: string;
 
   @IsOptional()
   @IsString()
   specialRequests?: string;
 }
 
-export class CreateBookingDto {
-  @IsUUID()
-  stayId: string;
-
-  @IsDateString()
-  checkIn: string;
-
-  @IsDateString()
-  checkOut: string;
-
-  @IsInt()
-  @Min(1)
-  guests: number;
-
-  @ValidateNested()
-  @Type(() => GuestInfoDto)
-  guestInfo: GuestInfoDto;
+export class CancelBookingDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

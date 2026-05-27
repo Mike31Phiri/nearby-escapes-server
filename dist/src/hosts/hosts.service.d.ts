@@ -13,43 +13,43 @@ export declare class HostsService {
     findById(id: string): Promise<{
         user: {
             email: string;
-            firstName: string;
-            lastName: string;
+            name: string;
+            avatar: string | null;
         };
     } & {
         id: string;
-        businessName: string;
-        isApproved: boolean;
         createdAt: Date;
         updatedAt: Date;
         userId: string;
+        businessName: string;
+        isApproved: boolean;
     }>;
     findByUserId(userId: string): Promise<{
         user: {
             email: string;
-            firstName: string;
-            lastName: string;
+            name: string;
+            avatar: string | null;
         };
     } & {
         id: string;
-        businessName: string;
-        isApproved: boolean;
         createdAt: Date;
         updatedAt: Date;
         userId: string;
+        businessName: string;
+        isApproved: boolean;
     }>;
     findApprovedByUserId(userId: string): Promise<{
         user: {
             email: string;
-            firstName: string;
-            lastName: string;
+            name: string;
+            avatar: string | null;
         };
     } & {
         id: string;
-        businessName: string;
-        isApproved: boolean;
         createdAt: Date;
         updatedAt: Date;
         userId: string;
+        businessName: string;
+        isApproved: boolean;
     }>;
 }

@@ -34,10 +34,12 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
+const adapter_pg_1 = require("@prisma/adapter-pg");
 const bcrypt = __importStar(require("bcrypt"));
 const dotenv = __importStar(require("dotenv"));
 dotenv.config();
-const prisma = new client_1.PrismaClient();
+const adapter = new adapter_pg_1.PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new client_1.PrismaClient({ adapter });
 async function main() {
     const existing = await prisma.user.findUnique({ where: { email: 'mike.phiri@nearbyescapes.com' } });
     if (existing) {
@@ -49,8 +51,7 @@ async function main() {
         data: {
             email: 'mike.phiri@nearbyescapes.com',
             password: hashed,
-            firstName: 'Mike',
-            lastName: 'Phiri',
+            name: 'Mike Phiri',
             role: 'ADMIN',
         },
     });

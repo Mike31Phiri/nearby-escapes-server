@@ -12,7 +12,7 @@ export class HostsService {
 
     const host = await this.prisma.host.create({
       data: { userId, businessName: dto.businessName },
-      include: { user: { select: { firstName: true, lastName: true } } },
+      include: { user: { select: { name: true } } },
     });
 
     await this.prisma.user.update({ where: { id: userId }, data: { role: 'HOST' } });
@@ -20,7 +20,7 @@ export class HostsService {
     return {
       id: host.id,
       userId: host.userId,
-      displayName: `${host.user.firstName} ${host.user.lastName}`.trim(),
+      displayName: host.user.name,
       businessName: host.businessName,
       verified: host.isApproved,
     };
@@ -29,7 +29,7 @@ export class HostsService {
   async findById(id: string) {
     const host = await this.prisma.host.findUnique({
       where: { id },
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      include: { user: { select: { name: true, email: true, avatar: true } } },
     });
     if (!host) throw new NotFoundException('Host not found');
     return host;
@@ -38,7 +38,7 @@ export class HostsService {
   async findByUserId(userId: string) {
     const host = await this.prisma.host.findUnique({
       where: { userId },
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      include: { user: { select: { name: true, email: true, avatar: true } } },
     });
     if (!host) throw new NotFoundException('Host profile not found');
     return host;
@@ -47,7 +47,7 @@ export class HostsService {
   async findApprovedByUserId(userId: string) {
     const host = await this.prisma.host.findUnique({
       where: { userId },
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      include: { user: { select: { name: true, email: true, avatar: true } } },
     });
     if (!host) throw new NotFoundException('Host profile not found');
     if (!host.isApproved) throw new ForbiddenException('Your host account is pending admin approval');

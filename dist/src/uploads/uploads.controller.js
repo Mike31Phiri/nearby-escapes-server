@@ -25,10 +25,11 @@ let UploadsController = class UploadsController {
     constructor(uploadsService) {
         this.uploadsService = uploadsService;
     }
-    async upload(req, files, resourceType, resourceId) {
+    async upload(req, files, listingId) {
         const urls = files.map((f) => f.location ?? `/uploads/${f.filename}`);
-        await this.uploadsService.attachPhotos(resourceType, resourceId, urls);
-        return { uploaded: urls };
+        const keys = files.map((f) => f.key ?? f.filename);
+        await this.uploadsService.attachPhotos(listingId, urls);
+        return { key: keys[0], url: urls[0], uploaded: urls.map((url, i) => ({ key: keys[i], url })) };
     }
     deletePhoto(key) {
         return this.uploadsService.deletePhoto(decodeURIComponent(key));
@@ -42,10 +43,9 @@ __decorate([
     (0, common_1.UseInterceptors)((0, platform_express_1.FilesInterceptor)('files', 10)),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.UploadedFiles)()),
-    __param(2, (0, common_1.Query)('resourceType')),
-    __param(3, (0, common_1.Query)('resourceId')),
+    __param(2, (0, common_1.Query)('listingId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Array, String, String]),
+    __metadata("design:paramtypes", [Object, Array, String]),
     __metadata("design:returntype", Promise)
 ], UploadsController.prototype, "upload", null);
 __decorate([

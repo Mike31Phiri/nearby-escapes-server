@@ -14,29 +14,29 @@ export declare class HostsController {
     myHostProfile(user: User): Promise<{
         user: {
             email: string;
-            firstName: string;
-            lastName: string;
+            name: string;
+            avatar: string | null;
         };
     } & {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        userId: string;
         businessName: string;
         isApproved: boolean;
-        userId: string;
     }>;
     findOne(id: string): Promise<{
         user: {
             email: string;
-            firstName: string;
-            lastName: string;
+            name: string;
+            avatar: string | null;
         };
     } & {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        userId: string;
         businessName: string;
         isApproved: boolean;
-        userId: string;
     }>;
 }

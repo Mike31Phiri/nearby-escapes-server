@@ -19,45 +19,70 @@ const users_service_1 = require("./users.service");
 const update_user_dto_1 = require("./dto/update-user.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
-const auth_service_1 = require("../auth/auth.service");
+const platform_express_1 = require("@nestjs/platform-express");
 let UsersController = class UsersController {
     usersService;
-    authService;
-    constructor(usersService, authService) {
+    constructor(usersService) {
         this.usersService = usersService;
-        this.authService = authService;
     }
-    me(user) {
-        return this.authService.sanitize(user);
+    profile(user) {
+        return this.usersService.getProfile(user.id);
+    }
+    findOne(id) {
+        return this.usersService.getPublicProfile(id);
     }
     update(user, dto) {
-        return this.usersService.updateUser(user.id, dto, user.role);
+        return this.usersService.updateProfile(user.id, dto);
+    }
+    uploadAvatar(user, file) {
+        const url = file.location ?? `/uploads/${file.filename}`;
+        return this.usersService.updateProfile(user.id, { avatar: url });
     }
 };
 exports.UsersController = UsersController;
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get current user profile' }),
-    (0, common_1.Get)('me'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)('profile'),
+    (0, swagger_1.ApiOperation)({ summary: 'Current user profile' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
-], UsersController.prototype, "me", null);
+], UsersController.prototype, "profile", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Update current user profile' }),
-    (0, common_1.Patch)('me'),
+    (0, common_1.Get)(':id'),
+    (0, swagger_1.ApiOperation)({ summary: 'Any user profile (public)' }),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Patch)('profile'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update own profile' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, update_user_dto_1.UpdateUserDto]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "update", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Post)('profile/avatar'),
+    (0, swagger_1.ApiOperation)({ summary: 'Upload avatar' }),
+    (0, swagger_1.ApiConsumes)('multipart/form-data'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('avatar')),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "uploadAvatar", null);
 exports.UsersController = UsersController = __decorate([
     (0, swagger_1.ApiTags)('Users'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('users'),
-    __metadata("design:paramtypes", [users_service_1.UsersService,
-        auth_service_1.AuthService])
+    __metadata("design:paramtypes", [users_service_1.UsersService])
 ], UsersController);
 //# sourceMappingURL=users.controller.js.map

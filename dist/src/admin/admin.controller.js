@@ -19,7 +19,6 @@ const admin_service_1 = require("./admin.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
-const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
 let AdminController = class AdminController {
     adminService;
     constructor(adminService) {
@@ -28,108 +27,225 @@ let AdminController = class AdminController {
     dashboard() {
         return this.adminService.getDashboardStats();
     }
-    bookingAnalytics() {
-        return this.adminService.getBookingAnalytics();
+    getUsers(page, limit, search) {
+        return this.adminService.getUsers(page, limit, search);
     }
-    paymentAnalytics() {
-        return this.adminService.getPaymentAnalytics();
+    updateUserStatus(id, status) {
+        return this.adminService.updateUserStatus(id, status);
     }
-    commissions() {
-        return this.adminService.getCommissions();
+    getListings(page, limit, status) {
+        return this.adminService.getListings(page, limit, status);
     }
-    payouts(pending) {
-        return this.adminService.getPayouts(pending === 'true');
+    updateListingStatus(id, status, reason) {
+        return this.adminService.updateListingStatus(id, status, reason);
     }
-    markPaid(id) {
-        return this.adminService.markPayoutPaid(id);
+    getBookings(page, limit) {
+        return this.adminService.getBookings(page, limit);
     }
-    users() {
-        return this.adminService.getAllUsers();
+    getDisputes(page, limit) {
+        return this.adminService.getDisputes(page, limit);
     }
-    bookings() {
-        return this.adminService.getAllBookings();
+    updateDispute(id, status, resolution) {
+        return this.adminService.updateDispute(id, status, resolution);
+    }
+    getPayouts(page, limit, status) {
+        return this.adminService.getPayouts(page, limit, status);
+    }
+    processPayouts(payoutIds) {
+        return this.adminService.processPayouts(payoutIds);
+    }
+    getPromotions(page, limit) {
+        return this.adminService.getPromotions(page, limit);
+    }
+    createPromotion(data) {
+        return this.adminService.createPromotion(data);
+    }
+    updatePromotion(id, data) {
+        return this.adminService.updatePromotion(id, data);
+    }
+    getActivity(page, limit) {
+        return this.adminService.getActivityLog(page, limit);
+    }
+    getReports() {
+        return this.adminService.getReports();
+    }
+    getSettings() {
+        return this.adminService.getSettings();
+    }
+    updateSettings(settings) {
+        return this.adminService.updateSettings(settings);
     }
     approveHost(id) {
         return this.adminService.approveHost(id);
     }
-    promoteToAdmin(id, user) {
-        return this.adminService.promoteToAdmin(id, user.id);
+    promoteToAdmin(id) {
+        return this.adminService.promoteToAdmin(id);
     }
 };
 exports.AdminController = AdminController;
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get dashboard stats' }),
     (0, common_1.Get)('dashboard'),
+    (0, swagger_1.ApiOperation)({ summary: 'Platform dashboard stats' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "dashboard", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get booking analytics' }),
-    (0, common_1.Get)('analytics/bookings'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "bookingAnalytics", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get payment analytics' }),
-    (0, common_1.Get)('analytics/payments'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "paymentAnalytics", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get all commission records' }),
-    (0, common_1.Get)('commissions'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "commissions", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get all payouts (filter by pending)' }),
-    (0, common_1.Get)('payouts'),
-    __param(0, (0, common_1.Query)('pending')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "payouts", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Mark a payout as paid' }),
-    (0, common_1.Patch)('payouts/:id/paid'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "markPaid", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get all users' }),
     (0, common_1.Get)('users'),
+    (0, swagger_1.ApiOperation)({ summary: 'All users (paginated, filterable)' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Number, Number, String]),
     __metadata("design:returntype", void 0)
-], AdminController.prototype, "users", null);
+], AdminController.prototype, "getUsers", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get all bookings' }),
+    (0, common_1.Patch)('users/:id/status'),
+    (0, swagger_1.ApiOperation)({ summary: 'Suspend/verify user' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updateUserStatus", null);
+__decorate([
+    (0, common_1.Get)('listings'),
+    (0, swagger_1.ApiOperation)({ summary: 'All listings (incl. moderation queue)' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number, String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getListings", null);
+__decorate([
+    (0, common_1.Patch)('listings/:id/status'),
+    (0, swagger_1.ApiOperation)({ summary: 'Approve/reject listing' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('status')),
+    __param(2, (0, common_1.Body)('reason')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updateListingStatus", null);
+__decorate([
     (0, common_1.Get)('bookings'),
+    (0, swagger_1.ApiOperation)({ summary: 'All bookings' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getBookings", null);
+__decorate([
+    (0, common_1.Get)('disputes'),
+    (0, swagger_1.ApiOperation)({ summary: 'All disputes' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getDisputes", null);
+__decorate([
+    (0, common_1.Patch)('disputes/:id'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update dispute (status, resolution)' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('status')),
+    __param(2, (0, common_1.Body)('resolution')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updateDispute", null);
+__decorate([
+    (0, common_1.Get)('payouts'),
+    (0, swagger_1.ApiOperation)({ summary: 'Monthly payout records' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number, String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getPayouts", null);
+__decorate([
+    (0, common_1.Post)('payouts/process'),
+    (0, swagger_1.ApiOperation)({ summary: 'Process pending payouts' }),
+    __param(0, (0, common_1.Body)('payoutIds')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Array]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "processPayouts", null);
+__decorate([
+    (0, common_1.Get)('promotions'),
+    (0, swagger_1.ApiOperation)({ summary: 'Promo codes & featured listings' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getPromotions", null);
+__decorate([
+    (0, common_1.Post)('promotions'),
+    (0, swagger_1.ApiOperation)({ summary: 'Create promo code' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "createPromotion", null);
+__decorate([
+    (0, common_1.Patch)('promotions/:id'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update promotion' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updatePromotion", null);
+__decorate([
+    (0, common_1.Get)('activity'),
+    (0, swagger_1.ApiOperation)({ summary: 'Activity log (audit trail)' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getActivity", null);
+__decorate([
+    (0, common_1.Get)('reports'),
+    (0, swagger_1.ApiOperation)({ summary: 'Analytics/reports' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
-], AdminController.prototype, "bookings", null);
+], AdminController.prototype, "getReports", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Approve a host account' }),
+    (0, common_1.Get)('settings'),
+    (0, swagger_1.ApiOperation)({ summary: 'System settings' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getSettings", null);
+__decorate([
+    (0, common_1.Patch)('settings'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update settings' }),
+    __param(0, (0, common_1.Body)('settings')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Array]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updateSettings", null);
+__decorate([
     (0, common_1.Patch)('hosts/:id/approve'),
+    (0, swagger_1.ApiOperation)({ summary: 'Approve host account' }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "approveHost", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Promote a user to admin' }),
-    (0, common_1.Patch)('users/:id/promote-admin'),
+    (0, common_1.Patch)('users/:id/promote'),
+    (0, swagger_1.ApiOperation)({ summary: 'Promote user to admin' }),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "promoteToAdmin", null);
 exports.AdminController = AdminController = __decorate([

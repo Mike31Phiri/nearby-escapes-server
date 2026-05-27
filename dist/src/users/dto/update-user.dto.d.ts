@@ -1,7 +1,7 @@
 export declare class UpdateUserDto {
-    fullName?: string;
+    name?: string;
     phone?: string;
-    avatarUrl?: string;
-    location?: string;
+    avatar?: string;
+    homeCity?: string;
     bio?: string;
 }

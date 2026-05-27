@@ -16,51 +16,61 @@ exports.PaymentsController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const dpo_service_1 = require("./dpo.service");
-const payment_intent_dto_1 = require("./dto/payment-intent.dto");
+const create_token_dto_1 = require("./dto/create-token.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
-const roles_guard_1 = require("../auth/guards/roles.guard");
-const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
 let PaymentsController = class PaymentsController {
     dpoService;
     constructor(dpoService) {
         this.dpoService = dpoService;
     }
-    async createIntent(user, dto) {
-        const { transactionId, checkoutUrl } = await this.dpoService.initiatePayment(dto.amount, user.id, dto.bookingId, dto.currency);
-        return { intentId: transactionId, checkoutUrl, status: 'pending' };
+    async createToken(user, dto) {
+        return this.dpoService.createPaymentToken(user, dto);
     }
-    async handleDpoWebhook(req) {
-        await this.dpoService.handleCallback(req.body);
+    async verifyPayment(transToken) {
+        return this.dpoService.verifyPayment(transToken);
+    }
+    async handleWebhook(payload) {
+        await this.dpoService.handleCallback(payload);
         return { status: 'success' };
     }
 };
 exports.PaymentsController = PaymentsController;
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('TRAVELER'),
-    (0, common_1.Post)('intent'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Post)('create-token'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({ summary: 'Initiate payment — returns DPO checkout URL' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Create DPO payment token' }),
+    (0, swagger_1.ApiBearerAuth)('access-token'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, payment_intent_dto_1.PaymentIntentDto]),
+    __metadata("design:paramtypes", [Object, create_token_dto_1.CreateTokenDto]),
     __metadata("design:returntype", Promise)
-], PaymentsController.prototype, "createIntent", null);
+], PaymentsController.prototype, "createToken", null);
 __decorate([
-    (0, common_1.Post)('dpo-webhook'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Get)('verify/:transToken'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Verify payment status' }),
+    (0, swagger_1.ApiBearerAuth)('access-token'),
+    __param(0, (0, common_1.Param)('transToken')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], PaymentsController.prototype, "verifyPayment", null);
+__decorate([
+    (0, common_1.Post)('webhook'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, common_1.Header)('Content-Type', 'application/json'),
-    (0, swagger_1.ApiOperation)({ summary: 'DPO payment webhook handler' }),
-    __param(0, (0, common_1.Req)()),
+    (0, swagger_1.ApiOperation)({ summary: 'DPO webhook/callback handler' }),
+    __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
-], PaymentsController.prototype, "handleDpoWebhook", null);
+], PaymentsController.prototype, "handleWebhook", null);
 exports.PaymentsController = PaymentsController = __decorate([
     (0, swagger_1.ApiTags)('Payments'),
-    (0, swagger_1.ApiBearerAuth)('access-token'),
     (0, common_1.Controller)('payments'),
     __metadata("design:paramtypes", [dpo_service_1.DpoService])
 ], PaymentsController);

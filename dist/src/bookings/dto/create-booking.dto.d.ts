@@ -1,14 +1,15 @@
-export declare class GuestInfoDto {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
+export declare class CreateBookingDto {
+    listingId: string;
+    listingType: string;
+    checkIn?: string;
+    checkOut?: string;
+    date?: string;
+    guests: number;
+    customerName: string;
+    customerPhone: string;
+    customerEmail?: string;
     specialRequests?: string;
 }
-export declare class CreateBookingDto {
-    stayId: string;
-    checkIn: string;
-    checkOut: string;
-    guests: number;
-    guestInfo: GuestInfoDto;
+export declare class CancelBookingDto {
+    reason?: string;
 }

@@ -6,321 +6,37 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id                 String              @id @default(uuid())
-  email              String              @unique
-  password           String
-  firstName          String
-  lastName           String
-  phone              String?
-  role               Role                @default(TRAVELER)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  resetToken         String?             @unique
-  resetTokenExpiry   DateTime?
-  avatarUrl          String?
-  bio                String?
-  location           String?
-  bookings           Booking[]
-  bookingHistory     BookingHistory[]
-  collections        Collection[]
-  feedbacks          Feedback[]
-  host               Host?
-  sentMessages       Message[]           @relation("SentMessages")
-  payments           Payment[]
-  threadParticipants ThreadParticipant[]
-}
-
-model Host {
-  id             String          @id @default(uuid())
-  userId         String          @unique
-  businessName   String
-  isApproved     Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  accommodations Accommodation[]
-  attractions    Attraction[]
-  buses          Bus[]
-  user           User            @relation(fields: [userId], references: [id])
-  packages       Package[]
-  payouts        Payout[]
-}
-
-model Accommodation {
-  id                   String                @id @default(uuid())
-  hostId               String
-  name                 String
-  description          String
-  location             String
-  pricePerNight        Decimal
-  totalRooms           Int
-  availableRooms       Int
-  photos               String[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  cancellationPolicy   CancellationPolicy    @default(MODERATE)
-  amenities            String[]
-  category             AccommodationCategory @default(LODGE)
-  maxGuests            Int                   @default(2)
-  host                 Host                  @relation(fields: [hostId], references: [id])
-  bookingItems         BookingItem[]
-  popularAccommodation PopularAccommodation?
-}
-
-model Bus {
-  id                 String             @id @default(uuid())
-  hostId             String
-  name               String
-  description        String
-  route              String
-  departureTime      DateTime
-  arrivalTime        DateTime
-  pricePerSeat       Decimal
-  totalSeats         Int
-  availableSeats     Int
-  photos             String[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  cancellationPolicy CancellationPolicy @default(MODERATE)
-  bookingItems       BookingItem[]
-  host               Host               @relation(fields: [hostId], references: [id])
-  popularBus         PopularBus?
-}
-
-model Attraction {
-  id                 String             @id @default(uuid())
-  hostId             String
-  name               String
-  description        String
-  location           String
-  pricePerPerson     Decimal
-  capacity           Int
-  availableSlots     Int
-  photos             String[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  cancellationPolicy CancellationPolicy @default(MODERATE)
-  host               Host               @relation(fields: [hostId], references: [id])
-  bookingItems       BookingItem[]
-  popularAttraction  PopularAttraction?
-}
-
-model Package {
-  id             String          @id @default(uuid())
-  hostId         String
-  name           String
-  description    String
-  totalPrice     Decimal
-  photos         String[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  bookingItems   BookingItem[]
-  host           Host            @relation(fields: [hostId], references: [id])
-  items          PackageItem[]
-  popularPackage PopularPackage?
-}
-
-model PackageItem {
-  id              String      @id @default(uuid())
-  packageId       String
-  itemType        BookingType
-  accommodationId String?
-  busId           String?
-  attractionId    String?
-  package         Package     @relation(fields: [packageId], references: [id])
-}
-
-model Booking {
-  id              String           @id @default(uuid())
-  userId          String
-  status          BookingStatus    @default(PENDING)
-  isGroupBooking  Boolean          @default(false)
-  groupSize       Int              @default(1)
-  totalAmount     Decimal
-  approvalToken   String?          @unique
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  cancelledAt     DateTime?
-  refundAmount    Decimal?         @default(0)
-  checkIn         DateTime?
-  checkOut        DateTime?
-  confirmationId  String?          @unique
-  guestEmail      String?
-  guestFirstName  String?
-  guestLastName   String?
-  guestPhone      String?
-  guests          Int              @default(1)
-  specialRequests String?
-  user            User             @relation(fields: [userId], references: [id])
-  history         BookingHistory[]
-  items           BookingItem[]
-  feedbacks       Feedback[]
-  payment         Payment?
-}
-
-model BookingItem {
-  id              String         @id @default(uuid())
-  bookingId       String
-  itemType        BookingType
-  accommodationId String?
-  busId           String?
-  attractionId    String?
-  packageId       String?
-  quantity        Int            @default(1)
-  unitPrice       Decimal
-  subtotal        Decimal
-  accommodation   Accommodation? @relation(fields: [accommodationId], references: [id])
-  attraction      Attraction?    @relation(fields: [attractionId], references: [id])
-  booking         Booking        @relation(fields: [bookingId], references: [id])
-  bus             Bus?           @relation(fields: [busId], references: [id])
-  package         Package?       @relation(fields: [packageId], references: [id])
-}
-
-model Payment {
-  id               String        @id @default(uuid())
-  bookingId        String        @unique
-  userId           String
-  amount           Decimal
-  commissionAmount Decimal
-  hostAmount       Decimal
-  status           PaymentStatus @default(PENDING)
-  provider         String?
-  providerRef      String?
-  receiptUrl       String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  booking          Booking       @relation(fields: [bookingId], references: [id])
-  user             User          @relation(fields: [userId], references: [id])
-}
-
-model Payout {
-  id        String    @id @default(uuid())
-  hostId    String
-  amount    Decimal
-  isPaid    Boolean   @default(false)
-  paidAt    DateTime?
-  createdAt DateTime  @default(now())
-  host      Host      @relation(fields: [hostId], references: [id])
-}
-
-model PopularAccommodation {
-  id              String        @id @default(uuid())
-  accommodationId String        @unique
-  bookingCount    Int           @default(0)
-  updatedAt       DateTime      @updatedAt
-  accommodation   Accommodation @relation(fields: [accommodationId], references: [id])
-}
-
-model PopularBus {
-  id           String   @id @default(uuid())
-  busId        String   @unique
-  bookingCount Int      @default(0)
-  updatedAt    DateTime @updatedAt
-  bus          Bus      @relation(fields: [busId], references: [id])
-}
-
-model PopularAttraction {
-  id           String     @id @default(uuid())
-  attractionId String     @unique
-  bookingCount Int        @default(0)
-  updatedAt    DateTime   @updatedAt
-  attraction   Attraction @relation(fields: [attractionId], references: [id])
-}
-
-model PopularPackage {
-  id           String   @id @default(uuid())
-  packageId    String   @unique
-  bookingCount Int      @default(0)
-  updatedAt    DateTime @updatedAt
-  package      Package  @relation(fields: [packageId], references: [id])
-}
-
-model BookingHistory {
-  id        String        @id @default(uuid())
-  bookingId String
-  userId    String
-  status    BookingStatus
-  createdAt DateTime      @default(now())
-  booking   Booking       @relation(fields: [bookingId], references: [id])
-  user      User          @relation(fields: [userId], references: [id])
-}
-
-model Collection {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  stayIds   String[]
-  isShared  Boolean  @default(false)
-  slug      String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id])
-}
-
-model Feedback {
-  id        String   @id @default(uuid())
-  stayId    String
-  bookingId String
-  userId    String
-  rating    Int
-  comment   String?
-  createdAt DateTime @default(now())
-  booking   Booking  @relation(fields: [bookingId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-}
-
-model Thread {
-  id           String              @id @default(uuid())
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  messages     Message[]
-  participants ThreadParticipant[]
-}
-
-model ThreadParticipant {
-  id       String @id @default(uuid())
-  threadId String
-  userId   String
-  thread   Thread @relation(fields: [threadId], references: [id])
-  user     User   @relation(fields: [userId], references: [id])
-
-  @@unique([threadId, userId])
-}
-
-model Message {
-  id        String   @id @default(uuid())
-  threadId  String
-  senderId  String
-  body      String
-  createdAt DateTime @default(now())
-  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
-  thread    Thread   @relation(fields: [threadId], references: [id])
-}
+// ─── Enums ──────────────────────────────────────────────────────────────────
 
 enum Role {
-  TRAVELER
+  GUEST
   HOST
   ADMIN
 }
 
-enum BookingStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
+enum ListingType {
+  STAY
+  EXPERIENCE
+  TRANSPORT
 }
 
-enum BookingType {
-  ACCOMMODATION
-  BUS
-  ATTRACTION
-  PACKAGE
+enum ListingStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
 }
 
 enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
+  UNPAID
+  PAID
   REFUNDED
 }
 
@@ -330,9 +46,415 @@ enum CancellationPolicy {
   STRICT
 }
 
-enum AccommodationCategory {
-  LODGE
-  HOTEL
-  CAMP
-  GUESTHOUSE
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_REQUEST
+  REVIEW_RECEIVED
+  MESSAGE
+  SYSTEM
+  LISTING_APPROVED
+  LISTING_REJECTED
+  PAYOUT
+  PROMOTION
+}
+
+enum DisputeStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED_HOST
+  RESOLVED_GUEST
+  REFUNDED
+  CLOSED
+}
+
+enum DisputePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+enum PromoType {
+  PERCENTAGE
+  FIXED
+}
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String             @id @default(uuid())
+  name          String
+  email         String             @unique
+  password      String
+  phone         String?
+  avatar        String?
+  role          Role               @default(GUEST)
+  homeCity      String?
+  bio           String?
+  isVerified    Boolean            @default(false)
+  verificationStatus VerificationStatus @default(PENDING)
+  resetToken    String?            @unique
+  resetTokenExpiry DateTime?
+  refreshToken  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  host              Host?
+  bookings          Booking[]
+  payments          Payment[]
+  reviews           Review[]
+  notifications     Notification[]
+  wishlist          Wishlist?
+  conversations     ConversationParticipant[]
+  sentMessages      Message[]               @relation("SentMessages")
+  activityLogs      ActivityLog[]
+}
+
+// ─── Host ────────────────────────────────────────────────────────────────────
+
+model Host {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  businessName String
+  isApproved   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  listings  Listing[]
+  payouts   Payout[]
+}
+
+// ─── Listing (unified: stay | experience | transport) ────────────────────────
+
+model Listing {
+  id        String        @id @default(uuid())
+  hostId    String
+  type      ListingType
+  status    ListingStatus @default(ACTIVE)
+
+  // --- Common fields ---
+  name        String
+  description String
+  location    String
+  images      String[]
+  price       Int      // smallest currency unit (e.g., ZMW cents)
+  currency    String   @default("ZMW")
+
+  // --- Stay-specific ---
+  propertyType      String?
+  bedrooms          Int?
+  beds              Int?
+  baths             Int?
+  maxGuests         Int?
+  amenities         String[]
+  checkInFrom       String?  // e.g. "14:00"
+  checkInUntil      String?  // e.g. "22:00"
+  checkOutBefore    String?  // e.g. "11:00"
+  houseRules        String[]
+  cancellationPolicy CancellationPolicy?
+
+  // --- Experience-specific ---
+  activityType    String?
+  duration        String?      // e.g. "3 hours"
+  maxParticipants Int?
+  difficultyLevel String?      // easy | moderate | challenging
+  whatsIncluded   String[]
+  meetingPoint    String?
+  timeSlots       String[]
+  pricePerPerson  Int?
+
+  // --- Transport-specific ---
+  from          String?
+  to            String?
+  vehicleType   String?
+  capacity      Int?
+  pricePerSeat  Int?
+  schedule      Json?          // { frequency, departureTimes }
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  host            Host              @relation(fields: [hostId], references: [id])
+  bookings        Booking[]
+  reviews         Review[]
+  wishlistItems   WishlistItem[]
+  availability    AvailabilitySlot[]
+  seasonalPrices  SeasonalPricing[]
+}
+
+// ─── Booking ─────────────────────────────────────────────────────────────────
+
+model Booking {
+  id             String        @id @default(uuid())
+  bookingRef     String        @unique
+  listingId      String
+  guestId        String
+  hostId         String
+  status         BookingStatus @default(PENDING)
+  amount         Int           // in smallest currency unit
+  currency       String        @default("ZMW")
+  paymentStatus  PaymentStatus @default(UNPAID)
+  transToken     String?
+
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  specialRequests String?
+
+  // For stays
+  checkIn   DateTime?
+  checkOut  DateTime?
+  // For experiences / transport
+  date      DateTime?
+
+  guests      Int    @default(1)
+  refundAmount Int?  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing   Listing   @relation(fields: [listingId], references: [id])
+  guest     User      @relation(fields: [guestId], references: [id])
+  payment   Payment?
+}
+
+// ─── Payment ─────────────────────────────────────────────────────────────────
+
+model Payment {
+  id        String        @id @default(uuid())
+  bookingId String        @unique
+  userId    String
+  amount    Int
+  commissionAmount Int?
+  hostAmount Int?
+  status    PaymentStatus @default(UNPAID)
+  provider  String?
+  providerRef String?
+  receiptUrl String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+// ─── Payout ──────────────────────────────────────────────────────────────────
+
+model Payout {
+  id          String       @id @default(uuid())
+  hostId      String
+  amount      Int
+  commission  Int?
+  netAmount   Int?
+  period      String?      // e.g. "2025-06"
+  status      PayoutStatus @default(PENDING)
+  method      String?      // bank_transfer | mobile_money | paypal
+  bookingRefs String[]
+  processedAt DateTime?
+  createdAt   DateTime     @default(now())
+
+  host Host @relation(fields: [hostId], references: [id])
+}
+
+// ─── Review ──────────────────────────────────────────────────────────────────
+
+model Review {
+  id        String   @id @default(uuid())
+  listingId String
+  bookingRef String?
+  guestId   String
+  rating    Int      // 1-5
+  text      String?
+  createdAt DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id])
+  guest   User    @relation(fields: [guestId], references: [id])
+
+  @@unique([listingId, guestId, bookingRef])
+}
+
+// ─── Notification ────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  description String
+  isRead      Boolean          @default(false)
+  actionUrl   String?
+  createdAt   DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// ─── Conversation (messaging) ────────────────────────────────────────────────
+
+model Conversation {
+  id            String                     @id @default(uuid())
+  listingId     String?
+  bookingRef    String?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  participants  ConversationParticipant[]
+  messages      Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String
+  userId         String
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  text           String
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+// ─── Wishlist ────────────────────────────────────────────────────────────────
+
+model Wishlist {
+  id        String        @id @default(uuid())
+  userId    String        @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user  User           @relation(fields: [userId], references: [id])
+  items WishlistItem[]
+}
+
+model WishlistItem {
+  id        String @id @default(uuid())
+  wishlistId String
+  listingId String
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id])
+  listing  Listing  @relation(fields: [listingId], references: [id])
+
+  @@unique([wishlistId, listingId])
+}
+
+// ─── Availability ────────────────────────────────────────────────────────────
+
+model AvailabilitySlot {
+  id        String   @id @default(uuid())
+  listingId String
+  date      DateTime // date only (YYYY-MM-DD)
+  status    String   @default("available") // available | blocked | booked
+  price     Int?     // optional override price
+
+  listing Listing @relation(fields: [listingId], references: [id])
+
+  @@unique([listingId, date])
+}
+
+model SeasonalPricing {
+  id        String   @id @default(uuid())
+  listingId String
+  from      DateTime
+  to        DateTime
+  price     Int      @default(0) // 0 = use default multiplier
+  label     String?  // e.g. "Peak Season"
+
+  listing Listing @relation(fields: [listingId], references: [id])
+}
+
+// ─── Activity Log (admin audit) ──────────────────────────────────────────────
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  action    String
+  userId    String?
+  userRole  String?  // guest | host | admin
+  target    String?
+  type      String   // booking | listing | user | payment | report | system
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+// ─── Promo Code ──────────────────────────────────────────────────────────────
+
+model PromoCode {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  type        PromoType
+  value       Int
+  minSpend    Int?
+  maxUses     Int      @default(100)
+  currentUses Int      @default(0)
+  appliesTo   String   @default("all") // all | stay | experience | transport
+  isActive    Boolean  @default(true)
+  startsAt    DateTime
+  expiresAt   DateTime
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── Dispute ─────────────────────────────────────────────────────────────────
+
+model Dispute {
+  id          String         @id @default(uuid())
+  bookingRef  String
+  listingName String
+  listingType String         // stay | experience | transport
+  guestId     String
+  guestName   String
+  hostId      String
+  hostName    String
+  amount      Int
+  reason      String
+  description String?
+  status      DisputeStatus  @default(OPEN)
+  priority    DisputePriority @default(MEDIUM)
+  raisedBy    String         // guest | host | system
+  raisedAt    DateTime       @default(now())
+  resolvedAt  DateTime?
+  resolution  String?
+}
+
+// ─── Setting ─────────────────────────────────────────────────────────────────
+
+model Setting {
+  id          String  @id @default(uuid())
+  category    String  // commission | booking | moderation | platform | notifications
+  key         String  @unique
+  label       String
+  value       String
+  type        String  // text | number | percentage | boolean | select
+  options     String[] // for select type
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

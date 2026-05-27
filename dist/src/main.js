@@ -16,33 +16,28 @@ async function bootstrap() {
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new common_1.ValidationPipe({ whitelist: true, transform: true }));
     app.enableCors({
-        origin: process.env.CORS_ORIGIN ?? 'http://localhost:3001',
+        origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
         credentials: true,
     });
     if (process.env.NODE_ENV !== 'production') {
         const config = new swagger_1.DocumentBuilder()
-            .setTitle('Nearby Escapes API')
-            .setDescription('Backend API for the Nearby Escapes online booking platform')
-            .setVersion('1.0')
+            .setTitle('Dream Stay Builder API')
+            .setDescription('Backend API for the Dream Stay Builder booking platform')
+            .setVersion('2.0')
             .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
             .addTag('Auth', 'Authentication & registration')
             .addTag('Users', 'User profile management')
             .addTag('Hosts', 'Host profile & approval')
-            .addTag('Accommodations', 'Accommodation listings')
-            .addTag('Buses', 'Bus listings')
-            .addTag('Attractions', 'Attraction listings')
-            .addTag('Packages', 'Bundled packages')
+            .addTag('Listings', 'Unified listings — stays, experiences, transport')
             .addTag('Bookings', 'Booking management')
-            .addTag('Payments', 'Payment processing')
-            .addTag('Recommendations', 'Personalized recommendations')
-            .addTag('Popular', 'Popular products for home page')
+            .addTag('Payments', 'DPO payment processing')
+            .addTag('Reviews', 'Reviews and ratings')
+            .addTag('Notifications', 'In-app notifications')
+            .addTag('Messages', 'Conversations and messaging')
+            .addTag('Wishlist', 'Saved/wishlisted listings')
+            .addTag('Availability', 'Date blocking, seasonal pricing')
             .addTag('Uploads', 'Photo uploads')
-            .addTag('Admin', 'Admin dashboard & analytics')
-            .addTag('Stays', 'Unified stay listings')
-            .addTag('Collections', 'Wishlists / saved stays')
-            .addTag('Feedback', 'Reviews and ratings')
-            .addTag('Inbox', 'Messaging between users and hosts')
-            .addTag('Host', 'Host dashboard, earnings, calendar, listings')
+            .addTag('Admin', 'Admin dashboard & management')
             .build();
         const document = swagger_1.SwaggerModule.createDocument(app, config);
         swagger_1.SwaggerModule.setup('api/docs', app, document, {

@@ -14,7 +14,7 @@ const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class ResetPasswordDto {
     token;
-    newPassword;
+    password;
 }
 exports.ResetPasswordDto = ResetPasswordDto;
 __decorate([
@@ -27,5 +27,5 @@ __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MinLength)(6),
     __metadata("design:type", String)
-], ResetPasswordDto.prototype, "newPassword", void 0);
+], ResetPasswordDto.prototype, "password", void 0);
 //# sourceMappingURL=reset-password.dto.js.map

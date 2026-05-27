@@ -17,7 +17,7 @@ export class HostsController {
 
   @ApiOperation({ summary: 'Upgrade current guest to host' })
   @UseGuards(RolesGuard)
-  @Roles('TRAVELER')
+  @Roles('GUEST')
   @Post()
   becomeHost(@CurrentUser() user: User, @Body() dto: CreateHostDto) {
     return this.hostsService.createHost(user.id, dto);

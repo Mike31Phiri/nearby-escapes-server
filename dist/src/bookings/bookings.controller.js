@@ -21,49 +21,31 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
-const hosts_service_1 = require("../hosts/hosts.service");
 let BookingsController = class BookingsController {
     bookingsService;
-    hostsService;
-    constructor(bookingsService, hostsService) {
+    constructor(bookingsService) {
         this.bookingsService = bookingsService;
-        this.hostsService = hostsService;
     }
     create(user, dto) {
         return this.bookingsService.create(user.id, dto);
     }
-    myBookings(user, status, page = '1', limit = '10') {
-        return this.bookingsService.findMyBookings(user.id, status, +page, +limit);
+    myBookings(user, role) {
+        return this.bookingsService.findMyBookings(user.id, role);
     }
     findOne(user, id) {
-        return this.bookingsService.findOne(id, user.id);
+        return this.bookingsService.findOne(id, user.id, user.role);
     }
-    async hostBookings(user) {
-        const host = await this.hostsService.findApprovedByUserId(user.id);
-        return this.bookingsService.findHostBookings(host.id);
+    cancel(user, id, dto) {
+        return this.bookingsService.cancel(id, user.id, dto?.reason);
     }
-    cancel(user, id) {
-        return this.bookingsService.cancelBooking(id, user.id);
-    }
-    async approve(user, id) {
-        const host = await this.hostsService.findApprovedByUserId(user.id);
-        return this.bookingsService.approveByHost(id, host.id);
-    }
-    async reject(user, id) {
-        const host = await this.hostsService.findApprovedByUserId(user.id);
-        return this.bookingsService.rejectByHost(id, host.id);
-    }
-    approveByToken(token) {
-        return this.bookingsService.approveByToken(token);
-    }
-    rejectByToken(token) {
-        return this.bookingsService.rejectByToken(token);
+    updateStatus(user, id, status) {
+        return this.bookingsService.updateStatus(id, user.id, status);
     }
 };
 exports.BookingsController = BookingsController;
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Create a new booking (multi-item, group supported)' }),
     (0, common_1.Post)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Create a new booking' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -71,19 +53,17 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "create", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get booking history for current user with optional filters' }),
     (0, common_1.Get)(),
+    (0, swagger_1.ApiOperation)({ summary: "User's bookings" }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('status')),
-    __param(2, (0, common_1.Query)('page')),
-    __param(3, (0, common_1.Query)('limit')),
+    __param(1, (0, common_1.Query)('role')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, Object, Object]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "myBookings", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get a single booking by ID' }),
     (0, common_1.Get)(':id'),
+    (0, swagger_1.ApiOperation)({ summary: 'Single booking detail' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -91,68 +71,32 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "findOne", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Get all bookings for current host' }),
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('HOST'),
-    (0, common_1.Get)('host/all'),
-    __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", Promise)
-], BookingsController.prototype, "hostBookings", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Cancel a booking (traveler)' }),
     (0, common_1.Patch)(':id/cancel'),
+    (0, swagger_1.ApiOperation)({ summary: 'Cancel booking (guest or host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:paramtypes", [Object, String, create_booking_dto_1.CancelBookingDto]),
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "cancel", null);
 __decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Approve a booking (host dashboard)' }),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('HOST'),
-    (0, common_1.Post)(':id/approve'),
+    (0, common_1.Patch)(':id/status'),
+    (0, swagger_1.ApiOperation)({ summary: 'Confirm/complete booking (host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)('status')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String]),
-    __metadata("design:returntype", Promise)
-], BookingsController.prototype, "approve", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Reject a booking (host dashboard)' }),
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('HOST'),
-    (0, common_1.Post)(':id/reject'),
-    __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String]),
-    __metadata("design:returntype", Promise)
-], BookingsController.prototype, "reject", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Approve booking via email token link' }),
-    (0, common_1.Post)('approve-by-token/:token'),
-    __param(0, (0, common_1.Param)('token')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", void 0)
-], BookingsController.prototype, "approveByToken", null);
-__decorate([
-    (0, swagger_1.ApiOperation)({ summary: 'Reject booking via email token link' }),
-    (0, common_1.Post)('reject-by-token/:token'),
-    __param(0, (0, common_1.Param)('token')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", void 0)
-], BookingsController.prototype, "rejectByToken", null);
+], BookingsController.prototype, "updateStatus", null);
 exports.BookingsController = BookingsController = __decorate([
     (0, swagger_1.ApiTags)('Bookings'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('bookings'),
-    __metadata("design:paramtypes", [bookings_service_1.BookingsService,
-        hosts_service_1.HostsService])
+    __metadata("design:paramtypes", [bookings_service_1.BookingsService])
 ], BookingsController);
 //# sourceMappingURL=bookings.controller.js.map

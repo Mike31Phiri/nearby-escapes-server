@@ -8,6 +8,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import type { User } from '@prisma/client';
 
 const COOKIE_NAME = 'access_token';
 
@@ -20,12 +21,13 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'Returns user object and sets HttpOnly cookie' })
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: any) {
     const { token, user } = await this.authService.register(dto);
     this.setCookie(res, token);
-    return user;
+    return { user, message: 'Registration successful. Welcome to Nearby Escapes!' };
   }
 
   @Post('login')
@@ -34,7 +36,7 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: any) {
     const { token, user } = await this.authService.login(dto);
     this.setCookie(res, token);
-    return user;
+    return { user };
   }
 
   @Post('logout')
@@ -42,15 +44,15 @@ export class AuthController {
   @ApiOperation({ summary: 'Clear session cookie' })
   logout(@Res({ passthrough: true }) res: any) {
     res.clearCookie(COOKIE_NAME, { path: '/' });
-    return { message: 'Logged out' };
+    return { message: 'Logged out successfully' };
   }
 
-  @Get('session')
+  @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Get current session user' })
-  session(@CurrentUser() user: any) {
-    return this.authService.sanitize(user);
+  @ApiOperation({ summary: 'Get current user from JWT' })
+  me(@CurrentUser() user: User) {
+    return { user: this.authService.sanitize(user) };
   }
 
   @Post('forgot-password')

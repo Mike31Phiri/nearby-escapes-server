@@ -12,10 +12,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateUserDto = void 0;
 const class_validator_1 = require("class-validator");
 class UpdateUserDto {
-    fullName;
+    name;
     phone;
-    avatarUrl;
-    location;
+    avatar;
+    homeCity;
     bio;
 }
 exports.UpdateUserDto = UpdateUserDto;
@@ -23,7 +23,7 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
-], UpdateUserDto.prototype, "fullName", void 0);
+], UpdateUserDto.prototype, "name", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -33,12 +33,12 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
-], UpdateUserDto.prototype, "avatarUrl", void 0);
+], UpdateUserDto.prototype, "avatar", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
-], UpdateUserDto.prototype, "location", void 0);
+], UpdateUserDto.prototype, "homeCity", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

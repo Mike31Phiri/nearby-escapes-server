@@ -1,229 +1,125 @@
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateBookingDto } from './dto/create-booking.dto';
-import { Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
-import { ConfigService } from '@nestjs/config';
+import { CreateBookingDto } from './dto/create-booking.dto';
+import { BookingStatus } from '@prisma/client';
 export declare class BookingsService {
     private prisma;
     private notifications;
-    private config;
-    constructor(prisma: PrismaService, notifications: NotificationsService, config: ConfigService);
+    constructor(prisma: PrismaService, notifications: NotificationsService);
     create(userId: string, dto: CreateBookingDto): Promise<{
         id: any;
-        stayId: any;
-        stayName: any;
-        stayImage: any;
-        stayLocation: any;
-        checkIn: any;
-        checkOut: any;
-        guests: any;
+        bookingRef: any;
+        type: any;
+        listingId: any;
+        listingName: any;
+        guestId: any;
+        hostId: any;
         status: any;
-        confirmationId: any;
-        fees: {
-            pricePerNight: any;
-            nights: any;
-            subtotal: any;
-            cleaningFee: number;
-            serviceFee: any;
-            taxes: any;
-            total: any;
+        amount: any;
+        currency: any;
+        paymentStatus: any;
+        details: {
+            checkIn: any;
+            checkOut: any;
+            date: any;
+            guests: any;
         };
-        host: {
-            id: any;
-            displayName: string;
-            avatarUrl: any;
-        } | null;
+        customer: {
+            name: any;
+            phone: any;
+            email: any;
+        };
+        specialRequests: any;
         createdAt: any;
+        updatedAt: any;
     }>;
-    findMyBookings(userId: string, status?: string, page?: number, limit?: number): Promise<{
+    findOne(id: string, userId: string, userRole: string): Promise<{
         id: any;
-        stayId: any;
-        stayName: any;
-        stayImage: any;
-        stayLocation: any;
-        checkIn: any;
-        checkOut: any;
-        guests: any;
+        bookingRef: any;
+        type: any;
+        listingId: any;
+        listingName: any;
+        guestId: any;
+        hostId: any;
         status: any;
-        confirmationId: any;
-        fees: {
-            pricePerNight: any;
-            nights: any;
-            subtotal: any;
-            cleaningFee: number;
-            serviceFee: any;
-            taxes: any;
-            total: any;
+        amount: any;
+        currency: any;
+        paymentStatus: any;
+        details: {
+            checkIn: any;
+            checkOut: any;
+            date: any;
+            guests: any;
         };
-        host: {
-            id: any;
-            displayName: string;
-            avatarUrl: any;
-        } | null;
+        customer: {
+            name: any;
+            phone: any;
+            email: any;
+        };
+        specialRequests: any;
         createdAt: any;
+        updatedAt: any;
+    }>;
+    findMyBookings(userId: string, role?: string): Promise<{
+        id: any;
+        bookingRef: any;
+        type: any;
+        listingId: any;
+        listingName: any;
+        guestId: any;
+        hostId: any;
+        status: any;
+        amount: any;
+        currency: any;
+        paymentStatus: any;
+        details: {
+            checkIn: any;
+            checkOut: any;
+            date: any;
+            guests: any;
+        };
+        customer: {
+            name: any;
+            phone: any;
+            email: any;
+        };
+        specialRequests: any;
+        createdAt: any;
+        updatedAt: any;
     }[]>;
-    findOne(id: string, userId: string): Promise<{
-        id: any;
-        stayId: any;
-        stayName: any;
-        stayImage: any;
-        stayLocation: any;
-        checkIn: any;
-        checkOut: any;
-        guests: any;
-        status: any;
-        confirmationId: any;
-        fees: {
-            pricePerNight: any;
-            nights: any;
-            subtotal: any;
-            cleaningFee: number;
-            serviceFee: any;
-            taxes: any;
-            total: any;
-        };
-        host: {
-            id: any;
-            displayName: string;
-            avatarUrl: any;
-        } | null;
-        createdAt: any;
-    }>;
-    cancelBooking(id: string, userId: string): Promise<{
+    cancel(id: string, userId: string, reason?: string): Promise<{
         status: string;
+        refundEligible: boolean;
         refundAmount: number;
+        policy: string;
+        message: string;
     }>;
-    approveByToken(token: string): Promise<{
-        id: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        isGroupBooking: boolean;
-        groupSize: number;
-        totalAmount: Prisma.Decimal;
-        approvalToken: string | null;
-        confirmationId: string | null;
-        checkIn: Date | null;
-        checkOut: Date | null;
-        guests: number;
-        guestFirstName: string | null;
-        guestLastName: string | null;
-        guestEmail: string | null;
-        guestPhone: string | null;
-        specialRequests: string | null;
-        cancelledAt: Date | null;
-        refundAmount: Prisma.Decimal | null;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
-    rejectByToken(token: string): Promise<{
-        id: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        isGroupBooking: boolean;
-        groupSize: number;
-        totalAmount: Prisma.Decimal;
-        approvalToken: string | null;
-        confirmationId: string | null;
-        checkIn: Date | null;
-        checkOut: Date | null;
-        guests: number;
-        guestFirstName: string | null;
-        guestLastName: string | null;
-        guestEmail: string | null;
-        guestPhone: string | null;
-        specialRequests: string | null;
-        cancelledAt: Date | null;
-        refundAmount: Prisma.Decimal | null;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
-    approveByHost(id: string, hostId: string): Promise<{
-        id: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        isGroupBooking: boolean;
-        groupSize: number;
-        totalAmount: Prisma.Decimal;
-        approvalToken: string | null;
-        confirmationId: string | null;
-        checkIn: Date | null;
-        checkOut: Date | null;
-        guests: number;
-        guestFirstName: string | null;
-        guestLastName: string | null;
-        guestEmail: string | null;
-        guestPhone: string | null;
-        specialRequests: string | null;
-        cancelledAt: Date | null;
-        refundAmount: Prisma.Decimal | null;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
-    rejectByHost(id: string, hostId: string): Promise<{
-        id: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        isGroupBooking: boolean;
-        groupSize: number;
-        totalAmount: Prisma.Decimal;
-        approvalToken: string | null;
-        confirmationId: string | null;
-        checkIn: Date | null;
-        checkOut: Date | null;
-        guests: number;
-        guestFirstName: string | null;
-        guestLastName: string | null;
-        guestEmail: string | null;
-        guestPhone: string | null;
-        specialRequests: string | null;
-        cancelledAt: Date | null;
-        refundAmount: Prisma.Decimal | null;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    }>;
-    findHostBookings(hostId: string): Promise<({
-        user: {
-            email: string;
-            firstName: string;
-            lastName: string;
+    updateStatus(id: string, userId: string, status: BookingStatus): Promise<{
+        id: any;
+        bookingRef: any;
+        type: any;
+        listingId: any;
+        listingName: any;
+        guestId: any;
+        hostId: any;
+        status: any;
+        amount: any;
+        currency: any;
+        paymentStatus: any;
+        details: {
+            checkIn: any;
+            checkOut: any;
+            date: any;
+            guests: any;
         };
-        items: {
-            id: string;
-            itemType: import("@prisma/client").$Enums.BookingType;
-            quantity: number;
-            unitPrice: Prisma.Decimal;
-            subtotal: Prisma.Decimal;
-            accommodationId: string | null;
-            busId: string | null;
-            attractionId: string | null;
-            packageId: string | null;
-            bookingId: string;
-        }[];
-    } & {
-        id: string;
-        status: import("@prisma/client").$Enums.BookingStatus;
-        isGroupBooking: boolean;
-        groupSize: number;
-        totalAmount: Prisma.Decimal;
-        approvalToken: string | null;
-        confirmationId: string | null;
-        checkIn: Date | null;
-        checkOut: Date | null;
-        guests: number;
-        guestFirstName: string | null;
-        guestLastName: string | null;
-        guestEmail: string | null;
-        guestPhone: string | null;
-        specialRequests: string | null;
-        cancelledAt: Date | null;
-        refundAmount: Prisma.Decimal | null;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-    })[]>;
+        customer: {
+            name: any;
+            phone: any;
+            email: any;
+        };
+        specialRequests: any;
+        createdAt: any;
+        updatedAt: any;
+    }>;
     private formatBooking;
-    private calculateRefund;
-    private updateStatusByToken;
-    private updateBookingStatus;
-    private assertHostOwnsBooking;
 }

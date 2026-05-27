@@ -40,7 +40,7 @@ exports.HostsController = HostsController;
 __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Upgrade current guest to host' }),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)('TRAVELER'),
+    (0, roles_decorator_1.Roles)('GUEST'),
     (0, common_1.Post)(),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),

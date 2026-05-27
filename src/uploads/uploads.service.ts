@@ -22,22 +22,14 @@ export class UploadsService {
     this.bucket = config.getOrThrow('AWS_S3_BUCKET');
   }
 
-  async attachPhotos(
-    resourceType: 'accommodation' | 'bus' | 'attraction' | 'package',
-    resourceId: string,
-    urls: string[],
-  ) {
-    const data = { photos: { push: urls } };
-    switch (resourceType) {
-      case 'accommodation':
-        return this.prisma.accommodation.update({ where: { id: resourceId }, data });
-      case 'bus':
-        return this.prisma.bus.update({ where: { id: resourceId }, data });
-      case 'attraction':
-        return this.prisma.attraction.update({ where: { id: resourceId }, data });
-      case 'package':
-        return this.prisma.package.update({ where: { id: resourceId }, data });
-    }
+  async attachPhotos(listingId: string, urls: string[]) {
+    const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
+    if (!listing) throw new NotFoundException('Listing not found');
+
+    return this.prisma.listing.update({
+      where: { id: listingId },
+      data: { images: { push: urls } },
+    });
   }
 
   async deletePhoto(key: string) {

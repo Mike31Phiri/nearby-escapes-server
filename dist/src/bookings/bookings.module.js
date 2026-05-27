@@ -10,13 +10,12 @@ exports.BookingsModule = void 0;
 const common_1 = require("@nestjs/common");
 const bookings_service_1 = require("./bookings.service");
 const bookings_controller_1 = require("./bookings.controller");
-const hosts_service_1 = require("../hosts/hosts.service");
 let BookingsModule = class BookingsModule {
 };
 exports.BookingsModule = BookingsModule;
 exports.BookingsModule = BookingsModule = __decorate([
     (0, common_1.Module)({
-        providers: [bookings_service_1.BookingsService, hosts_service_1.HostsService],
+        providers: [bookings_service_1.BookingsService],
         controllers: [bookings_controller_1.BookingsController],
         exports: [bookings_service_1.BookingsService],
     })

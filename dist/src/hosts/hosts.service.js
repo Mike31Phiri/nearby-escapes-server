@@ -23,13 +23,13 @@ let HostsService = class HostsService {
             throw new common_1.BadRequestException('Already registered as a host');
         const host = await this.prisma.host.create({
             data: { userId, businessName: dto.businessName },
-            include: { user: { select: { firstName: true, lastName: true } } },
+            include: { user: { select: { name: true } } },
         });
         await this.prisma.user.update({ where: { id: userId }, data: { role: 'HOST' } });
         return {
             id: host.id,
             userId: host.userId,
-            displayName: `${host.user.firstName} ${host.user.lastName}`.trim(),
+            displayName: host.user.name,
             businessName: host.businessName,
             verified: host.isApproved,
         };
@@ -37,7 +37,7 @@ let HostsService = class HostsService {
     async findById(id) {
         const host = await this.prisma.host.findUnique({
             where: { id },
-            include: { user: { select: { firstName: true, lastName: true, email: true } } },
+            include: { user: { select: { name: true, email: true, avatar: true } } },
         });
         if (!host)
             throw new common_1.NotFoundException('Host not found');
@@ -46,7 +46,7 @@ let HostsService = class HostsService {
     async findByUserId(userId) {
         const host = await this.prisma.host.findUnique({
             where: { userId },
-            include: { user: { select: { firstName: true, lastName: true, email: true } } },
+            include: { user: { select: { name: true, email: true, avatar: true } } },
         });
         if (!host)
             throw new common_1.NotFoundException('Host profile not found');
@@ -55,7 +55,7 @@ let HostsService = class HostsService {
     async findApprovedByUserId(userId) {
         const host = await this.prisma.host.findUnique({
             where: { userId },
-            include: { user: { select: { firstName: true, lastName: true, email: true } } },
+            include: { user: { select: { name: true, email: true, avatar: true } } },
         });
         if (!host)
             throw new common_1.NotFoundException('Host profile not found');

@@ -34,19 +34,19 @@ let AuthController = class AuthController {
     async register(dto, res) {
         const { token, user } = await this.authService.register(dto);
         this.setCookie(res, token);
-        return user;
+        return { user, message: 'Registration successful. Welcome to Nearby Escapes!' };
     }
     async login(dto, res) {
         const { token, user } = await this.authService.login(dto);
         this.setCookie(res, token);
-        return user;
+        return { user };
     }
     logout(res) {
         res.clearCookie(COOKIE_NAME, { path: '/' });
-        return { message: 'Logged out' };
+        return { message: 'Logged out successfully' };
     }
-    session(user) {
-        return this.authService.sanitize(user);
+    me(user) {
+        return { user: this.authService.sanitize(user) };
     }
     forgotPassword(dto) {
         return this.authService.forgotPassword(dto);
@@ -68,6 +68,7 @@ let AuthController = class AuthController {
 exports.AuthController = AuthController;
 __decorate([
     (0, common_1.Post)('register'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     (0, swagger_1.ApiOperation)({ summary: 'Register a new user' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'Returns user object and sets HttpOnly cookie' }),
     __param(0, (0, common_1.Body)()),
@@ -96,15 +97,15 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "logout", null);
 __decorate([
-    (0, common_1.Get)('session'),
+    (0, common_1.Get)('me'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get current session user' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Get current user from JWT' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
-], AuthController.prototype, "session", null);
+], AuthController.prototype, "me", null);
 __decorate([
     (0, common_1.Post)('forgot-password'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

@@ -6,22 +6,16 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { HostsModule } from './hosts/hosts.module';
-import { AccommodationsModule } from './accommodations/accommodations.module';
-import { BusesModule } from './buses/buses.module';
-import { AttractionsModule } from './attractions/attractions.module';
-import { PackagesModule } from './packages/packages.module';
+import { ListingsModule } from './listings/listings.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { RecommendationsModule } from './recommendations/recommendations.module';
+import { MessagesModule } from './messages/messages.module';
+import { WishlistModule } from './wishlist/wishlist.module';
+import { AvailabilityModule } from './availability/availability.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
-import { PopularModule } from './popular/popular.module';
-import { ApiModule } from './api/api.module';
-import { StaysModule } from './stays/stays.module';
-import { CollectionsModule } from './collections/collections.module';
-import { FeedbackModule } from './feedback/feedback.module';
-import { InboxModule } from './inbox/inbox.module';
 
 @Module({
   imports: [
@@ -31,22 +25,16 @@ import { InboxModule } from './inbox/inbox.module';
     AuthModule,
     UsersModule,
     HostsModule,
-    AccommodationsModule,
-    BusesModule,
-    AttractionsModule,
-    PackagesModule,
+    ListingsModule,
     BookingsModule,
     PaymentsModule,
+    ReviewsModule,
     NotificationsModule,
-    RecommendationsModule,
+    MessagesModule,
+    WishlistModule,
+    AvailabilityModule,
     UploadsModule,
     AdminModule,
-    PopularModule,
-    ApiModule,
-    StaysModule,
-    CollectionsModule,
-    FeedbackModule,
-    InboxModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

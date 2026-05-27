@@ -8,9 +8,6 @@ import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { randomUUID } from 'crypto';
-import { extname } from 'path';
-import * as multerS3 from 'multer-s3';
 import type { Request } from 'express';
 
 @ApiTags('Uploads')
@@ -26,12 +23,12 @@ export class UploadsController {
   async upload(
     @Req() req: Request,
     @UploadedFiles() files: Express.MulterS3.File[],
-    @Query('resourceType') resourceType: 'accommodation' | 'bus' | 'attraction' | 'package',
-    @Query('resourceId') resourceId: string,
+    @Query('listingId') listingId: string,
   ) {
     const urls = files.map((f) => (f as any).location ?? `/uploads/${(f as any).filename}`);
-    await this.uploadsService.attachPhotos(resourceType, resourceId, urls);
-    return { uploaded: urls };
+    const keys = files.map((f) => (f as any).key ?? (f as any).filename);
+    await this.uploadsService.attachPhotos(listingId, urls);
+    return { key: keys[0], url: urls[0], uploaded: urls.map((url, i) => ({ key: keys[i], url })) };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

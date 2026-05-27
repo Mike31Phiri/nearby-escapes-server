@@ -9,67 +9,75 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateBookingDto = exports.GuestInfoDto = void 0;
+exports.CancelBookingDto = exports.CreateBookingDto = void 0;
 const class_validator_1 = require("class-validator");
-const class_transformer_1 = require("class-transformer");
-class GuestInfoDto {
-    firstName;
-    lastName;
-    email;
-    phone;
-    specialRequests;
-}
-exports.GuestInfoDto = GuestInfoDto;
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], GuestInfoDto.prototype, "firstName", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], GuestInfoDto.prototype, "lastName", void 0);
-__decorate([
-    (0, class_validator_1.IsEmail)(),
-    __metadata("design:type", String)
-], GuestInfoDto.prototype, "email", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], GuestInfoDto.prototype, "phone", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], GuestInfoDto.prototype, "specialRequests", void 0);
 class CreateBookingDto {
-    stayId;
+    listingId;
+    listingType;
     checkIn;
     checkOut;
+    date;
     guests;
-    guestInfo;
+    customerName;
+    customerPhone;
+    customerEmail;
+    specialRequests;
 }
 exports.CreateBookingDto = CreateBookingDto;
 __decorate([
-    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
-], CreateBookingDto.prototype, "stayId", void 0);
+], CreateBookingDto.prototype, "listingId", void 0);
 __decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsIn)(['stay', 'experience', 'transport']),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "listingType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "checkIn", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], CreateBookingDto.prototype, "checkOut", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "date", void 0);
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], CreateBookingDto.prototype, "guests", void 0);
 __decorate([
-    (0, class_validator_1.ValidateNested)(),
-    (0, class_transformer_1.Type)(() => GuestInfoDto),
-    __metadata("design:type", GuestInfoDto)
-], CreateBookingDto.prototype, "guestInfo", void 0);
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "customerName", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "customerPhone", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "customerEmail", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateBookingDto.prototype, "specialRequests", void 0);
+class CancelBookingDto {
+    reason;
+}
+exports.CancelBookingDto = CancelBookingDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CancelBookingDto.prototype, "reason", void 0);
 //# sourceMappingURL=create-booking.dto.js.map

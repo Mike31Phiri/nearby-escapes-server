@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
   Inject,
   forwardRef,
@@ -33,12 +32,19 @@ export class AuthService {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new ConflictException('An account with this email already exists');
 
-    const [firstName, ...rest] = dto.fullName.trim().split(' ');
-    const lastName = rest.join(' ') || '';
-
     const hashed = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
-      data: { email: dto.email, password: hashed, firstName, lastName, phone: dto.phone },
+      data: {
+        email: dto.email,
+        password: hashed,
+        name: dto.name,
+        phone: dto.phone || null,
+        role: dto.role === 'host' ? 'HOST' : 'GUEST',
+        // If registering as host, also create a host profile
+        ...(dto.role === 'host' ? {
+          host: { create: { businessName: `${dto.name}'s Services` } },
+        } : {}),
+      },
     });
 
     return { token: this.signToken(user.id, user.email), user: this.sanitize(user) };
@@ -66,8 +72,8 @@ export class AuthService {
       data: { resetToken: token, resetTokenExpiry: expiry },
     });
 
-    const resetUrl = `${this.config.get('FRONTEND_URL')}/reset-password?token=${token}`;
-    await this.notifications.sendPasswordReset(user.email, user.firstName, resetUrl);
+    const resetUrl = `${this.config.get('FRONTEND_URL') || 'http://localhost:3000'}/auth/reset-password?token=${token}`;
+    await this.notifications.sendPasswordReset(user.email, user.name, resetUrl);
 
     return { message: 'If this email exists, a reset link has been sent' };
   }
@@ -79,21 +85,20 @@ export class AuthService {
       throw new BadRequestException('Reset token has expired, please request a new one');
     }
 
-    const hashed = await bcrypt.hash(dto.newPassword, 10);
+    const hashed = await bcrypt.hash(dto.password, 10);
     await this.prisma.user.update({
       where: { id: user.id },
       data: { password: hashed, resetToken: null, resetTokenExpiry: null },
     });
 
-    return { message: 'Password reset successful, please login with your new password' };
+    return { message: 'Password reset successfully.' };
   }
 
   sanitize(user: any) {
-    const { password, resetToken, resetTokenExpiry, ...rest } = user;
+    const { password, resetToken, resetTokenExpiry, refreshToken, deletedAt, ...rest } = user;
     return {
       ...rest,
-      fullName: `${user.firstName} ${user.lastName}`.trim(),
-      role: user.role.toLowerCase().replace('traveler', 'guest'),
+      role: user.role.toLowerCase(),
     };
   }
 
