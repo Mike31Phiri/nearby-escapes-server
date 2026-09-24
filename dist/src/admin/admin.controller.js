@@ -33,8 +33,14 @@ let AdminController = class AdminController {
     updateUserStatus(id, status) {
         return this.adminService.updateUserStatus(id, status);
     }
+    getProperties(page, limit, status) {
+        return this.adminService.getProperties(page, limit, status);
+    }
     getListings(page, limit, status) {
         return this.adminService.getListings(page, limit, status);
+    }
+    updatePropertyStatus(id, status, reason) {
+        return this.adminService.updatePropertyStatus(id, status, reason);
     }
     updateListingStatus(id, status, reason) {
         return this.adminService.updateListingStatus(id, status, reason);
@@ -53,15 +59,6 @@ let AdminController = class AdminController {
     }
     processPayouts(payoutIds) {
         return this.adminService.processPayouts(payoutIds);
-    }
-    getPromotions(page, limit) {
-        return this.adminService.getPromotions(page, limit);
-    }
-    createPromotion(data) {
-        return this.adminService.createPromotion(data);
-    }
-    updatePromotion(id, data) {
-        return this.adminService.updatePromotion(id, data);
     }
     getActivity(page, limit) {
         return this.adminService.getActivityLog(page, limit);
@@ -110,8 +107,18 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "updateUserStatus", null);
 __decorate([
+    (0, common_1.Get)('properties'),
+    (0, swagger_1.ApiOperation)({ summary: 'All properties (incl. moderation queue)' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('status')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number, String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getProperties", null);
+__decorate([
     (0, common_1.Get)('listings'),
-    (0, swagger_1.ApiOperation)({ summary: 'All listings (incl. moderation queue)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'All listings (backwards compatibility)' }),
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('limit')),
     __param(2, (0, common_1.Query)('status')),
@@ -120,8 +127,18 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "getListings", null);
 __decorate([
+    (0, common_1.Patch)('properties/:id/status'),
+    (0, swagger_1.ApiOperation)({ summary: 'Approve/reject property' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('status')),
+    __param(2, (0, common_1.Body)('reason')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "updatePropertyStatus", null);
+__decorate([
     (0, common_1.Patch)('listings/:id/status'),
-    (0, swagger_1.ApiOperation)({ summary: 'Approve/reject listing' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Approve/reject listing (backwards compatibility)' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)('status')),
     __param(2, (0, common_1.Body)('reason')),
@@ -175,32 +192,6 @@ __decorate([
     __metadata("design:paramtypes", [Array]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "processPayouts", null);
-__decorate([
-    (0, common_1.Get)('promotions'),
-    (0, swagger_1.ApiOperation)({ summary: 'Promo codes & featured listings' }),
-    __param(0, (0, common_1.Query)('page')),
-    __param(1, (0, common_1.Query)('limit')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Number]),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "getPromotions", null);
-__decorate([
-    (0, common_1.Post)('promotions'),
-    (0, swagger_1.ApiOperation)({ summary: 'Create promo code' }),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "createPromotion", null);
-__decorate([
-    (0, common_1.Patch)('promotions/:id'),
-    (0, swagger_1.ApiOperation)({ summary: 'Update promotion' }),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
-], AdminController.prototype, "updatePromotion", null);
 __decorate([
     (0, common_1.Get)('activity'),
     (0, swagger_1.ApiOperation)({ summary: 'Activity log (audit trail)' }),

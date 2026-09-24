@@ -26,8 +26,17 @@ let AvailabilityController = class AvailabilityController {
     constructor(availabilityService) {
         this.availabilityService = availabilityService;
     }
+    getStayAvailability(stayId, year, month) {
+        return this.availabilityService.getStayAvailability(stayId, year ? +year : undefined, month ? +month : undefined);
+    }
+    getExperienceAvailability(experienceId, query) {
+        return this.availabilityService.getExperienceAvailability(experienceId, query.date);
+    }
+    getTransportAvailability(transportId, query) {
+        return this.availabilityService.getTransportAvailability(transportId, query.date);
+    }
     getAvailability(listingId, year, month) {
-        return this.availabilityService.getAvailability(listingId, year ? +year : undefined, month ? +month : undefined);
+        return this.availabilityService.getStayAvailability(listingId, year ? +year : undefined, month ? +month : undefined);
     }
     blockDates(user, dto) {
         return this.availabilityService.blockDates(dto, user.id);
@@ -44,8 +53,36 @@ let AvailabilityController = class AvailabilityController {
 };
 exports.AvailabilityController = AvailabilityController;
 __decorate([
+    (0, common_1.Get)('stays/:stayId'),
+    (0, swagger_1.ApiOperation)({ summary: 'Month grid of stay availability and 10-minute active holds' }),
+    __param(0, (0, common_1.Param)('stayId')),
+    __param(1, (0, common_1.Query)('year')),
+    __param(2, (0, common_1.Query)('month')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", void 0)
+], AvailabilityController.prototype, "getStayAvailability", null);
+__decorate([
+    (0, common_1.Get)('experiences/:experienceId'),
+    (0, swagger_1.ApiOperation)({ summary: 'Experience time slot availability for a specific date (blocks held/booked slots)' }),
+    __param(0, (0, common_1.Param)('experienceId')),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, availability_dto_1.ExperienceAvailabilityQueryDto]),
+    __metadata("design:returntype", void 0)
+], AvailabilityController.prototype, "getExperienceAvailability", null);
+__decorate([
+    (0, common_1.Get)('transport/:transportId'),
+    (0, swagger_1.ApiOperation)({ summary: 'Transport seat availability for a specific date' }),
+    __param(0, (0, common_1.Param)('transportId')),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, availability_dto_1.TransportAvailabilityQueryDto]),
+    __metadata("design:returntype", void 0)
+], AvailabilityController.prototype, "getTransportAvailability", null);
+__decorate([
     (0, common_1.Get)(':listingId'),
-    (0, swagger_1.ApiOperation)({ summary: 'Month grid of availability' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Availability check (backwards compatibility)' }),
     __param(0, (0, common_1.Param)('listingId')),
     __param(1, (0, common_1.Query)('year')),
     __param(2, (0, common_1.Query)('month')),
@@ -58,7 +95,7 @@ __decorate([
     (0, roles_decorator_1.Roles)('HOST'),
     (0, common_1.Post)('block'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Block date range' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Block date range (Host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -70,7 +107,7 @@ __decorate([
     (0, roles_decorator_1.Roles)('HOST'),
     (0, common_1.Post)('unblock'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Unblock date range' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Unblock date range (Host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -82,7 +119,7 @@ __decorate([
     (0, roles_decorator_1.Roles)('HOST'),
     (0, common_1.Post)('seasonal-pricing'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Add seasonal pricing rule' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Add seasonal pricing rule (Host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -94,7 +131,7 @@ __decorate([
     (0, roles_decorator_1.Roles)('HOST'),
     (0, common_1.Delete)('seasonal-pricing/:id'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Remove seasonal pricing' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Remove seasonal pricing rule (Host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),

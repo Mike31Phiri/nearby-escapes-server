@@ -1,12 +1,20 @@
 export declare class BlockDatesDto {
-    listingId: string;
+    stayId?: string;
+    listingId?: string;
     dateFrom: string;
     dateTo: string;
 }
 export declare class SeasonalPricingDto {
-    listingId: string;
+    stayId?: string;
+    listingId?: string;
     from: string;
     to: string;
     price: number;
     label?: string;
+}
+export declare class ExperienceAvailabilityQueryDto {
+    date: string;
+}
+export declare class TransportAvailabilityQueryDto {
+    date: string;
 }

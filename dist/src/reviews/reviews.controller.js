@@ -24,6 +24,9 @@ let ReviewsController = class ReviewsController {
     constructor(reviewsService) {
         this.reviewsService = reviewsService;
     }
+    findByProperty(propertyId) {
+        return this.reviewsService.findByProperty(propertyId);
+    }
     findByListing(listingId) {
         return this.reviewsService.findByListing(listingId);
     }
@@ -36,8 +39,16 @@ let ReviewsController = class ReviewsController {
 };
 exports.ReviewsController = ReviewsController;
 __decorate([
+    (0, common_1.Get)('property/:propertyId'),
+    (0, swagger_1.ApiOperation)({ summary: 'Reviews for a property' }),
+    __param(0, (0, common_1.Param)('propertyId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], ReviewsController.prototype, "findByProperty", null);
+__decorate([
     (0, common_1.Get)('listing/:listingId'),
-    (0, swagger_1.ApiOperation)({ summary: 'Reviews for a listing' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Reviews for a listing (backwards compatible)' }),
     __param(0, (0, common_1.Param)('listingId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),

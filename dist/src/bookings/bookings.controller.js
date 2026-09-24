@@ -29,14 +29,23 @@ let BookingsController = class BookingsController {
     create(user, dto) {
         return this.bookingsService.create(user.id, dto);
     }
-    myBookings(user, role) {
-        return this.bookingsService.findMyBookings(user.id, role);
+    myBookings(user, as) {
+        return this.bookingsService.findMyBookings(user.id, as);
     }
     findOne(user, id) {
         return this.bookingsService.findOne(id, user.id, user.role);
     }
     cancel(user, id, dto) {
         return this.bookingsService.cancel(id, user.id, dto?.reason);
+    }
+    releaseHold(user, id) {
+        return this.bookingsService.releaseHold(id, user.id);
+    }
+    checkIn(user, id) {
+        return this.bookingsService.checkIn(id, user.id);
+    }
+    checkOut(user, id) {
+        return this.bookingsService.checkOut(id, user.id);
     }
     updateStatus(user, id, status) {
         return this.bookingsService.updateStatus(id, user.id, status);
@@ -56,7 +65,7 @@ __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: "User's bookings" }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('role')),
+    __param(1, (0, common_1.Query)('as')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
@@ -71,7 +80,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "findOne", null);
 __decorate([
-    (0, common_1.Patch)(':id/cancel'),
+    (0, common_1.Post)(':id/cancel'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Cancel booking (guest or host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
@@ -80,6 +90,40 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, create_booking_dto_1.CancelBookingDto]),
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "cancel", null);
+__decorate([
+    (0, common_1.Post)(':id/release'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Release a 10-minute hold early if user leaves checkout' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], BookingsController.prototype, "releaseHold", null);
+__decorate([
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('HOST', 'ADMIN'),
+    (0, common_1.Post)(':id/check-in'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Host confirms guest check-in (triggers release of funds to host)' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], BookingsController.prototype, "checkIn", null);
+__decorate([
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('HOST', 'ADMIN'),
+    (0, common_1.Post)(':id/check-out'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Host confirms guest check-out (reopens inventory immediately)' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], BookingsController.prototype, "checkOut", null);
 __decorate([
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('HOST'),

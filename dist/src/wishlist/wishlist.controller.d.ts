@@ -8,16 +8,18 @@ export declare class WishlistController {
         userId: string;
         items: {
             id: string;
+            propertyId: string;
+            listingId: string;
             type: string;
             name: string;
             description: string;
             location: string;
-            images: string[];
+            thumbnailUrl: any;
             price: number;
+            priceFormatted: string;
             currency: string;
-            rating: number;
             reviewCount: number;
-            hostName: string | null;
+            hostName: any;
             createdAt: Date;
         }[];
         createdAt: Date;
@@ -28,16 +30,18 @@ export declare class WishlistController {
         userId: string;
         items: {
             id: string;
+            propertyId: string;
+            listingId: string;
             type: string;
             name: string;
             description: string;
             location: string;
-            images: string[];
+            thumbnailUrl: any;
             price: number;
+            priceFormatted: string;
             currency: string;
-            rating: number;
             reviewCount: number;
-            hostName: string | null;
+            hostName: any;
             createdAt: Date;
         }[];
         createdAt: Date;
@@ -48,16 +52,18 @@ export declare class WishlistController {
         userId: string;
         items: {
             id: string;
+            propertyId: string;
+            listingId: string;
             type: string;
             name: string;
             description: string;
             location: string;
-            images: string[];
+            thumbnailUrl: any;
             price: number;
+            priceFormatted: string;
             currency: string;
-            rating: number;
             reviewCount: number;
-            hostName: string | null;
+            hostName: any;
             createdAt: Date;
         }[];
         createdAt: Date;

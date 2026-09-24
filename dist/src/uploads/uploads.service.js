@@ -31,13 +31,20 @@ let UploadsService = class UploadsService {
         });
         this.bucket = config.getOrThrow('AWS_S3_BUCKET');
     }
-    async attachPhotos(listingId, urls) {
-        const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
-        if (!listing)
-            throw new common_1.NotFoundException('Listing not found');
-        return this.prisma.listing.update({
-            where: { id: listingId },
-            data: { images: { push: urls } },
+    async attachPhotos(propertyId, urls) {
+        const property = await this.prisma.property.findUnique({
+            where: { id: propertyId },
+            include: { images: { orderBy: { sortOrder: 'desc' }, take: 1 } },
+        });
+        if (!property)
+            throw new common_1.NotFoundException('Property not found');
+        const lastSortOrder = property.images[0]?.sortOrder ?? -1;
+        return this.prisma.propertyImage.createMany({
+            data: urls.map((url, idx) => ({
+                propertyId,
+                url,
+                sortOrder: lastSortOrder + 1 + idx,
+            })),
         });
     }
     async deletePhoto(key) {

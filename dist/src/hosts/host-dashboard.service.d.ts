@@ -2,10 +2,27 @@ import { PrismaService } from '../prisma/prisma.service';
 export declare class HostDashboardService {
     private prisma;
     constructor(prisma: PrismaService);
-    getDashboard(hostId: string): Promise<{
+    getDashboard(userId: string): Promise<{
         stats: {
             totalListings: number;
             activeListings: number;
+            totalBookings: number;
+            pendingBookings: number;
+            totalRevenue: number;
+            averageRating: number;
+            reviewCount: number;
+            totalProperties?: undefined;
+            activeProperties?: undefined;
+        };
+        recentBookings: never[];
+        recentReviews: never[];
+        earningsByMonth: never[];
+    } | {
+        stats: {
+            totalListings: number;
+            totalProperties: number;
+            activeListings: number;
+            activeProperties: number;
             totalBookings: number;
             pendingBookings: number;
             totalRevenue: number;
@@ -15,7 +32,9 @@ export declare class HostDashboardService {
         recentBookings: {
             id: string;
             bookingRef: string;
+            propertyName: string | null;
             listingName: string | null;
+            thumbnailUrl: any;
             guestName: string | null;
             guests: number;
             checkIn: Date | null;
@@ -26,6 +45,7 @@ export declare class HostDashboardService {
         }[];
         recentReviews: {
             id: string;
+            propertyName: any;
             listingName: any;
             guestName: string | null;
             rating: number;
@@ -34,24 +54,45 @@ export declare class HostDashboardService {
         }[];
         earningsByMonth: never[];
     }>;
-    getEarnings(hostId: string): Promise<{
+    getEarnings(userId: string): Promise<{
         total: number;
         monthly: {
             month: string;
             amount: number;
         }[];
     }>;
-    getListings(hostId: string): Promise<{
+    getProperties(userId: string): Promise<{
         id: string;
+        propertyId: string;
+        listingId: string;
         type: string;
         name: string;
         location: string;
-        images: string[];
+        thumbnailUrl: any;
         price: number;
+        priceFormatted: string;
         status: string;
         totalBookings: number;
         averageRating: number;
         reviewCount: number;
+        unitsCount: number;
+        createdAt: Date;
+    }[]>;
+    getListings(userId: string): Promise<{
+        id: string;
+        propertyId: string;
+        listingId: string;
+        type: string;
+        name: string;
+        location: string;
+        thumbnailUrl: any;
+        price: number;
+        priceFormatted: string;
+        status: string;
+        totalBookings: number;
+        averageRating: number;
+        reviewCount: number;
+        unitsCount: number;
         createdAt: Date;
     }[]>;
 }

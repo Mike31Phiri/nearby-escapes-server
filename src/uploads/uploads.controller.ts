@@ -2,7 +2,7 @@ import {
   Controller, Delete, Param, Post, Query, Req,
   UploadedFiles, UseGuards, UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,11 +23,15 @@ export class UploadsController {
   async upload(
     @Req() req: Request,
     @UploadedFiles() files: Express.MulterS3.File[],
-    @Query('listingId') listingId: string,
+    @Query('propertyId') propertyId?: string,
+    @Query('listingId') listingId?: string,
   ) {
+    const targetId = propertyId || listingId;
     const urls = files.map((f) => (f as any).location ?? `/uploads/${(f as any).filename}`);
     const keys = files.map((f) => (f as any).key ?? (f as any).filename);
-    await this.uploadsService.attachPhotos(listingId, urls);
+    if (targetId) {
+      await this.uploadsService.attachPhotos(targetId, urls);
+    }
     return { key: keys[0], url: urls[0], uploaded: urls.map((url, i) => ({ key: keys[i], url })) };
   }
 

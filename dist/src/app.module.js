@@ -15,16 +15,18 @@ const prisma_module_1 = require("./prisma/prisma.module");
 const auth_module_1 = require("./auth/auth.module");
 const users_module_1 = require("./users/users.module");
 const hosts_module_1 = require("./hosts/hosts.module");
-const listings_module_1 = require("./listings/listings.module");
+const properties_module_1 = require("./properties/properties.module");
 const bookings_module_1 = require("./bookings/bookings.module");
 const payments_module_1 = require("./payments/payments.module");
 const reviews_module_1 = require("./reviews/reviews.module");
 const notifications_module_1 = require("./notifications/notifications.module");
-const messages_module_1 = require("./messages/messages.module");
 const wishlist_module_1 = require("./wishlist/wishlist.module");
 const availability_module_1 = require("./availability/availability.module");
 const uploads_module_1 = require("./uploads/uploads.module");
 const admin_module_1 = require("./admin/admin.module");
+const platform_module_1 = require("./platform/platform.module");
+const read_store_module_1 = require("./read-store/read-store.module");
+const policies_module_1 = require("./policies/policies.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -32,21 +34,23 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
-            throttler_1.ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
+            throttler_1.ThrottlerModule.forRoot([{ ttl: 60000, limit: 600 }]),
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
             users_module_1.UsersModule,
             hosts_module_1.HostsModule,
-            listings_module_1.ListingsModule,
+            properties_module_1.PropertiesModule,
             bookings_module_1.BookingsModule,
             payments_module_1.PaymentsModule,
             reviews_module_1.ReviewsModule,
             notifications_module_1.NotificationsModule,
-            messages_module_1.MessagesModule,
             wishlist_module_1.WishlistModule,
             availability_module_1.AvailabilityModule,
             uploads_module_1.UploadsModule,
             admin_module_1.AdminModule,
+            platform_module_1.PlatformModule,
+            read_store_module_1.ReadStoreModule,
+            policies_module_1.PoliciesModule,
         ],
         providers: [{ provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard }],
     })

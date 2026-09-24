@@ -15,15 +15,16 @@ export declare class AdminService {
             pendingDisputes: number;
         };
         recentUsers: {
-            id: string;
             email: string;
             name: string;
             role: import("@prisma/client").$Enums.Role;
+            id: string;
             createdAt: Date;
         }[];
         recentBookings: {
             id: string;
             bookingRef: string;
+            propertyName: string | null;
             listingName: string | null;
             guestName: string | null;
             status: string;
@@ -39,10 +40,10 @@ export declare class AdminService {
         data: {
             role: string;
             verificationStatus: string;
-            id: string;
             email: string;
             name: string;
             phone: string | null;
+            id: string;
             avatar: string | null;
             isVerified: boolean;
             createdAt: Date;
@@ -55,20 +56,23 @@ export declare class AdminService {
         };
     }>;
     updateUserStatus(userId: string, status: string): Promise<{
-        id: string;
         email: string;
         name: string;
+        id: string;
         isVerified: boolean;
         verificationStatus: import("@prisma/client").$Enums.VerificationStatus;
     }>;
-    getListings(page?: number, limit?: number, status?: string): Promise<{
+    getProperties(page?: number, limit?: number, status?: string): Promise<{
         data: {
             id: string;
+            propertyId: string;
+            listingId: string;
             type: string;
             name: string;
             hostName: string | null;
             location: string;
             price: number;
+            priceFormatted: string;
             status: string;
             bookingsCount: number;
             reviewsCount: number;
@@ -81,6 +85,34 @@ export declare class AdminService {
             totalPages: number;
         };
     }>;
+    getListings(page?: number, limit?: number, status?: string): Promise<{
+        data: {
+            id: string;
+            propertyId: string;
+            listingId: string;
+            type: string;
+            name: string;
+            hostName: string | null;
+            location: string;
+            price: number;
+            priceFormatted: string;
+            status: string;
+            bookingsCount: number;
+            reviewsCount: number;
+            createdAt: Date;
+        }[];
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
+    }>;
+    updatePropertyStatus(propertyId: string, status: string, reason?: string): Promise<{
+        id: string;
+        status: string;
+        message: string;
+    }>;
     updateListingStatus(listingId: string, status: string, reason?: string): Promise<{
         id: string;
         status: string;
@@ -90,7 +122,9 @@ export declare class AdminService {
         data: {
             id: string;
             bookingRef: string;
+            propertyName: string | null;
             listingName: string | null;
+            propertyType: string | null;
             listingType: string | null;
             guestName: string | null;
             guestEmail: string | null;
@@ -110,17 +144,17 @@ export declare class AdminService {
         data: {
             status: string;
             priority: string;
-            id: string;
-            guestId: string;
-            bookingRef: string;
-            hostId: string;
-            amount: number;
             description: string | null;
-            listingType: string;
-            reason: string;
-            listingName: string;
+            id: string;
+            hostId: string;
+            bookingRef: string;
+            guestId: string;
+            amount: number;
+            propertyName: string;
+            propertyType: string;
             guestName: string;
             hostName: string;
+            reason: string;
             raisedBy: string;
             raisedAt: Date;
             resolvedAt: Date | null;
@@ -136,17 +170,17 @@ export declare class AdminService {
     updateDispute(disputeId: string, status: string, resolution?: string): Promise<{
         status: string;
         priority: string;
-        id: string;
-        guestId: string;
-        bookingRef: string;
-        hostId: string;
-        amount: number;
         description: string | null;
-        listingType: string;
-        reason: string;
-        listingName: string;
+        id: string;
+        hostId: string;
+        bookingRef: string;
+        guestId: string;
+        amount: number;
+        propertyName: string;
+        propertyType: string;
         guestName: string;
         hostName: string;
+        reason: string;
         raisedBy: string;
         raisedAt: Date;
         resolvedAt: Date | null;
@@ -179,75 +213,6 @@ export declare class AdminService {
         failed: number;
         totalAmount: number;
     }>;
-    getPromotions(page?: number, limit?: number): Promise<{
-        data: {
-            type: string;
-            id: string;
-            createdAt: Date;
-            description: string | null;
-            code: string;
-            value: number;
-            minSpend: number | null;
-            maxUses: number;
-            currentUses: number;
-            appliesTo: string;
-            isActive: boolean;
-            startsAt: Date;
-            expiresAt: Date;
-        }[];
-        meta: {
-            page: number;
-            limit: number;
-            total: number;
-            totalPages: number;
-        };
-    }>;
-    createPromotion(data: {
-        code: string;
-        type: string;
-        value: number;
-        minSpend?: number;
-        maxUses: number;
-        appliesTo?: string;
-        isActive: boolean;
-        startsAt: string;
-        expiresAt: string;
-        description?: string;
-    }): Promise<{
-        type: string;
-        id: string;
-        createdAt: Date;
-        description: string | null;
-        code: string;
-        value: number;
-        minSpend: number | null;
-        maxUses: number;
-        currentUses: number;
-        appliesTo: string;
-        isActive: boolean;
-        startsAt: Date;
-        expiresAt: Date;
-    }>;
-    updatePromotion(id: string, data: Partial<{
-        isActive: boolean;
-        maxUses: number;
-        expiresAt: string;
-        description: string;
-    }>): Promise<{
-        type: string;
-        id: string;
-        createdAt: Date;
-        description: string | null;
-        code: string;
-        value: number;
-        minSpend: number | null;
-        maxUses: number;
-        currentUses: number;
-        appliesTo: string;
-        isActive: boolean;
-        startsAt: Date;
-        expiresAt: Date;
-    }>;
     getActivityLog(page?: number, limit?: number): Promise<{
         data: {
             id: string;
@@ -273,14 +238,14 @@ export declare class AdminService {
         type: string;
         metadata?: any;
     }): Promise<{
+        type: string;
         id: string;
         createdAt: Date;
-        metadata: Prisma.JsonValue | null;
         userId: string | null;
-        type: string;
         action: string;
         userRole: string | null;
         target: string | null;
+        metadata: Prisma.JsonValue | null;
     }>;
     getReports(): Promise<{
         monthlyData: {
@@ -310,16 +275,16 @@ export declare class AdminService {
     private getPlatformStats;
     getSettings(): Promise<{
         settings: {
+            type: string;
+            description: string | null;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            options: string[];
-            type: string;
-            description: string | null;
-            label: string;
-            key: string;
-            value: string;
             category: string;
+            key: string;
+            label: string;
+            value: string;
+            options: string[];
         }[];
     }>;
     updateSettings(updates: {
@@ -328,34 +293,47 @@ export declare class AdminService {
     }[]): Promise<{
         updated: number;
         settings: {
+            type: string;
+            description: string | null;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            options: string[];
-            type: string;
-            description: string | null;
-            label: string;
-            key: string;
-            value: string;
             category: string;
+            key: string;
+            label: string;
+            value: string;
+            options: string[];
         }[];
     }>;
     promoteToAdmin(userId: string): Promise<{
-        id: string;
         email: string;
         name: string;
         role: import("@prisma/client").$Enums.Role;
+        id: string;
     }>;
     approveHost(hostId: string): Promise<{
-        user: {
-            id: string;
-        };
-    } & {
+        email: string;
+        password: string;
+        name: string;
+        phone: string | null;
+        role: import("@prisma/client").$Enums.Role;
         id: string;
+        avatar: string | null;
+        homeCity: string | null;
+        bio: string | null;
+        isVerified: boolean;
+        verificationStatus: import("@prisma/client").$Enums.VerificationStatus;
+        businessName: string | null;
+        isApproved: boolean;
+        defaultCheckInTime: string | null;
+        defaultCheckOutTime: string | null;
+        payoutMethod: string | null;
+        payoutAccount: string | null;
+        resetToken: string | null;
+        resetTokenExpiry: Date | null;
+        refreshToken: string | null;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
-        businessName: string;
-        isApproved: boolean;
+        deletedAt: Date | null;
     }>;
 }

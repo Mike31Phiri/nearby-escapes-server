@@ -56,6 +56,18 @@ export class DpoService {
         const booking = await this.prisma.booking.findUnique({ where: { bookingRef: dto.bookingRef } });
         if (!booking) throw new BadRequestException('Booking not found');
 
+        if (booking.status === 'CANCELLED' || booking.status === 'EXPIRED') {
+          throw new BadRequestException('This booking has been cancelled or has expired.');
+        }
+
+        if (booking.status === 'PENDING' && booking.expiresAt && booking.expiresAt < new Date()) {
+          await this.prisma.booking.update({
+            where: { id: booking.id },
+            data: { status: 'EXPIRED' },
+          });
+          throw new BadRequestException('Your 10-minute booking hold has expired. Please initiate a new booking.');
+        }
+
         // Update booking with transToken
         await this.prisma.booking.update({
           where: { bookingRef: dto.bookingRef },
@@ -115,7 +127,11 @@ export class DpoService {
           });
           await this.prisma.booking.update({
             where: { id: payment.bookingId },
-            data: { paymentStatus: 'PAID' },
+            data: {
+              paymentStatus: 'PAID',
+              status: 'CONFIRMED',
+              expiresAt: null,
+            },
           });
           if (payment.booking) {
             const guest = await this.prisma.user.findUnique({ where: { id: payment.userId } });
@@ -169,7 +185,11 @@ export class DpoService {
     if (isSuccessful) {
       await this.prisma.booking.update({
         where: { id: payment.bookingId },
-        data: { paymentStatus: 'PAID' },
+        data: {
+          paymentStatus: 'PAID',
+          status: 'CONFIRMED',
+          expiresAt: null,
+        },
       });
 
       if (payment.booking?.guest?.email) {

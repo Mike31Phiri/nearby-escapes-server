@@ -9,15 +9,22 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SeasonalPricingDto = exports.BlockDatesDto = void 0;
+exports.TransportAvailabilityQueryDto = exports.ExperienceAvailabilityQueryDto = exports.SeasonalPricingDto = exports.BlockDatesDto = void 0;
 const class_validator_1 = require("class-validator");
 class BlockDatesDto {
+    stayId;
     listingId;
     dateFrom;
     dateTo;
 }
 exports.BlockDatesDto = BlockDatesDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], BlockDatesDto.prototype, "stayId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], BlockDatesDto.prototype, "listingId", void 0);
@@ -30,6 +37,7 @@ __decorate([
     __metadata("design:type", String)
 ], BlockDatesDto.prototype, "dateTo", void 0);
 class SeasonalPricingDto {
+    stayId;
     listingId;
     from;
     to;
@@ -38,6 +46,12 @@ class SeasonalPricingDto {
 }
 exports.SeasonalPricingDto = SeasonalPricingDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SeasonalPricingDto.prototype, "stayId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], SeasonalPricingDto.prototype, "listingId", void 0);
@@ -59,4 +73,20 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], SeasonalPricingDto.prototype, "label", void 0);
+class ExperienceAvailabilityQueryDto {
+    date;
+}
+exports.ExperienceAvailabilityQueryDto = ExperienceAvailabilityQueryDto;
+__decorate([
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], ExperienceAvailabilityQueryDto.prototype, "date", void 0);
+class TransportAvailabilityQueryDto {
+    date;
+}
+exports.TransportAvailabilityQueryDto = TransportAvailabilityQueryDto;
+__decorate([
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], TransportAvailabilityQueryDto.prototype, "date", void 0);
 //# sourceMappingURL=availability.dto.js.map

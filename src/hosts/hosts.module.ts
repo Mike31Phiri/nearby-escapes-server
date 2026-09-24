@@ -3,11 +3,14 @@ import { HostsService } from './hosts.service';
 import { HostsController } from './hosts.controller';
 import { HostController } from './host.controller';
 import { HostDashboardService } from './host-dashboard.service';
-import { ListingsService } from '../listings/listings.service';
+import { PropertiesService } from '../properties/properties.service';
+import { BookingsModule } from '../bookings/bookings.module';
 
 @Module({
-  providers: [HostsService, HostDashboardService, ListingsService],
+  imports: [BookingsModule],
+  providers: [HostsService, HostDashboardService, PropertiesService],
   controllers: [HostsController, HostController],
   exports: [HostsService],
 })
 export class HostsModule {}
+

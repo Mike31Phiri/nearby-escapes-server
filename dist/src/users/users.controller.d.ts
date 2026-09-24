@@ -28,11 +28,9 @@ export declare class UsersController {
         avatar: string | null;
         homeCity: string | null;
         bio: string | null;
+        businessName: string | null;
+        isApproved: boolean;
         createdAt: Date;
-        host: {
-            businessName: string;
-            isApproved: boolean;
-        } | null;
     }>;
     update(user: User, dto: UpdateUserDto): Promise<{
         id: string;

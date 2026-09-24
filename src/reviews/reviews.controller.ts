@@ -11,8 +11,14 @@ import type { User } from '@prisma/client';
 export class ReviewsController {
   constructor(private reviewsService: ReviewsService) {}
 
+  @Get('property/:propertyId')
+  @ApiOperation({ summary: 'Reviews for a property' })
+  findByProperty(@Param('propertyId') propertyId: string) {
+    return this.reviewsService.findByProperty(propertyId);
+  }
+
   @Get('listing/:listingId')
-  @ApiOperation({ summary: 'Reviews for a listing' })
+  @ApiOperation({ summary: 'Reviews for a listing (backwards compatible)' })
   findByListing(@Param('listingId') listingId: string) {
     return this.reviewsService.findByListing(listingId);
   }

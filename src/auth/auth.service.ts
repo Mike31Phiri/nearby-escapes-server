@@ -40,10 +40,9 @@ export class AuthService {
         name: dto.name,
         phone: dto.phone || null,
         role: dto.role === 'host' ? 'HOST' : 'GUEST',
-        // If registering as host, also create a host profile
-        ...(dto.role === 'host' ? {
-          host: { create: { businessName: `${dto.name}'s Services` } },
-        } : {}),
+        // Host-specific fields (null for guests)
+        businessName: dto.role === 'host' ? `${dto.name}'s Services` : null,
+        isApproved: false,
       },
     });
 
@@ -98,6 +97,9 @@ export class AuthService {
     const { password, resetToken, resetTokenExpiry, refreshToken, deletedAt, ...rest } = user;
     return {
       ...rest,
+      // Frontend expects roles: UserRole[] (array). Backend stores a single role enum.
+      roles: [user.role.toLowerCase()],
+      // Keep role too for convenience
       role: user.role.toLowerCase(),
     };
   }

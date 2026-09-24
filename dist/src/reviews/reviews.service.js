@@ -18,9 +18,12 @@ let ReviewsService = class ReviewsService {
         this.prisma = prisma;
     }
     async create(userId, dto) {
-        const listing = await this.prisma.listing.findUnique({ where: { id: dto.listingId } });
-        if (!listing)
-            throw new common_1.NotFoundException('Listing not found');
+        const propertyId = dto.propertyId || dto.listingId;
+        if (!propertyId)
+            throw new common_1.BadRequestException('propertyId or listingId is required');
+        const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+        if (!property)
+            throw new common_1.NotFoundException('Property not found');
         if (dto.bookingRef) {
             const booking = await this.prisma.booking.findUnique({ where: { bookingRef: dto.bookingRef } });
             if (!booking)
@@ -32,13 +35,19 @@ let ReviewsService = class ReviewsService {
             }
         }
         const existing = await this.prisma.review.findUnique({
-            where: { listingId_guestId_bookingRef: { listingId: dto.listingId, guestId: userId, bookingRef: dto.bookingRef || '' } },
+            where: {
+                propertyId_guestId_bookingRef: {
+                    propertyId,
+                    guestId: userId,
+                    bookingRef: dto.bookingRef || '',
+                },
+            },
         });
         if (existing)
             throw new common_1.BadRequestException('You have already reviewed this booking');
         const review = await this.prisma.review.create({
             data: {
-                listingId: dto.listingId,
+                propertyId,
                 bookingRef: dto.bookingRef || null,
                 guestId: userId,
                 rating: dto.rating,
@@ -48,35 +57,40 @@ let ReviewsService = class ReviewsService {
         });
         return this.formatReview(review);
     }
-    async findByListing(listingId) {
-        const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
-        if (!listing)
-            throw new common_1.NotFoundException('Listing not found');
+    async findByProperty(propertyId) {
+        const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+        if (!property)
+            throw new common_1.NotFoundException('Property not found');
         const reviews = await this.prisma.review.findMany({
-            where: { listingId },
+            where: { propertyId },
             include: { guest: { select: { name: true, avatar: true } } },
             orderBy: { createdAt: 'desc' },
         });
         return reviews.map((r) => this.formatReview(r));
+    }
+    async findByListing(listingId) {
+        return this.findByProperty(listingId);
     }
     async findByUser(userId) {
         const reviews = await this.prisma.review.findMany({
             where: { guestId: userId },
             include: {
                 guest: { select: { name: true, avatar: true } },
-                listing: { select: { name: true } },
+                property: { select: { name: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
         return reviews.map((r) => ({
             ...this.formatReview(r),
-            listingName: r.listing?.name || null,
+            propertyName: r.property?.name || null,
+            listingName: r.property?.name || null,
         }));
     }
     formatReview(review) {
         return {
             id: review.id,
-            listingId: review.listingId,
+            propertyId: review.propertyId,
+            listingId: review.propertyId,
             bookingRef: review.bookingRef || null,
             guestId: review.guestId,
             guestName: review.guest?.name || null,

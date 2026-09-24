@@ -21,7 +21,7 @@ export class UsersService {
   async getProfile(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { host: true, bookings: { take: 5, orderBy: { createdAt: 'desc' } } },
+      include: { bookingsAsGuest: { take: 5, orderBy: { createdAt: 'desc' } } },
     });
     if (!user) throw new NotFoundException('User not found');
 
@@ -41,7 +41,7 @@ export class UsersService {
       bio: user.bio,
       joinedAt: user.createdAt,
       stats: {
-        totalBookings: user.bookings.length,
+        totalBookings: user.bookingsAsGuest.length,
         totalReviews: reviewStats._count.id,
         memberSince: user.createdAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       },
@@ -59,7 +59,8 @@ export class UsersService {
         homeCity: true,
         bio: true,
         createdAt: true,
-        host: { select: { businessName: true, isApproved: true } },
+        businessName: true,
+        isApproved: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');

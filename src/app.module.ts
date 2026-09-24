@@ -6,36 +6,40 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { HostsModule } from './hosts/hosts.module';
-import { ListingsModule } from './listings/listings.module';
+import { PropertiesModule } from './properties/properties.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { MessagesModule } from './messages/messages.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
-
+import { PlatformModule } from './platform/platform.module';
+import { ReadStoreModule } from './read-store/read-store.module';
+import { PoliciesModule } from './policies/policies.module';
+/*The consolidation of all the modules */
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 600 }]),
     PrismaModule,
     AuthModule,
     UsersModule,
     HostsModule,
-    ListingsModule,
+    PropertiesModule,
     BookingsModule,
     PaymentsModule,
     ReviewsModule,
     NotificationsModule,
-    MessagesModule,
     WishlistModule,
     AvailabilityModule,
     UploadsModule,
     AdminModule,
+    PlatformModule,
+    ReadStoreModule,
+    PoliciesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule {}
+export class AppModule { }

@@ -3,7 +3,7 @@ import type { Request } from 'express';
 export declare class UploadsController {
     private uploadsService;
     constructor(uploadsService: UploadsService);
-    upload(req: Request, files: Express.MulterS3.File[], listingId: string): Promise<{
+    upload(req: Request, files: Express.MulterS3.File[], propertyId?: string, listingId?: string): Promise<{
         key: any;
         url: any;
         uploaded: {

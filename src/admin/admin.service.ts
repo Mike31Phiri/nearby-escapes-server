@@ -18,7 +18,7 @@ export class AdminService {
       this.prisma.user.count({ where: { deletedAt: null } }),
       this.prisma.user.count({ where: { role: 'HOST', deletedAt: null } }),
       this.prisma.user.count({ where: { role: 'GUEST', deletedAt: null } }),
-      this.prisma.listing.count({ where: { deletedAt: null } }),
+      this.prisma.property.count({ where: { deletedAt: null } }),
       this.prisma.booking.count(),
       this.prisma.payment.aggregate({ _sum: { amount: true } }),
       this.prisma.dispute.count({ where: { status: { in: ['OPEN', 'INVESTIGATING'] } } }),
@@ -35,7 +35,7 @@ export class AdminService {
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
-          listing: { select: { name: true } },
+          property: { select: { name: true } },
           guest: { select: { name: true } },
         },
       }),
@@ -63,7 +63,8 @@ export class AdminService {
       recentBookings: recentBookings.map((b) => ({
         id: b.id,
         bookingRef: b.bookingRef,
-        listingName: b.listing?.name || null,
+        propertyName: b.property?.name || null,
+        listingName: b.property?.name || null,
         guestName: b.guest?.name || null,
         status: b.status.toLowerCase(),
         amount: b.amount,
@@ -127,75 +128,90 @@ export class AdminService {
     });
   }
 
-  // ─── Listings ──────────────────────────────────────────────────────────────
+  // ─── Properties / Listings ─────────────────────────────────────────────────
 
-  async getListings(page = 1, limit = 20, status?: string) {
-    const where: Prisma.ListingWhereInput = { deletedAt: null };
+  async getProperties(page = 1, limit = 20, status?: string) {
+    const where: Prisma.PropertyWhereInput = { deletedAt: null };
     if (status) where.status = status.toUpperCase() as any;
 
-    const [listings, total] = await Promise.all([
-      this.prisma.listing.findMany({
+    const [properties, total] = await Promise.all([
+      this.prisma.property.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          host: { include: { user: { select: { name: true } } } },
+          host: { select: { name: true, businessName: true } },
+          stays: { where: { deletedAt: null, isActive: true }, take: 1 },
+          experiences: { where: { deletedAt: null, isActive: true }, take: 1 },
+          transports: { where: { deletedAt: null, isActive: true }, take: 1 },
           _count: { select: { bookings: true, reviews: true } },
         },
       }),
-      this.prisma.listing.count({ where }),
+      this.prisma.property.count({ where }),
     ]);
 
     return {
-      data: listings.map((l) => ({
-        id: l.id,
-        type: l.type.toLowerCase(),
-        name: l.name,
-        hostName: l.host?.user?.name || null,
-        location: l.location,
-        price: l.price,
-        status: l.status.toLowerCase(),
-        bookingsCount: l._count.bookings,
-        reviewsCount: l._count.reviews,
-        createdAt: l.createdAt,
-      })),
+      data: properties.map((p) => {
+        const price =
+          p.stays[0]?.price ??
+          p.experiences[0]?.price ??
+          p.transports[0]?.pricePerSeat ??
+          0;
+        return {
+          id: p.id,
+          propertyId: p.id,
+          listingId: p.id,
+          type: p.type.toLowerCase(),
+          name: p.name,
+          hostName: p.host?.businessName || p.host?.name || null,
+          location: p.location,
+          price,
+          priceFormatted: `K${(price / 100).toFixed(2)}`,
+          status: p.status.toLowerCase(),
+          bookingsCount: p._count.bookings,
+          reviewsCount: p._count.reviews,
+          createdAt: p.createdAt,
+        };
+      }),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
 
-  async updateListingStatus(listingId: string, status: string, reason?: string) {
-    const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
-    if (!listing) throw new NotFoundException('Listing not found');
+  async getListings(page = 1, limit = 20, status?: string) {
+    return this.getProperties(page, limit, status);
+  }
+
+  async updatePropertyStatus(propertyId: string, status: string, reason?: string) {
+    const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) throw new NotFoundException('Property not found');
 
     const newStatus = status === 'approved' ? 'ACTIVE' : 'INACTIVE';
-    const updated = await this.prisma.listing.update({
-      where: { id: listingId },
+    const updated = await this.prisma.property.update({
+      where: { id: propertyId },
       data: { status: newStatus as any },
     });
 
-    // Create notification for host
-    const hostUser = await this.prisma.host.findUnique({
-      where: { id: listing.hostId },
-      include: { user: true },
+    // Notify the host directly via their userId (hostId is a User id)
+    await this.prisma.notification.create({
+      data: {
+        userId: property.hostId,
+        type: status === 'approved' ? 'PROPERTY_APPROVED' : 'PROPERTY_REJECTED',
+        title: status === 'approved' ? 'Property Approved' : 'Property Rejected',
+        description: reason || `Your property "${property.name}" has been ${status}.`,
+        actionUrl: '/host/properties',
+      },
     });
-    if (hostUser) {
-      await this.prisma.notification.create({
-        data: {
-          userId: hostUser.userId,
-          type: status === 'approved' ? 'LISTING_APPROVED' : 'LISTING_REJECTED',
-          title: status === 'approved' ? 'Listing Approved' : 'Listing Rejected',
-          description: reason || `Your listing "${listing.name}" has been ${status}.`,
-          actionUrl: '/host/listings',
-        },
-      });
-    }
 
     return {
       id: updated.id,
       status: updated.status.toLowerCase(),
-      message: `Listing ${status} successfully`,
+      message: `Property ${status} successfully`,
     };
+  }
+
+  async updateListingStatus(listingId: string, status: string, reason?: string) {
+    return this.updatePropertyStatus(listingId, status, reason);
   }
 
   // ─── Bookings ──────────────────────────────────────────────────────────────
@@ -207,7 +223,7 @@ export class AdminService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          listing: { select: { name: true, type: true } },
+          property: { select: { name: true, type: true } },
           guest: { select: { name: true, email: true } },
           payment: { select: { status: true } },
         },
@@ -219,8 +235,10 @@ export class AdminService {
       data: bookings.map((b) => ({
         id: b.id,
         bookingRef: b.bookingRef,
-        listingName: b.listing?.name || null,
-        listingType: b.listing?.type?.toLowerCase() || null,
+        propertyName: b.property?.name || null,
+        listingName: b.property?.name || null,
+        propertyType: b.property?.type?.toLowerCase() || null,
+        listingType: b.property?.type?.toLowerCase() || null,
         guestName: b.guest?.name || b.customerName || null,
         guestEmail: b.guest?.email || b.customerEmail || null,
         amount: b.amount,
@@ -285,7 +303,7 @@ export class AdminService {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: { host: { include: { user: { select: { name: true, email: true } } } } },
+        include: { host: { select: { name: true, email: true } } },
       }),
       this.prisma.payout.count({ where }),
     ]);
@@ -293,8 +311,8 @@ export class AdminService {
     return {
       data: payouts.map((p) => ({
         id: p.id,
-        hostName: p.host?.user?.name || null,
-        hostEmail: p.host?.user?.email || null,
+        hostName: p.host?.name || null,
+        hostEmail: p.host?.email || null,
         amount: p.amount,
         commission: p.commission,
         netAmount: p.netAmount,
@@ -325,64 +343,6 @@ export class AdminService {
     return { processed, failed: payoutIds.length - processed, totalAmount };
   }
 
-  // ─── Promotions ────────────────────────────────────────────────────────────
-
-  async getPromotions(page = 1, limit = 20) {
-    const [promotions, total] = await Promise.all([
-      this.prisma.promoCode.findMany({
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.promoCode.count(),
-    ]);
-
-    return {
-      data: promotions.map((p) => ({
-        ...p,
-        type: p.type.toLowerCase(),
-      })),
-      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
-  }
-
-  async createPromotion(data: {
-    code: string; type: string; value: number; minSpend?: number;
-    maxUses: number; appliesTo?: string; isActive: boolean;
-    startsAt: string; expiresAt: string; description?: string;
-  }) {
-    const promo = await this.prisma.promoCode.create({
-      data: {
-        code: data.code.toUpperCase(),
-        type: data.type.toUpperCase() as any,
-        value: data.value,
-        minSpend: data.minSpend || null,
-        maxUses: data.maxUses,
-        appliesTo: data.appliesTo || 'all',
-        isActive: data.isActive,
-        startsAt: new Date(data.startsAt),
-        expiresAt: new Date(data.expiresAt),
-        description: data.description || null,
-      },
-    });
-    return { ...promo, type: promo.type.toLowerCase() };
-  }
-
-  async updatePromotion(id: string, data: Partial<{
-    isActive: boolean; maxUses: number; expiresAt: string; description: string;
-  }>) {
-    const updateData: any = {};
-    if (data.isActive !== undefined) updateData.isActive = data.isActive;
-    if (data.maxUses !== undefined) updateData.maxUses = data.maxUses;
-    if (data.expiresAt) updateData.expiresAt = new Date(data.expiresAt);
-    if (data.description !== undefined) updateData.description = data.description;
-
-    const promo = await this.prisma.promoCode.update({
-      where: { id },
-      data: updateData,
-    });
-    return { ...promo, type: promo.type.toLowerCase() };
-  }
 
   // ─── Activity Log ──────────────────────────────────────────────────────────
 
@@ -477,12 +437,12 @@ export class AdminService {
       this.prisma.user.count({ where: { deletedAt: null } }),
       this.prisma.user.count({ where: { role: 'GUEST', deletedAt: null } }),
       this.prisma.user.count({ where: { role: 'HOST', deletedAt: null } }),
-      this.prisma.listing.count({ where: { deletedAt: null } }),
-      this.prisma.listing.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
+      this.prisma.property.count({ where: { deletedAt: null } }),
+      this.prisma.property.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
       this.prisma.booking.count(),
       this.prisma.booking.count({ where: { status: 'COMPLETED' } }),
       this.prisma.payment.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }),
-      this.prisma.listing.count({ where: { status: 'PENDING', deletedAt: null } }),
+      this.prisma.property.count({ where: { status: 'PENDING', deletedAt: null } }),
     ]);
 
     const [avgRatingResult, avgRatingGrowth] = await Promise.all([
@@ -547,27 +507,24 @@ export class AdminService {
   // ─── Approve host ──────────────────────────────────────────────────────────
 
   async approveHost(hostId: string) {
-    const host = await this.prisma.host.findUnique({ where: { id: hostId } });
-    if (!host) throw new NotFoundException('Host not found');
+    const user = await this.prisma.user.findUnique({ where: { id: hostId } });
+    if (!user || user.role !== 'HOST') throw new NotFoundException('Host not found');
 
-    const updated = await this.prisma.host.update({
+    const updated = await this.prisma.user.update({
       where: { id: hostId },
       data: { isApproved: true },
-      include: { user: { select: { id: true } } },
     });
 
     // Notify the host
-    if (updated.user) {
-      await this.prisma.notification.create({
-        data: {
-          userId: updated.user.id,
-          type: 'SYSTEM',
-          title: 'Host Account Approved',
-          description: 'Your host account has been approved. You can now create listings.',
-          actionUrl: '/host/listings',
-        },
-      });
-    }
+    await this.prisma.notification.create({
+      data: {
+        userId: updated.id,
+        type: 'SYSTEM',
+        title: 'Host Account Approved',
+        description: 'Your host account has been approved. You can now create properties.',
+        actionUrl: '/host/properties',
+      },
+    });
 
     return updated;
   }

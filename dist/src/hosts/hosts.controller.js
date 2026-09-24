@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const hosts_service_1 = require("./hosts.service");
 const create_host_dto_1 = require("./dto/create-host.dto");
+const update_host_settings_dto_1 = require("./dto/update-host-settings.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
@@ -31,6 +32,15 @@ let HostsController = class HostsController {
     }
     myHostProfile(user) {
         return this.hostsService.findByUserId(user.id);
+    }
+    hostStatus(user) {
+        return this.hostsService.getHostStatus(user.id);
+    }
+    getHostSettings(user) {
+        return this.hostsService.getHostSettings(user.id);
+    }
+    updateHostSettings(user, dto) {
+        return this.hostsService.updateHostSettings(user.id, dto);
     }
     findOne(id) {
         return this.hostsService.findById(id);
@@ -56,6 +66,31 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], HostsController.prototype, "myHostProfile", null);
+__decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Get host approval status — never throws, always returns status' }),
+    (0, common_1.Get)('me/status'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], HostsController.prototype, "hostStatus", null);
+__decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Get host settings including checkin/checkout times' }),
+    (0, common_1.Get)('me/settings'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], HostsController.prototype, "getHostSettings", null);
+__decorate([
+    (0, swagger_1.ApiOperation)({ summary: 'Update host settings including checkin/checkout times and payout account' }),
+    (0, common_1.Patch)('me/settings'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, update_host_settings_dto_1.UpdateHostSettingsDto]),
+    __metadata("design:returntype", void 0)
+], HostsController.prototype, "updateHostSettings", null);
 __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Get host by ID' }),
     (0, common_1.Get)(':id'),

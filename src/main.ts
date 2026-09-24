@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -13,14 +16,14 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+    origin: true,
     credentials: true,
   });
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('Dream Stay Builder API')
-      .setDescription('Backend API for the Dream Stay Builder booking platform')
+      .setTitle('Nearby Escapes API')
+      .setDescription('Backend API for the Nearby Escapes booking platform')
       .setVersion('2.0')
       .addBearerAuth(
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
@@ -34,7 +37,6 @@ async function bootstrap() {
       .addTag('Payments', 'DPO payment processing')
       .addTag('Reviews', 'Reviews and ratings')
       .addTag('Notifications', 'In-app notifications')
-      .addTag('Messages', 'Conversations and messaging')
       .addTag('Wishlist', 'Saved/wishlisted listings')
       .addTag('Availability', 'Date blocking, seasonal pricing')
       .addTag('Uploads', 'Photo uploads')

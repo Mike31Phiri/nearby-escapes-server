@@ -18,6 +18,12 @@ export declare class UsersService {
         bio: string | null;
         isVerified: boolean;
         verificationStatus: import("@prisma/client").$Enums.VerificationStatus;
+        businessName: string | null;
+        isApproved: boolean;
+        defaultCheckInTime: string | null;
+        defaultCheckOutTime: string | null;
+        payoutMethod: string | null;
+        payoutAccount: string | null;
         resetTokenExpiry: Date | null;
         refreshToken: string | null;
         createdAt: Date;
@@ -37,6 +43,12 @@ export declare class UsersService {
         bio: string | null;
         isVerified: boolean;
         verificationStatus: import("@prisma/client").$Enums.VerificationStatus;
+        businessName: string | null;
+        isApproved: boolean;
+        defaultCheckInTime: string | null;
+        defaultCheckOutTime: string | null;
+        payoutMethod: string | null;
+        payoutAccount: string | null;
         resetTokenExpiry: Date | null;
         refreshToken: string | null;
         createdAt: Date;
@@ -67,11 +79,9 @@ export declare class UsersService {
         avatar: string | null;
         homeCity: string | null;
         bio: string | null;
+        businessName: string | null;
+        isApproved: boolean;
         createdAt: Date;
-        host: {
-            businessName: string;
-            isApproved: boolean;
-        } | null;
     }>;
     updateProfile(id: string, dto: UpdateUserDto): Promise<{
         id: string;

@@ -23,10 +23,13 @@ let WishlistService = class WishlistService {
             include: {
                 items: {
                     include: {
-                        listing: {
+                        property: {
                             include: {
-                                host: { include: { user: { select: { name: true } } } },
-                                reviews: { select: { rating: true } },
+                                host: { select: { name: true, businessName: true } },
+                                images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+                                stays: { where: { deletedAt: null, isActive: true }, take: 1 },
+                                experiences: { where: { deletedAt: null, isActive: true }, take: 1 },
+                                transports: { where: { deletedAt: null, isActive: true }, take: 1 },
                                 _count: { select: { reviews: true } },
                             },
                         },
@@ -40,10 +43,13 @@ let WishlistService = class WishlistService {
                 include: {
                     items: {
                         include: {
-                            listing: {
+                            property: {
                                 include: {
-                                    host: { include: { user: { select: { name: true } } } },
-                                    reviews: { select: { rating: true } },
+                                    host: { select: { name: true, businessName: true } },
+                                    images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+                                    stays: { where: { deletedAt: null, isActive: true }, take: 1 },
+                                    experiences: { where: { deletedAt: null, isActive: true }, take: 1 },
+                                    transports: { where: { deletedAt: null, isActive: true }, take: 1 },
                                     _count: { select: { reviews: true } },
                                 },
                             },
@@ -56,51 +62,53 @@ let WishlistService = class WishlistService {
             id: wishlist.id,
             userId: wishlist.userId,
             items: wishlist.items.map((item) => {
-                const l = item.listing;
-                const ratings = l.reviews?.map((r) => r.rating) || [];
-                const avgRating = ratings.length
-                    ? Number((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1))
-                    : 0;
+                const p = item.property;
+                const price = p.stays?.[0]?.price ??
+                    p.experiences?.[0]?.price ??
+                    p.transports?.[0]?.pricePerSeat ??
+                    0;
                 return {
-                    id: l.id,
-                    type: l.type.toLowerCase(),
-                    name: l.name,
-                    description: l.description,
-                    location: l.location,
-                    images: l.images,
-                    price: l.price,
-                    currency: l.currency,
-                    rating: avgRating,
-                    reviewCount: l._count?.reviews || 0,
-                    hostName: l.host?.user?.name || null,
-                    createdAt: l.createdAt,
+                    id: p.id,
+                    propertyId: p.id,
+                    listingId: p.id,
+                    type: p.type.toLowerCase(),
+                    name: p.name,
+                    description: p.description,
+                    location: p.location,
+                    thumbnailUrl: p.images?.[0]?.url || null,
+                    price,
+                    priceFormatted: `K${(price / 100).toFixed(2)}`,
+                    currency: p.currency,
+                    reviewCount: p._count?.reviews || 0,
+                    hostName: p.host?.businessName || p.host?.name || null,
+                    createdAt: p.createdAt,
                 };
             }),
             createdAt: wishlist.createdAt,
             updatedAt: wishlist.updatedAt,
         };
     }
-    async addItem(userId, listingId, listingType) {
+    async addItem(userId, propertyId, _type) {
         let wishlist = await this.prisma.wishlist.findUnique({ where: { userId } });
         if (!wishlist) {
             wishlist = await this.prisma.wishlist.create({ data: { userId } });
         }
-        const listing = await this.prisma.listing.findUnique({ where: { id: listingId } });
-        if (!listing || listing.deletedAt)
-            throw new common_1.NotFoundException('Listing not found');
+        const property = await this.prisma.property.findUnique({ where: { id: propertyId } });
+        if (!property || property.deletedAt)
+            throw new common_1.NotFoundException('Property not found');
         await this.prisma.wishlistItem.upsert({
-            where: { wishlistId_listingId: { wishlistId: wishlist.id, listingId } },
-            create: { wishlistId: wishlist.id, listingId },
+            where: { wishlistId_propertyId: { wishlistId: wishlist.id, propertyId } },
+            create: { wishlistId: wishlist.id, propertyId },
             update: {},
         });
         return this.getWishlist(userId);
     }
-    async removeItem(userId, listingId) {
+    async removeItem(userId, propertyId) {
         const wishlist = await this.prisma.wishlist.findUnique({ where: { userId } });
         if (!wishlist)
             throw new common_1.NotFoundException('Wishlist not found');
         await this.prisma.wishlistItem.deleteMany({
-            where: { wishlistId: wishlist.id, listingId },
+            where: { wishlistId: wishlist.id, propertyId },
         });
         return this.getWishlist(userId);
     }

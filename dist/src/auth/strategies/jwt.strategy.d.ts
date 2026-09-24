@@ -23,6 +23,12 @@ export declare class JwtStrategy extends JwtStrategy_base {
         bio: string | null;
         isVerified: boolean;
         verificationStatus: import("@prisma/client").$Enums.VerificationStatus;
+        businessName: string | null;
+        isApproved: boolean;
+        defaultCheckInTime: string | null;
+        defaultCheckOutTime: string | null;
+        payoutMethod: string | null;
+        payoutAccount: string | null;
         resetTokenExpiry: Date | null;
         refreshToken: string | null;
         createdAt: Date;

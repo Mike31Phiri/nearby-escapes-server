@@ -1,5 +1,6 @@
 import { HostsService } from './hosts.service';
 import { CreateHostDto } from './dto/create-host.dto';
+import { UpdateHostSettingsDto } from './dto/update-host-settings.dto';
 import type { User } from '@prisma/client';
 export declare class HostsController {
     private hostsService;
@@ -8,35 +9,57 @@ export declare class HostsController {
         id: string;
         userId: string;
         displayName: string;
-        businessName: string;
+        businessName: string | null;
         verified: boolean;
     }>;
     myHostProfile(user: User): Promise<{
-        user: {
-            email: string;
-            name: string;
-            avatar: string | null;
-        };
-    } & {
+        email: string;
+        name: string;
+        role: import("@prisma/client").$Enums.Role;
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-        businessName: string;
+        avatar: string | null;
+        businessName: string | null;
         isApproved: boolean;
     }>;
-    findOne(id: string): Promise<{
-        user: {
-            email: string;
-            name: string;
-            avatar: string | null;
-        };
-    } & {
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-        businessName: string;
+    hostStatus(user: User): Promise<{
+        hasProfile: boolean;
         isApproved: boolean;
+        hostId: null;
+        businessName: null;
+        role: "guest";
+    } | {
+        hasProfile: boolean;
+        isApproved: boolean;
+        hostId: string;
+        businessName: string | null;
+        role: "host" | "host_pending";
+    }>;
+    getHostSettings(user: User): Promise<{
+        businessName: string | null;
+        defaultCheckInTime: string;
+        defaultCheckOutTime: string;
+        payoutMethod: string;
+        payoutAccount: string | null;
+        isApproved: boolean;
+    }>;
+    updateHostSettings(user: User, dto: UpdateHostSettingsDto): Promise<{
+        message: string;
+        settings: {
+            businessName: string | null;
+            defaultCheckInTime: string;
+            defaultCheckOutTime: string;
+            payoutMethod: string;
+            payoutAccount: string | null;
+            isApproved: boolean;
+        };
+    }>;
+    findOne(id: string): Promise<{
+        email: string;
+        name: string;
+        id: string;
+        avatar: string | null;
+        businessName: string | null;
+        isApproved: boolean;
+        createdAt: Date;
     }>;
 }

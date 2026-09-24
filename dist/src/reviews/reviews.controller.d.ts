@@ -4,8 +4,20 @@ import type { User } from '@prisma/client';
 export declare class ReviewsController {
     private reviewsService;
     constructor(reviewsService: ReviewsService);
+    findByProperty(propertyId: string): Promise<{
+        id: any;
+        propertyId: any;
+        listingId: any;
+        bookingRef: any;
+        guestId: any;
+        guestName: any;
+        rating: any;
+        text: any;
+        createdAt: any;
+    }[]>;
     findByListing(listingId: string): Promise<{
         id: any;
+        propertyId: any;
         listingId: any;
         bookingRef: any;
         guestId: any;
@@ -16,6 +28,7 @@ export declare class ReviewsController {
     }[]>;
     create(user: User, dto: CreateReviewDto): Promise<{
         id: any;
+        propertyId: any;
         listingId: any;
         bookingRef: any;
         guestId: any;
@@ -25,8 +38,10 @@ export declare class ReviewsController {
         createdAt: any;
     }>;
     findByUser(user: User): Promise<{
+        propertyName: any;
         listingName: any;
         id: any;
+        propertyId: any;
         listingId: any;
         bookingRef: any;
         guestId: any;

@@ -1,8 +1,13 @@
 import { IsString, IsDateString, IsOptional, IsInt, Min } from 'class-validator';
 
 export class BlockDatesDto {
+  @IsOptional()
   @IsString()
-  listingId: string;
+  stayId?: string;
+
+  @IsOptional()
+  @IsString()
+  listingId?: string;
 
   @IsDateString()
   dateFrom: string;
@@ -12,8 +17,13 @@ export class BlockDatesDto {
 }
 
 export class SeasonalPricingDto {
+  @IsOptional()
   @IsString()
-  listingId: string;
+  stayId?: string;
+
+  @IsOptional()
+  @IsString()
+  listingId?: string;
 
   @IsDateString()
   from: string;
@@ -28,4 +38,14 @@ export class SeasonalPricingDto {
   @IsOptional()
   @IsString()
   label?: string;
+}
+
+export class ExperienceAvailabilityQueryDto {
+  @IsDateString()
+  date: string;
+}
+
+export class TransportAvailabilityQueryDto {
+  @IsDateString()
+  date: string;
 }

@@ -7,20 +7,20 @@ CREATE TYPE "ListingType" AS ENUM ('STAY', 'EXPERIENCE', 'TRANSPORT');
 -- CreateEnum
 CREATE TYPE "ListingStatus" AS ENUM ('DRAFT', 'PENDING', 'ACTIVE', 'INACTIVE');
 
--- CreateEnum
+-- CreateEnum We might not need booking status because of the availability checker
 CREATE TYPE "BookingStatus" AS ENUM ('PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED');
 
--- CreateEnum
+-- CreateEnum 
 CREATE TYPE "PaymentStatus" AS ENUM ('UNPAID', 'PAID', 'REFUNDED');
 
--- CreateEnum
+-- CreateEnum We need custom cancelation policy too
 CREATE TYPE "CancellationPolicy" AS ENUM ('FLEXIBLE', 'MODERATE', 'STRICT');
 
 -- CreateEnum
 CREATE TYPE "VerificationStatus" AS ENUM ('PENDING', 'VERIFIED', 'SUSPENDED');
 
 -- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('BOOKING_CONFIRMED', 'BOOKING_CANCELLED', 'BOOKING_REQUEST', 'REVIEW_RECEIVED', 'MESSAGE', 'SYSTEM', 'LISTING_APPROVED', 'LISTING_REJECTED', 'PAYOUT', 'PROMOTION');
+CREATE TYPE "NotificationType" AS ENUM ('BOOKING_CONFIRMED', 'BOOKING_CANCELLED', 'BOOKING_REQUEST', 'REVIEW_RECEIVED', 'SYSTEM', 'LISTING_APPROVED', 'LISTING_REJECTED', 'PAYOUT', 'PROMOTION');
 
 -- CreateEnum
 CREATE TYPE "DisputeStatus" AS ENUM ('OPEN', 'INVESTIGATING', 'RESOLVED_HOST', 'RESOLVED_GUEST', 'REFUNDED', 'CLOSED');
@@ -34,7 +34,7 @@ CREATE TYPE "PayoutStatus" AS ENUM ('PENDING', 'PROCESSING', 'PAID', 'FAILED');
 -- CreateEnum
 CREATE TYPE "PromoType" AS ENUM ('PERCENTAGE', 'FIXED');
 
--- CreateTable
+-- CreateTable the master entity 
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -57,7 +57,7 @@ CREATE TABLE "User" (
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable this is a host entity from the user entity
 CREATE TABLE "Host" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE "Booking" (
     "hostId" TEXT NOT NULL,
     "status" "BookingStatus" NOT NULL DEFAULT 'PENDING',
     "amount" INTEGER NOT NULL,
-    "currency" TEXT NOT NULL DEFAULT 'ZMW',
+    "currency" TEXT NOT NULL DEFAULT 'ZMW',l
     "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'UNPAID',
     "transToken" TEXT,
     "customerName" TEXT NOT NULL,
@@ -200,17 +200,6 @@ CREATE TABLE "Notification" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "Conversation" (
-    "id" TEXT NOT NULL,
-    "listingId" TEXT,
-    "bookingRef" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "Conversation_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable

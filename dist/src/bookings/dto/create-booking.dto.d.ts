@@ -1,12 +1,17 @@
 export declare class CreateBookingDto {
-    listingId: string;
-    listingType: string;
+    propertyId?: string;
+    listingId?: string;
+    stayId?: string;
+    experienceId?: string;
+    transportId?: string;
+    listingType?: string;
     checkIn?: string;
     checkOut?: string;
     date?: string;
+    timeSlot?: string;
     guests: number;
-    customerName: string;
-    customerPhone: string;
+    customerName?: string;
+    customerPhone?: string;
     customerEmail?: string;
     specialRequests?: string;
 }

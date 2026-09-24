@@ -41,10 +41,20 @@ export class AdminController {
     return this.adminService.updateUserStatus(id, status);
   }
 
-  // ─── Listings ──────────────────────────────────────────────────────────────
+  // ─── Properties / Listings ─────────────────────────────────────────────────
+
+  @Get('properties')
+  @ApiOperation({ summary: 'All properties (incl. moderation queue)' })
+  getProperties(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getProperties(page, limit, status);
+  }
 
   @Get('listings')
-  @ApiOperation({ summary: 'All listings (incl. moderation queue)' })
+  @ApiOperation({ summary: 'All listings (backwards compatibility)' })
   getListings(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -53,8 +63,18 @@ export class AdminController {
     return this.adminService.getListings(page, limit, status);
   }
 
+  @Patch('properties/:id/status')
+  @ApiOperation({ summary: 'Approve/reject property' })
+  updatePropertyStatus(
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.adminService.updatePropertyStatus(id, status, reason);
+  }
+
   @Patch('listings/:id/status')
-  @ApiOperation({ summary: 'Approve/reject listing' })
+  @ApiOperation({ summary: 'Approve/reject listing (backwards compatibility)' })
   updateListingStatus(
     @Param('id') id: string,
     @Body('status') status: string,
@@ -105,26 +125,6 @@ export class AdminController {
   @ApiOperation({ summary: 'Process pending payouts' })
   processPayouts(@Body('payoutIds') payoutIds: string[]) {
     return this.adminService.processPayouts(payoutIds);
-  }
-
-  // ─── Promotions ────────────────────────────────────────────────────────────
-
-  @Get('promotions')
-  @ApiOperation({ summary: 'Promo codes & featured listings' })
-  getPromotions(@Query('page') page?: number, @Query('limit') limit?: number) {
-    return this.adminService.getPromotions(page, limit);
-  }
-
-  @Post('promotions')
-  @ApiOperation({ summary: 'Create promo code' })
-  createPromotion(@Body() data: any) {
-    return this.adminService.createPromotion(data);
-  }
-
-  @Patch('promotions/:id')
-  @ApiOperation({ summary: 'Update promotion' })
-  updatePromotion(@Param('id') id: string, @Body() data: any) {
-    return this.adminService.updatePromotion(id, data);
   }
 
   // ─── Activity Log ──────────────────────────────────────────────────────────

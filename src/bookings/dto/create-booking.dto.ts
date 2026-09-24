@@ -1,12 +1,30 @@
 import { IsString, IsOptional, IsInt, Min, IsDateString, IsIn } from 'class-validator';
 
 export class CreateBookingDto {
+  @IsOptional()
   @IsString()
-  listingId: string;
+  propertyId?: string;
 
+  @IsOptional()
+  @IsString()
+  listingId?: string; // backwards compatibility
+
+  @IsOptional()
+  @IsString()
+  stayId?: string;
+
+  @IsOptional()
+  @IsString()
+  experienceId?: string;
+
+  @IsOptional()
+  @IsString()
+  transportId?: string;
+
+  @IsOptional()
   @IsString()
   @IsIn(['stay', 'experience', 'transport'])
-  listingType: string;
+  listingType?: string;
 
   // For stays
   @IsOptional()
@@ -23,15 +41,22 @@ export class CreateBookingDto {
   @IsDateString()
   date?: string;
 
+  // For experiences / transport time slot (e.g. "09:00", "14:00")
+  @IsOptional()
+  @IsString()
+  timeSlot?: string;
+
   @IsInt()
   @Min(1)
   guests: number;
 
+  @IsOptional()
   @IsString()
-  customerName: string;
+  customerName?: string;
 
+  @IsOptional()
   @IsString()
-  customerPhone: string;
+  customerPhone?: string;
 
   @IsOptional()
   @IsString()

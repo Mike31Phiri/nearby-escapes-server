@@ -1,8 +1,13 @@
 import { IsString, IsInt, Min, Max, IsOptional } from 'class-validator';
 
 export class CreateReviewDto {
+  @IsOptional()
   @IsString()
-  listingId: string;
+  propertyId?: string;
+
+  @IsOptional()
+  @IsString()
+  listingId?: string;
 
   @IsOptional()
   @IsString()
