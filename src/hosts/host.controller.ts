@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { HostsService } from './hosts.service';
 import { HostDashboardService } from './host-dashboard.service';
 import { BookingsService } from '../bookings/bookings.service';
@@ -52,9 +52,26 @@ export class HostController {
   async getBookings(
     @CurrentUser() user: User,
     @Query() query: GetHostBookingsQueryDto,
-  ): Promise<HostBookingListItemDto[]> {
+  ): Promise<{ data: HostBookingListItemDto[]; meta: { page: number; limit: number } }> {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.dashboardService.getBookings(host.id, query);
+    const data = await this.dashboardService.getBookings(host.id, query);
+    return {
+      data,
+      meta: {
+        page: Math.max(1, Number(query.page) || 1),
+        limit: Math.max(1, Math.min(100, Number(query.limit) || 20)),
+      },
+    };
+  }
+
+  @Get('bookings/:id')
+  @ApiOperation({ summary: 'Full booking details modal (host view)' })
+  async getBookingDetail(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ) {
+    const host = await this.hostsService.findApprovedByUserId(user.id);
+    return this.dashboardService.getBookingDetail(host.id, id);
   }
 
   @Get('finances/summary')
@@ -112,10 +129,22 @@ export class HostController {
   }
 
   @Get('listings')
-  @ApiOperation({ summary: "Host's own listings with stats" })
-  async getListings(@CurrentUser() user: User) {
+  @ApiOperation({ summary: "Host's listings — minimal shape for dropdowns (?fields=id,name,type), full stats otherwise" })
+  @ApiQuery({ name: 'fields', required: false, description: 'Comma-separated fields to include (e.g. id,name,type)' })
+  async getListings(
+    @CurrentUser() user: User,
+    @Query('fields') fields?: string,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.dashboardService.getListings(host.id);
+    const all = await this.dashboardService.getListings(host.id);
+    // When ?fields=id,name,type (or any minimal field set) return slim dropdown shape
+    if (fields) {
+      const wanted = new Set(fields.split(',').map((f) => f.trim()));
+      if (wanted.has('id') && wanted.has('name') && wanted.has('type') && wanted.size <= 3) {
+        return all.map((l: any) => ({ id: l.id, name: l.name, type: l.type }));
+      }
+    }
+    return all;
   }
 
   @Get('settings')

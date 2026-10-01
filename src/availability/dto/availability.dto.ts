@@ -47,6 +47,32 @@ export class BlockDatesDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @ApiPropertyOptional({ description: 'Reason for blocking (e.g. Maintenance / Repairs)', example: 'Maintenance / Repairs' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+/** Rich response after blocking dates — matches spec blockedRangeId + echo */
+export class BlockDatesResponseDto {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ description: 'Generated block range ID', example: 'blk-9012' })
+  blockedRangeId: string;
+
+  @ApiProperty({ example: 'uuid-prop-1' })
+  listingId: string;
+
+  @ApiProperty({ example: '2026-10-01' })
+  startDate: string;
+
+  @ApiProperty({ example: '2026-10-05' })
+  endDate: string;
+
+  @ApiPropertyOptional({ example: 'Maintenance / Repairs' })
+  reason?: string;
 }
 
 export class UnblockDatesDto {
@@ -84,7 +110,7 @@ export class UnblockDatesResponseDto {
   @ApiProperty({ example: true })
   success: boolean;
 
-  @ApiPropertyOptional({ example: 'Unblocked dates successfully' })
+  @ApiPropertyOptional({ example: 'Dates unblocked successfully.' })
   @IsOptional()
   @IsString()
   message?: string;

@@ -344,7 +344,10 @@ export class HostDashboardService {
         const todayTime = new Date(todayStr).getTime();
         const elapsedDays = Math.floor((todayTime - checkInTime) / (1000 * 60 * 60 * 24));
         const currentNight = Math.min(totalNights, Math.max(1, elapsedDays + 1));
-        stayProgress = `Night ${currentNight} of ${totalNights}`;
+        // Add 'Check-out tomorrow' suffix when checkout is next day
+        const tomorrowStr = new Date(todayTime + 86400000).toISOString().slice(0, 10);
+        const checkOutTomorrow = checkOutDateStr === tomorrowStr;
+        stayProgress = `Night ${currentNight} of ${totalNights}${checkOutTomorrow ? ' · Check-out tomorrow' : ''}`;
       }
 
       const mappedStatus: 'confirmed' | 'checked_in' | 'checked_out' =
@@ -568,5 +571,116 @@ export class HostDashboardService {
 
   async getListings(userId: string) {
     return this.getProperties(userId);
+  }
+
+  /**
+   * GET /api/host/bookings/:id
+   * Full booking detail for the host booking-details modal.
+   * Returns pricing breakdown in Ngwee, guest info, and stay progress.
+   */
+  async getBookingDetail(hostId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: {
+        id: bookingId,
+        OR: [{ hostId }, { property: { hostId } }],
+      },
+      include: {
+        property: {
+          include: {
+            images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+            stays: { take: 1 },
+          },
+        },
+        guest: {
+          select: { id: true, name: true, email: true, phone: true, avatar: true },
+        },
+        payment: { select: { status: true } },
+      },
+    });
+
+    if (!booking) {
+      const { NotFoundException } = await import('@nestjs/common');
+      throw new NotFoundException('Booking not found');
+    }
+
+    const listingType = (booking.property?.type?.toLowerCase() || 'stay') as
+      | 'stay'
+      | 'experience'
+      | 'transport';
+
+    const checkIn = this.formatDateOnly(booking.checkIn) || this.formatDateOnly(booking.date) || null;
+    const checkOut = this.formatDateOnly(booking.checkOut) || null;
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Compute stay progress for modal
+    let stayProgress: string | undefined = undefined;
+    if (listingType === 'stay' && checkIn && checkOut) {
+      const checkInTime = new Date(checkIn).getTime();
+      const checkOutTime = new Date(checkOut).getTime();
+      const totalNights = Math.max(1, Math.round((checkOutTime - checkInTime) / (1000 * 60 * 60 * 24)));
+      const todayTime = new Date(todayStr).getTime();
+      const elapsedDays = Math.floor((todayTime - checkInTime) / (1000 * 60 * 60 * 24));
+      if (elapsedDays < 0) {
+        stayProgress = 'Arriving today';
+      } else if (checkOut === todayStr) {
+        stayProgress = 'Departing today';
+      } else {
+        const currentNight = Math.min(totalNights, Math.max(1, elapsedDays + 1));
+        const tomorrowStr = new Date(todayTime + 86400000).toISOString().slice(0, 10);
+        stayProgress = `Night ${currentNight} of ${totalNights}${checkOut === tomorrowStr ? ' · Check-out tomorrow' : ''}`;
+      }
+    }
+
+    // Pricing breakdown: Booking stores a flat `amount` (total in Ngwee).
+    // We reconstruct an approximate fee split since cleaningFee/serviceFee
+    // are not separate columns in the Booking model.
+    const totalAmountNgwee = booking.amount;
+    const nights = (listingType === 'stay' && checkIn && checkOut)
+      ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
+      : 1;
+    // Estimate: ~5% platform service fee, no explicit cleaning fee stored
+    const serviceFeeNgwee = Math.round(totalAmountNgwee * 0.05);
+    const cleaningFeeNgwee = 0;
+    const subtotalNgwee = totalAmountNgwee - serviceFeeNgwee - cleaningFeeNgwee;
+    const baseRateNgwee = nights > 0 ? Math.round(subtotalNgwee / nights) : subtotalNgwee;
+
+    const mappedStatus =
+      booking.status === 'CHECKED_IN'
+        ? 'checked_in'
+        : booking.status === 'COMPLETED'
+          ? 'checked_out'
+          : booking.status === 'CANCELLED' || booking.status === 'EXPIRED'
+            ? 'cancelled'
+            : booking.status.toLowerCase();
+
+    return {
+      id: booking.id,
+      bookingRef: booking.bookingRef,
+      listingId: booking.propertyId,
+      listingName: booking.property?.name || 'Listing',
+      listingType,
+      listingImage: (booking.property as any)?.images?.[0]?.url || '',
+      status: mappedStatus,
+      paymentStatus: (booking.payment?.status || 'UNPAID').toLowerCase(),
+      guestName: booking.customerName || booking.guest?.name || 'Guest',
+      guestEmail: booking.customerEmail || booking.guest?.email || '',
+      guestPhone: booking.customerPhone || booking.guest?.phone || '',
+      guests: booking.guests,
+      checkIn,
+      checkOut,
+      timeSlot: booking.timeSlot || null,
+      stayProgress: stayProgress || null,
+      createdAt: booking.createdAt.toISOString(),
+      pricing: {
+        currency: booking.currency || 'ZMW',
+        baseRateNgwee,
+        nightsCount: nights,
+        subtotalNgwee,
+        cleaningFeeNgwee,
+        serviceFeeNgwee,
+        totalAmountNgwee,
+      },
+      specialRequests: booking.specialRequests || null,
+    };
   }
 }

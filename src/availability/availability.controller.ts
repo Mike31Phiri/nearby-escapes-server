@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { AvailabilityService } from './availability.service';
 import {
   BlockDatesDto,
+  BlockDatesResponseDto,
   UnblockDatesDto,
   UnblockDatesResponseDto,
   SeasonalPricingDto,
@@ -102,21 +103,34 @@ export class AvailabilityController {
     @Body() dto: UnblockDatesDto,
   ): Promise<UnblockDatesResponseDto> {
     const result = await this.availabilityService.unblockDates(dto, user.id);
-    return { success: result.success };
+    return { success: result.success, message: 'Dates unblocked successfully.' };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Post('block-dates')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Block dates (Host)' })
-  @ApiResponse({ status: 200, type: UnblockDatesResponseDto })
+  @ApiOperation({ summary: 'Block dates (Host) — returns blockedRangeId + echo' })
+  @ApiResponse({ status: 200, type: BlockDatesResponseDto })
   async blockDatesEndpoint(
     @CurrentUser() user: User,
     @Body() dto: UnblockDatesDto,
-  ): Promise<UnblockDatesResponseDto> {
-    const result = await this.availabilityService.blockDates(dto, user.id);
-    return { success: result.success };
+  ): Promise<BlockDatesResponseDto> {
+    const listingId = (dto as any).listingId || (dto as any).propertyId || '';
+    const startDate = dto.startDate;
+    const endDate = dto.endDate;
+    const reason = (dto as any).reason;
+    await this.availabilityService.blockDates(dto as any, user.id);
+    // Generate a deterministic block ID based on listing + dates
+    const blockedRangeId = `blk-${Buffer.from(`${listingId}|${startDate}|${endDate}`).toString('base64').replace(/=/g, '').slice(0, 8)}`;
+    return {
+      success: true,
+      blockedRangeId,
+      listingId,
+      startDate,
+      endDate,
+      ...(reason ? { reason } : {}),
+    };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
