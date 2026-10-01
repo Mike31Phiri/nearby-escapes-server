@@ -44,11 +44,17 @@ export class ReadStoreService {
   // ── Queue helpers ────────────────────────────────────────────────────────────
 
   async enqueueSync(propertyId: string, deleted = false): Promise<void> {
-    await this.syncQueue.add(
-      deleted ? 'delete' : 'upsert',
-      { propertyId, deleted },
-      { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
-    );
+    try {
+      await this.syncQueue.add(
+        deleted ? 'delete' : 'upsert',
+        { propertyId, deleted },
+        { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `Redis/Queue sync skipped for property ${propertyId}: ${err?.message}`,
+      );
+    }
   }
 
   // ── Write side (called by worker) ────────────────────────────────────────────
