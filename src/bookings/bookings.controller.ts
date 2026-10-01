@@ -1,7 +1,16 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto, CancelBookingDto } from './dto/create-booking.dto';
+import {
+  GuestBookingsGroupedDto,
+  GuestBookingItemDto,
+  GetGuestBookingsQueryDto,
+} from './dto/guest-bookings.dto';
+import {
+  HostCancelReservationDto,
+  HostCancelReservationResponseDto,
+} from './dto/host-cancel.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,13 +30,40 @@ export class BookingsController {
     return this.bookingsService.create(user.id, dto);
   }
 
+  @Get('grouped')
+  @ApiOperation({
+    summary: 'Get user bookings grouped into upcoming, active, recent, and cancelled',
+  })
+  @ApiResponse({ status: 200, type: GuestBookingsGroupedDto })
+  groupedBookings(
+    @CurrentUser() user: User,
+    @Query('userId') userId?: string,
+  ): Promise<GuestBookingsGroupedDto> {
+    return this.bookingsService.getGuestBookingsGrouped(userId || user.id);
+  }
+
+  @Get('my-trips')
+  @ApiOperation({ summary: 'Alias for grouped user bookings (upcoming, active, recents)' })
+  @ApiResponse({ status: 200, type: GuestBookingsGroupedDto })
+  myTrips(
+    @CurrentUser() user: User,
+    @Query('userId') userId?: string,
+  ): Promise<GuestBookingsGroupedDto> {
+    return this.bookingsService.getGuestBookingsGrouped(userId || user.id);
+  }
+
   @Get()
-  @ApiOperation({ summary: "User's bookings" })
+  @ApiOperation({ summary: "User's bookings with optional category filtering (upcoming, active, recent, all)" })
+  @ApiResponse({ status: 200, type: [GuestBookingItemDto] })
   myBookings(
     @CurrentUser() user: User,
-    @Query('as') as?: string,
+    @Query() query: GetGuestBookingsQueryDto & { as?: string },
   ) {
-    return this.bookingsService.findMyBookings(user.id, as);
+    if (query.as === 'host') {
+      return this.bookingsService.findMyBookings(user.id, 'host');
+    }
+    const targetUserId = query.userId || user.id;
+    return this.bookingsService.getGuestBookings(targetUserId, query);
   }
 
   @Get(':id')
@@ -38,8 +74,16 @@ export class BookingsController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cancel booking (guest or host)' })
-  cancel(@CurrentUser() user: User, @Param('id') id: string, @Body() dto?: CancelBookingDto) {
+  @ApiOperation({ summary: '4.1 Cancel reservation by booking ID and reopen inventory' })
+  @ApiResponse({ status: 200, type: HostCancelReservationResponseDto })
+  async cancel(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto?: HostCancelReservationDto & CancelBookingDto,
+  ) {
+    if (dto?.cancelledBy === 'host' || user.role === 'HOST') {
+      return this.bookingsService.hostCancel(id, user.id, dto?.reason);
+    }
     return this.bookingsService.cancel(id, user.id, dto?.reason);
   }
 
@@ -54,7 +98,7 @@ export class BookingsController {
   @Roles('HOST', 'ADMIN')
   @Post(':id/check-in')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Host confirms guest check-in (triggers release of funds to host)' })
+  @ApiOperation({ summary: 'Host and Admins confirms guest check-in (triggers release of funds to host)' })
   checkIn(@CurrentUser() user: User, @Param('id') id: string) {
     return this.bookingsService.checkIn(id, user.id);
   }

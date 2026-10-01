@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:admin": "node prisma/seeds/admin.seed.js",
-    "seed:policies": "node prisma/seeds/policies.seed.js"
+    "seed:policies": "node prisma/seeds/policies.seed.js",
+    "seed:images": "node prisma/seeds/media-assets.seed.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1017.0",
@@ -33,6 +34,7 @@
     "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^12.0.2",
     "@nestjs/swagger": "^11.2.6",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.5.0",

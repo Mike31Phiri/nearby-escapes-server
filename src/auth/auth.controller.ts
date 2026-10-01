@@ -27,7 +27,11 @@ export class AuthController {
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: any) {
     const { token, user } = await this.authService.register(dto);
     this.setCookie(res, token);
-    return { user, message: 'Registration successful. Welcome to Nearby Escapes!' };
+    return {
+      user,
+      accessToken: token,
+      message: 'Registration successful. Welcome to Nearby Escapes!',
+    };
   }
 
   @Post('login')
@@ -36,7 +40,7 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: any) {
     const { token, user } = await this.authService.login(dto);
     this.setCookie(res, token);
-    return { user };
+    return { user, accessToken: token };
   }
 
   @Post('logout')

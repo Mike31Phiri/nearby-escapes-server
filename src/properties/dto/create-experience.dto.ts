@@ -1,4 +1,7 @@
-import { IsString, IsOptional, IsInt, Min, IsArray, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, IsArray, IsBoolean, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { CreateListingPolicyDto } from './listing-policy.dto';
+
 
 export class CreateExperienceDto {
   @IsString()
@@ -50,6 +53,20 @@ export class CreateExperienceDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateListingPolicyDto)
+  policies?: CreateListingPolicyDto[];
+
+  @IsOptional()
+  @IsArray()
+  tags?: any[];
+
+  @IsOptional()
+  @IsArray()
+  recommendations?: any[];
 }
 
 export class UpdateExperienceDto {

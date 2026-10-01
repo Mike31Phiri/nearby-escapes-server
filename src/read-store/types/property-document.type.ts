@@ -12,6 +12,23 @@ export interface PropertyAmenityDoc {
   icon?: string | null;
 }
 
+export interface ListingTagDoc {
+  id?: string;
+  name: string;
+  slug: string;
+  category: string;
+  icon?: string | null;
+}
+
+export interface ListingRecommendationDoc {
+  id?: string;
+  audience: string;
+  title: string;
+  reason?: string | null;
+  badge?: string | null;
+  sortOrder?: number;
+}
+
 export interface StayUnitDoc {
   id: string;
   name: string;
@@ -28,6 +45,8 @@ export interface StayUnitDoc {
   checkOutBefore?: string | null;
   cancellationPolicy?: string | null;
   isActive: boolean;
+  tags?: ListingTagDoc[];
+  recommendations?: ListingRecommendationDoc[];
 }
 
 export interface ExperienceUnitDoc {
@@ -44,6 +63,8 @@ export interface ExperienceUnitDoc {
   isActive: boolean;
   timeSlots: string[];
   inclusions: string[];
+  tags?: ListingTagDoc[];
+  recommendations?: ListingRecommendationDoc[];
 }
 
 export interface TransportUnitDoc {
@@ -58,6 +79,8 @@ export interface TransportUnitDoc {
   priceFormatted?: string;
   schedule?: any | null;
   isActive: boolean;
+  tags?: ListingTagDoc[];
+  recommendations?: ListingRecommendationDoc[];
 }
 
 export interface ReadPropertyDocument {
@@ -82,11 +105,30 @@ export interface ReadPropertyDocument {
   images: PropertyImageDoc[];
   amenities: PropertyAmenityDoc[];
   rules: string[];
+  tags?: ListingTagDoc[];
+  recommendations?: ListingRecommendationDoc[];
 
   // Host info
   hostId: string;
   hostName: string | null;
   hostAvatar: string | null;
+
+  // Frontend contract aliases
+  vertical?: string;
+  title?: string;
+  slug?: string;
+  city?: string | null;
+  province?: string | null;
+  featuredImage?: string | null;
+  image?: string | null;
+  pricePerUnitNgwee?: number;
+  reviews?: number;
+  host?: {
+    id: string;
+    name: string | null;
+    avatarUrl: string | null;
+    superhost?: boolean;
+  };
 
   // Units
   stays: StayUnitDoc[];

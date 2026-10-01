@@ -17,11 +17,14 @@ import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
 import { PlatformModule } from './platform/platform.module';
 import { ReadStoreModule } from './read-store/read-store.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PoliciesModule } from './policies/policies.module';
+import { PopularityModule } from './popularity/popularity.module';
 /*The consolidation of all the modules */
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 600 }]),
     PrismaModule,
     AuthModule,
@@ -39,6 +42,7 @@ import { PoliciesModule } from './policies/policies.module';
     PlatformModule,
     ReadStoreModule,
     PoliciesModule,
+    PopularityModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

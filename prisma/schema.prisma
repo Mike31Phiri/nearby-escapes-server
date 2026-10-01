@@ -102,6 +102,46 @@ enum PolicyType {
   OTHER
 }
 
+// Categories for host-defined per-listing policies
+enum ListingPolicyCategory {
+  CANCELLATION
+  CHECK_IN
+  CHECK_OUT
+  HOUSE_RULES
+  SAFETY
+  PET_POLICY
+  CHILD_POLICY
+  NOISE_POLICY
+  SMOKING_POLICY
+  REFUND
+  DAMAGE
+  OTHER
+}
+
+// Categories for listing tags
+enum TagCategory {
+  CATEGORY      // e.g. "Safari Lodge", "Cottage", "Water Adventure", "Luxury Coach"
+  AMENITY       // e.g. "WiFi", "Pool", "Air Conditioning", "USB Charging Ports"
+  ACTIVITY      // e.g. "Game Drive", "Rafting", "Hiking", "Sunset Cruise"
+  LOCATION      // e.g. "Livingstone", "Zambezi River", "Waterfront", "Lusaka"
+  TRIP_TYPE     // e.g. "ONE_WAY" (one-time travel), "ROUND_TRIP" (round travel)
+  VEHICLE_TYPE  // e.g. "Bus", "Minibus", "Luxury Coach", "4x4 Shuttle"
+  OTHER
+}
+
+// Audience / intent categories for curated recommendations
+enum RecommendationAudience {
+  COUPLES
+  FAMILIES
+  SOLO
+  ADVENTURE
+  NATURE
+  WEEKEND_GETAWAY
+  BUDGET
+  LUXURY
+  GENERAL
+}
+
 // ─── User ────────────────────────────────────────────────────────────────────
 // Single table for all roles (GUEST | HOST | ADMIN).
 // Host-specific metadata (businessName, isApproved) lives here on the same row.
@@ -146,6 +186,7 @@ model User {
   wishlist               Wishlist?
   activityLogs           ActivityLog[]
   payouts                Payout[]
+  hostApplication        HostApplication?
   createdPolicies        Policy[]               @relation("CreatedPolicies")
   createdPolicyVersions  PolicyVersion[]        @relation("CreatedPolicyVersions")
 }
@@ -162,9 +203,11 @@ model Property {
   type        PropertyType
   status      PropertyStatus @default(ACTIVE)
   name        String
-  description String
-  location    String
+  description String?        @default("")
+  location    String?        @default("")
   currency    String         @default("ZMW")
+  draftStep   Int?           @default(1)
+  draftData   Json?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   deletedAt   DateTime?
@@ -182,9 +225,15 @@ model Property {
   rules     PropertyRule[]
 
   // Cross-cutting relations
-  bookings      Booking[]
-  reviews       Review[]
-  wishlistItems WishlistItem[]
+  bookings        Booking[]
+  reviews         Review[]
+  wishlistItems   WishlistItem[]
+  tags            ListingTag[]
+  recommendations ListingRecommendation[]
+
+  @@index([status, deletedAt])
+  @@index([type])
+  @@index([createdAt])
 }
 
 // ─── Stay ────────────────────────────────────────────────────────────────────
@@ -214,8 +263,11 @@ model Stay {
 
   property       Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   bookings       Booking[]        @relation("StayBookings")
-  availability   AvailabilitySlot[]
-  seasonalPrices SeasonalPricing[]
+  availability    AvailabilitySlot[]
+  seasonalPrices  SeasonalPricing[]
+  policies        ListingPolicy[]
+  tags            ListingTag[]
+  recommendations ListingRecommendation[]
 }
 
 // ─── Experience ───────────────────────────────────────────────────────────────
@@ -240,9 +292,12 @@ model Experience {
   deletedAt       DateTime?
 
   property   Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  timeSlots  ExperienceTimeSlot[]
-  inclusions ExperienceInclusion[]
-  bookings   Booking[]            @relation("ExperienceBookings")
+  timeSlots       ExperienceTimeSlot[]
+  inclusions      ExperienceInclusion[]
+  bookings        Booking[]            @relation("ExperienceBookings")
+  policies        ListingPolicy[]
+  tags            ListingTag[]
+  recommendations ListingRecommendation[]
 }
 
 // ─── Transport ────────────────────────────────────────────────────────────────
@@ -266,8 +321,11 @@ model Transport {
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
 
-  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  bookings Booking[] @relation("TransportBookings")
+  property Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  bookings        Booking[]     @relation("TransportBookings")
+  policies        ListingPolicy[]
+  tags            ListingTag[]
+  recommendations ListingRecommendation[]
 }
 
 // ─── PropertyImage ───────────────────────────────────────────────────────────
@@ -474,14 +532,17 @@ model Wishlist {
 }
 
 model WishlistItem {
-  id         String @id @default(uuid())
+  id         String   @id @default(uuid())
   wishlistId String
   propertyId String
+  createdAt  DateTime @default(now())
 
-  wishlist Wishlist @relation(fields: [wishlistId], references: [id])
-  property Property @relation(fields: [propertyId], references: [id])
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([wishlistId, propertyId])
+  @@index([propertyId])
+  @@index([wishlistId, createdAt])
 }
 
 // ─── Availability ─────────────────────────────────────────────────────────────
@@ -564,7 +625,94 @@ model Setting {
   updatedAt   DateTime @updatedAt
 }
 
-// ─── Policies ─────────────────────────────────────────────────────────────────
+// ─── Listing Policies (host-defined, per-unit) ───────────────────────────────
+// Each Stay / Experience / Transport unit can have multiple named policies.
+// e.g. "No smoking inside", "Pets allowed with prior approval", "Check-in from 14:00"
+
+model ListingPolicy {
+  id           String                @id @default(uuid())
+  stayId       String?
+  experienceId String?
+  transportId  String?
+  category     ListingPolicyCategory @default(OTHER)
+  title        String                // "No Smoking", "Cancellation Policy", etc.
+  body         String                @db.Text  // full policy text
+  sortOrder    Int                   @default(0)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  stay         Stay?       @relation(fields: [stayId],       references: [id], onDelete: Cascade)
+  experience   Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  transport    Transport?  @relation(fields: [transportId],  references: [id], onDelete: Cascade)
+
+  @@index([stayId])
+  @@index([experienceId])
+  @@index([transportId])
+}
+
+// ─── Listing Tags ─────────────────────────────────────────────────────────────
+// Multipurpose tags for category filtering, amenities, activities, locations,
+// and transport attributes (one-time vs round travel, vehicle type, bus amenities).
+
+model ListingTag {
+  id           String      @id @default(uuid())
+  propertyId   String?
+  stayId       String?
+  experienceId String?
+  transportId  String?
+
+  category     TagCategory @default(CATEGORY)
+  name         String      // e.g. "Safari Lodge", "WiFi", "Round Travel", "4x4 Shuttle"
+  slug         String      // normalized lowercase: "safari-lodge", "wifi", "round-travel"
+  icon         String?     // optional emoji or icon identifier
+
+  createdAt    DateTime    @default(now())
+
+  property   Property?   @relation(fields: [propertyId],   references: [id], onDelete: Cascade)
+  stay       Stay?       @relation(fields: [stayId],       references: [id], onDelete: Cascade)
+  experience Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  transport  Transport?  @relation(fields: [transportId],  references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([stayId])
+  @@index([experienceId])
+  @@index([transportId])
+  @@index([category, slug])
+}
+
+// ─── Listing Recommendations ─────────────────────────────────────────────────
+// Curated or host-provided recommendations (e.g. "Best for Couples", "Family Friendly",
+// "Weekend Getaway", "High Adrenaline").
+
+model ListingRecommendation {
+  id           String                 @id @default(uuid())
+  propertyId   String?
+  stayId       String?
+  experienceId String?
+  transportId  String?
+
+  audience     RecommendationAudience @default(GENERAL)
+  title        String                 // "Recommended for Couples", "Top Pick for Families"
+  reason       String?                @db.Text
+  badge        String?                // "Couples' Choice", "Family Pick", "Adventure Top Rated"
+  sortOrder    Int                    @default(0)
+
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  property   Property?   @relation(fields: [propertyId],   references: [id], onDelete: Cascade)
+  stay       Stay?       @relation(fields: [stayId],       references: [id], onDelete: Cascade)
+  experience Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  transport  Transport?  @relation(fields: [transportId],  references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([stayId])
+  @@index([experienceId])
+  @@index([transportId])
+  @@index([audience])
+}
+
+// ─── Platform Policies ────────────────────────────────────────────────────────
 
 model Policy {
   id             String          @id @default(uuid())
@@ -605,3 +753,44 @@ model PolicyVersion {
   @@unique([policyId, version])
   @@index([policyId])
 }
+
+// ─── Test & Sample Media Assets ──────────────────────────────────────────────
+// Stock / sample image URLs stored in DB for seeding, testing APIs,
+// mock listing generation, and demo listing wizards.
+
+model MediaAsset {
+  id        String   @id @default(uuid())
+  url       String   @unique
+  category  String?  @default("GENERAL")
+  caption   String?
+  source    String?  @default("UNSPLASH")
+  createdAt DateTime @default(now())
+
+  @@index([category])
+}
+
+// ─── Host Application & KYC ──────────────────────────────────────────────────
+
+model HostApplication {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName   String
+  operatingSince String?
+  province       String?
+  town           String?
+  businessEmail  String?
+  businessPhone  String?
+  pacraDocs      Json?
+  ownershipDocs  Json?
+  operationDocs  Json?
+  status         String    @default("pending_review") // "pending_review" | "under_review" | "approved" | "rejected"
+  reviewerNotes  String?
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([userId])
+}
+

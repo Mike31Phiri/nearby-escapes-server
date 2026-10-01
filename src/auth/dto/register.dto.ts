@@ -19,9 +19,4 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phone?: string;
-
-  @ApiPropertyOptional({ example: 'host', enum: ['guest', 'host'] })
-  @IsOptional()
-  @IsIn(['guest', 'host'])
-  role?: 'guest' | 'host';
 }

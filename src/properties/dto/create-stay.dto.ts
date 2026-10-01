@@ -1,5 +1,8 @@
-import { IsString, IsOptional, IsInt, Min, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, IsEnum, IsBoolean, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { CancellationPolicy } from '@prisma/client';
+import { CreateListingPolicyDto } from './listing-policy.dto';
+
 
 export class CreateStayDto {
   @IsString()
@@ -60,6 +63,20 @@ export class CreateStayDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateListingPolicyDto)
+  policies?: CreateListingPolicyDto[];
+
+  @IsOptional()
+  @IsArray()
+  tags?: any[];
+
+  @IsOptional()
+  @IsArray()
+  recommendations?: any[];
 }
 
 export class UpdateStayDto {

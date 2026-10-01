@@ -1,7 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { AvailabilityService } from './availability.service';
-import { BlockDatesDto, SeasonalPricingDto, ExperienceAvailabilityQueryDto, TransportAvailabilityQueryDto } from './dto/availability.dto';
+import {
+  BlockDatesDto,
+  UnblockDatesDto,
+  UnblockDatesResponseDto,
+  SeasonalPricingDto,
+  ExperienceAvailabilityQueryDto,
+  TransportAvailabilityQueryDto,
+  ExperienceSlotBlockDto,
+  ExperienceSlotActionResponseDto,
+} from './dto/availability.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -51,15 +60,29 @@ export class AvailabilityController {
     return this.availabilityService.getTransportAvailability(transportId, query.date);
   }
 
+  @Get('properties/:propertyId')
+  @ApiOperation({ summary: 'Property-level calendar availability grid' })
+  getPropertyAvailability(
+    @Param('propertyId') propertyId: string,
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.availabilityService.getPropertyAvailability(
+      propertyId,
+      year ? +year : undefined,
+      month ? +month : undefined,
+    );
+  }
+
   // Backwards compatibility endpoint
   @Get(':listingId')
-  @ApiOperation({ summary: 'Availability check (backwards compatibility)' })
+  @ApiOperation({ summary: 'Availability check (supports propertyId or stayId)' })
   getAvailability(
     @Param('listingId') listingId: string,
     @Query('year') year?: string,
     @Query('month') month?: string,
   ) {
-    return this.availabilityService.getStayAvailability(
+    return this.availabilityService.getAvailability(
       listingId,
       year ? +year : undefined,
       month ? +month : undefined,
@@ -70,9 +93,63 @@ export class AvailabilityController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
+  @Post('unblock-dates')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Unblock dates (Host)' })
+  @ApiResponse({ status: 200, type: UnblockDatesResponseDto })
+  async unblockDatesEndpoint(
+    @CurrentUser() user: User,
+    @Body() dto: UnblockDatesDto,
+  ): Promise<UnblockDatesResponseDto> {
+    const result = await this.availabilityService.unblockDates(dto, user.id);
+    return { success: result.success };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('HOST')
+  @Post('block-dates')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Block dates (Host)' })
+  @ApiResponse({ status: 200, type: UnblockDatesResponseDto })
+  async blockDatesEndpoint(
+    @CurrentUser() user: User,
+    @Body() dto: UnblockDatesDto,
+  ): Promise<UnblockDatesResponseDto> {
+    const result = await this.availabilityService.blockDates(dto, user.id);
+    return { success: result.success };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('HOST')
+  @Post('experiences/block-slot')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Block an experience time slot for a date' })
+  @ApiResponse({ status: 200, type: ExperienceSlotActionResponseDto })
+  async blockExperienceSlot(
+    @CurrentUser() user: User,
+    @Body() dto: ExperienceSlotBlockDto,
+  ): Promise<ExperienceSlotActionResponseDto> {
+    return this.availabilityService.blockExperienceSlot(dto, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('HOST')
+  @Post('experiences/unblock-slot')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Unblock an experience time slot for a date' })
+  @ApiResponse({ status: 200, type: ExperienceSlotActionResponseDto })
+  async unblockExperienceSlot(
+    @CurrentUser() user: User,
+    @Body() dto: ExperienceSlotBlockDto,
+  ): Promise<ExperienceSlotActionResponseDto> {
+    return this.availabilityService.unblockExperienceSlot(dto, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('HOST')
   @Post('block')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Block date range (Host)' })
+  @ApiOperation({ summary: 'Block date range (Host) - Legacy' })
   blockDates(@CurrentUser() user: User, @Body() dto: BlockDatesDto) {
     return this.availabilityService.blockDates(dto, user.id);
   }
@@ -81,7 +158,7 @@ export class AvailabilityController {
   @Roles('HOST')
   @Post('unblock')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Unblock date range (Host)' })
+  @ApiOperation({ summary: 'Unblock date range (Host) - Legacy' })
   unblockDates(@CurrentUser() user: User, @Body() dto: BlockDatesDto) {
     return this.availabilityService.unblockDates(dto, user.id);
   }

@@ -39,9 +39,8 @@ export class AuthService {
         password: hashed,
         name: dto.name,
         phone: dto.phone || null,
-        role: dto.role === 'host' ? 'HOST' : 'GUEST',
-        // Host-specific fields (null for guests)
-        businessName: dto.role === 'host' ? `${dto.name}'s Services` : null,
+        role: 'GUEST',
+        businessName: null,
         isApproved: false,
       },
     });
@@ -95,12 +94,15 @@ export class AuthService {
 
   sanitize(user: any) {
     const { password, resetToken, resetTokenExpiry, refreshToken, deletedAt, ...rest } = user;
+    const role = (user.role || 'GUEST').toLowerCase();
+    const isHost = role === 'host';
+
     return {
       ...rest,
-      // Frontend expects roles: UserRole[] (array). Backend stores a single role enum.
-      roles: [user.role.toLowerCase()],
-      // Keep role too for convenience
-      role: user.role.toLowerCase(),
+      // Frontend expects roles: UserRole[] (array) where hosts retain guest booking capabilities
+      roles: isHost ? ['guest', 'host'] : [role],
+      role,
+      isHostVerified: isHost ? Boolean(user.isApproved) : false,
     };
   }
 

@@ -61,7 +61,7 @@ export class PropertySyncWorker extends WorkerHost {
       },
     });
 
-    if (!property || property.deletedAt) {
+    if (!property || property.deletedAt || property.status !== 'ACTIVE') {
       await this.readStore.deleteProperty(propertyId);
       return;
     }
@@ -96,8 +96,8 @@ export class PropertySyncWorker extends WorkerHost {
       type: property.type.toLowerCase() as 'stay' | 'experience' | 'transport',
       status: property.status.toLowerCase(),
       name: property.name,
-      description: property.description,
-      location: property.location,
+      description: property.description || '',
+      location: property.location || '',
       currency: property.currency,
       price: startingPrice,
       priceFormatted: `K${(startingPrice / 100).toFixed(2)}`,

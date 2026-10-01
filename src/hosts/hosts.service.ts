@@ -148,5 +148,83 @@ export class HostsService {
       },
     };
   }
+
+  async submitApplication(userId: string, dto: import('./dto/onboard-host.dto').OnboardHostDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const app = await this.prisma.hostApplication.upsert({
+      where: { userId },
+      create: {
+        userId,
+        businessName: dto.businessName,
+        operatingSince: dto.operatingSince,
+        province: dto.province,
+        town: dto.town,
+        businessEmail: dto.businessEmail,
+        businessPhone: dto.businessPhone,
+        pacraDocs: dto.pacraDocs ?? undefined,
+        ownershipDocs: dto.ownershipDocs ?? undefined,
+        operationDocs: dto.operationDocs ?? undefined,
+        status: 'pending_review',
+      },
+      update: {
+        businessName: dto.businessName,
+        operatingSince: dto.operatingSince,
+        province: dto.province,
+        town: dto.town,
+        businessEmail: dto.businessEmail,
+        businessPhone: dto.businessPhone,
+        pacraDocs: dto.pacraDocs ?? undefined,
+        ownershipDocs: dto.ownershipDocs ?? undefined,
+        operationDocs: dto.operationDocs ?? undefined,
+        status: 'pending_review',
+        reviewerNotes: null,
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { businessName: dto.businessName },
+    });
+
+    return {
+      applicationId: app.id,
+      userId: app.userId,
+      businessName: app.businessName,
+      status: app.status,
+      submittedAt: app.createdAt,
+      message: 'Application submitted. Our verification team will review your documents within 1–3 business days.',
+    };
+  }
+
+  async getApplicationStatus(userId: string) {
+    const app = await this.prisma.hostApplication.findUnique({
+      where: { userId },
+    });
+
+    if (!app) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { businessName: true, role: true, isApproved: true },
+      });
+      return {
+        applicationId: null,
+        status: user?.isApproved ? 'approved' : 'not_applied',
+        businessName: user?.businessName || null,
+        submittedAt: null,
+        reviewerNotes: null,
+      };
+    }
+
+    return {
+      applicationId: app.id,
+      status: app.status,
+      businessName: app.businessName,
+      submittedAt: app.createdAt,
+      reviewerNotes: app.reviewerNotes,
+    };
+  }
 }
+
 

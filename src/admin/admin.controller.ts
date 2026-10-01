@@ -159,6 +159,25 @@ export class AdminController {
 
   // ─── Hosts ─────────────────────────────────────────────────────────────────
 
+  @Get('host-applications')
+  @ApiOperation({ summary: 'List host applications / KYC submissions' })
+  getHostApplications(
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getHostApplications(status, page, limit);
+  }
+
+  @Patch('host-applications/:id/review')
+  @ApiOperation({ summary: 'Review host application (approve/reject KYC)' })
+  reviewHostApplication(
+    @Param('id') id: string,
+    @Body() dto: import('./dto/review-host-application.dto').ReviewHostApplicationDto,
+  ) {
+    return this.adminService.reviewHostApplication(id, dto);
+  }
+
   @Patch('hosts/:id/approve')
   @ApiOperation({ summary: 'Approve host account' })
   approveHost(@Param('id') id: string) {
@@ -173,3 +192,4 @@ export class AdminController {
     return this.adminService.promoteToAdmin(id);
   }
 }
+

@@ -6,10 +6,12 @@ import { HostDashboardService } from './host-dashboard.service';
 import { PropertiesService } from '../properties/properties.service';
 import { BookingsModule } from '../bookings/bookings.module';
 
+import { HostOnboardingController } from './host-onboarding.controller';
+
 @Module({
   imports: [BookingsModule],
   providers: [HostsService, HostDashboardService, PropertiesService],
-  controllers: [HostsController, HostController],
+  controllers: [HostsController, HostController, HostOnboardingController],
   exports: [HostsService],
 })
 export class HostsModule {}
