@@ -1,136 +1,39 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { ConfigService } from '@nestjs/config';
-import { Client as ElasticsearchClient } from '@elastic/elasticsearch';
-import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReadPropertyDocument, ReadListingDocument } from './types/property-document.type';
-import { PROPERTY_SYNC_QUEUE, PropertySyncJobData } from './property-sync.constants';
-
-const REDIS_KEY = (id: string) => `property:${id}`;
-const ES_INDEX = 'properties';
+import { ReadPropertyDocument } from './types/property-document.type';
 
 @Injectable()
 export class ReadStoreService {
   private readonly logger = new Logger(ReadStoreService.name);
-  private readonly redis: Redis;
-  private readonly es: ElasticsearchClient;
 
-  constructor(
-    @InjectQueue(PROPERTY_SYNC_QUEUE) private readonly syncQueue: Queue<PropertySyncJobData>,
-    private readonly config: ConfigService,
-    private readonly prisma: PrismaService,
-  ) {
-    this.redis = new Redis({
-      host: config.get<string>('REDIS_HOST') || 'localhost',
-      port: config.get<number>('REDIS_PORT') || 6379,
-      lazyConnect: true,
-    });
+  constructor(private readonly prisma: PrismaService) {}
 
-    this.redis.on('error', (err) => {
-      this.logger.warn(`Redis connection warning: ${err.message}`);
-    });
-
-    this.es = new ElasticsearchClient({
-      node: config.get<string>('ELASTICSEARCH_URL') || 'http://localhost:9200',
-      maxRetries: 1,
-      requestTimeout: 2000,
-    });
-
-    this.ensureIndex();
-  }
-
-  // ── Queue helpers ────────────────────────────────────────────────────────────
+  // ── Sync helpers (kept for backwards compatibility; writes go direct to DB) ───
 
   async enqueueSync(propertyId: string, deleted = false): Promise<void> {
-    try {
-      await this.syncQueue.add(
-        deleted ? 'delete' : 'upsert',
-        { propertyId, deleted },
-        { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
-      );
-    } catch (err: any) {
-      this.logger.warn(
-        `Redis/Queue sync skipped for property ${propertyId}: ${err?.message}`,
-      );
-    }
+    // Writes are saved directly to PostgreSQL, so no background sync queue is needed
+    return Promise.resolve();
   }
 
-  // ── Write side (called by worker) ────────────────────────────────────────────
-
   async upsertProperty(doc: ReadPropertyDocument): Promise<void> {
-    // 1. Write to Redis
-    try {
-      await this.redis.set(REDIS_KEY(doc.id), JSON.stringify(doc));
-      await this.redis.set(`listing:${doc.id}`, JSON.stringify(doc));
-    } catch (err) {
-      this.logger.warn(`Redis set skipped: ${err.message}`);
-    }
-
-    // 2. Index in Elasticsearch
-    try {
-      await this.es.index({
-        index: ES_INDEX,
-        id: doc.id,
-        document: doc,
-      });
-    } catch (err) {
-      this.logger.warn(`Elasticsearch index skipped: ${err.message}`);
-    }
+    return Promise.resolve();
   }
 
   async upsertListing(doc: ReadPropertyDocument): Promise<void> {
-    return this.upsertProperty(doc);
+    return Promise.resolve();
   }
 
   async deleteProperty(propertyId: string): Promise<void> {
-    try {
-      await this.redis.del(REDIS_KEY(propertyId));
-      await this.redis.del(`listing:${propertyId}`);
-    } catch {}
-    try {
-      await this.es.delete({ index: ES_INDEX, id: propertyId });
-    } catch {}
+    return Promise.resolve();
   }
 
   async deleteListing(listingId: string): Promise<void> {
-    return this.deleteProperty(listingId);
+    return Promise.resolve();
   }
 
-  // ── Read side (called by controller) ────────────────────────────────────────
+  // ── Read side (direct PostgreSQL lookups) ───────────────────────────────────
 
   async getPropertyById(id: string): Promise<ReadPropertyDocument> {
-    // Redis first -- sub-ms lookup
-    try {
-      const cached = (await this.redis.get(REDIS_KEY(id))) || (await this.redis.get(`listing:${id}`));
-      if (cached) {
-        const doc = JSON.parse(cached) as ReadPropertyDocument;
-        if (doc.status?.toLowerCase() !== 'active') {
-          throw new NotFoundException('Property not found');
-        }
-        return doc;
-      }
-    } catch (err) {
-      if (err instanceof NotFoundException) throw err;
-    }
-
-    // Fallback 1: Elasticsearch
-    try {
-      const result = await this.es.get<ReadPropertyDocument>({ index: ES_INDEX, id });
-      const doc = result._source as ReadPropertyDocument;
-      if (doc.status?.toLowerCase() !== 'active') {
-        throw new NotFoundException('Property not found');
-      }
-      try {
-        await this.redis.set(REDIS_KEY(id), JSON.stringify(doc));
-      } catch {}
-      return doc;
-    } catch (err) {
-      if (err instanceof NotFoundException) throw err;
-    }
-
-    // Fallback 2: Direct Database query (for local dev or cache miss)
     return this.getPropertyFromDb(id);
   }
 
@@ -139,94 +42,14 @@ export class ReadStoreService {
   }
 
   async searchProperties(query: any): Promise<{ data: ReadPropertyDocument[]; meta: any }> {
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 12));
-    const from = (page - 1) * limit;
-
-    const must: any[] = [{ term: { status: 'active' } }];
-    const filter: any[] = [];
-
-    const typeFilter = query.vertical || query.type;
-    if (typeFilter && typeFilter !== 'all') {
-      must.push({ term: { type: typeFilter.toLowerCase() } });
-    }
-
-    if (query.q) {
-      must.push({
-        multi_match: {
-          query: query.q,
-          fields: ['name^3', 'description', 'location^2', 'stays.name', 'experiences.name', 'transports.name'],
-          fuzziness: 'AUTO',
-        },
-      });
-    }
-
-    if (query.city) {
-      must.push({ match: { location: { query: query.city, fuzziness: 'AUTO' } } });
-    }
-    if (query.province) {
-      must.push({ match: { location: { query: query.province, fuzziness: 'AUTO' } } });
-    }
-    if (query.location && !query.q && !query.city && !query.province) {
-      must.push({ match: { location: { query: query.location, fuzziness: 'AUTO' } } });
-    }
-
-    const minP = query.minPriceNgwee !== undefined ? Number(query.minPriceNgwee) : query.minPrice !== undefined ? Number(query.minPrice) : undefined;
-    const maxP = query.maxPriceNgwee !== undefined ? Number(query.maxPriceNgwee) : query.maxPrice !== undefined ? Number(query.maxPrice) : undefined;
-    if (minP !== undefined || maxP !== undefined) {
-      const rangeFilter: any = {};
-      if (minP !== undefined) rangeFilter.gte = minP;
-      if (maxP !== undefined) rangeFilter.lte = maxP;
-      filter.push({ range: { price: rangeFilter } });
-    }
-
-    if (query.featured === 'gem') {
-      filter.push({ range: { rating: { gte: 4 } } });
-    } else if (query.featured === 'packages') {
-      must.push({ term: { type: 'experience' } });
-    }
-
-    if (query.guests) {
-      filter.push({ range: { 'stays.maxGuests': { gte: Number(query.guests) } } });
-    }
-
-    let sort: any[] = [{ createdAt: 'desc' }];
-    if (query.sort === 'price_asc') sort = [{ price: 'asc' }];
-    else if (query.sort === 'price_desc') sort = [{ price: 'desc' }];
-    else if (query.sort === 'rating') sort = [{ rating: 'desc' }];
-    else if (query.sort === 'popular') sort = [{ reviewCount: 'desc' }];
-    else if (query.sort === 'newest') sort = [{ createdAt: 'desc' }];
-
-    try {
-      const response = await this.es.search<ReadPropertyDocument>({
-        index: ES_INDEX,
-        from,
-        size: limit,
-        query: { bool: { must, filter } },
-        sort,
-      });
-
-      const hits = response.hits.hits;
-      const total =
-        typeof response.hits.total === 'number'
-          ? response.hits.total
-          : (response.hits.total as any)?.value || 0;
-
-      return {
-        data: hits.map((h) => h._source as ReadPropertyDocument),
-        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-      };
-    } catch (err) {
-      this.logger.warn(`Elasticsearch unavailable or empty (${err.message}). Serving from Postgres.`);
-      return this.searchPropertiesFromDb(query);
-    }
+    return this.searchPropertiesFromDb(query);
   }
 
   async searchListings(query: any) {
     return this.searchProperties(query);
   }
 
-  // ── Database Fallbacks (High resilience) ─────────────────────────────────────
+  // ── Database Queries (Prisma / PostgreSQL) ──────────────────────────────────
 
   private async getPropertyFromDb(id: string): Promise<ReadPropertyDocument> {
     const property = await this.prisma.property.findUnique({
@@ -375,7 +198,7 @@ export class ReadStoreService {
   }
 
   private mapToDoc(property: any): ReadPropertyDocument {
-    const ratings = property.reviews.map((r: any) => r.rating);
+    const ratings = property.reviews?.map((r: any) => r.rating) || [];
     const avgRating = ratings.length
       ? Number((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1))
       : 0;
@@ -488,41 +311,5 @@ export class ReadStoreService {
       createdAt: property.createdAt.toISOString(),
       updatedAt: property.updatedAt.toISOString(),
     };
-  }
-
-  // ── Elasticsearch index setup ────────────────────────────────────────────────
-
-  private async ensureIndex(): Promise<void> {
-    try {
-      const exists = await this.es.indices.exists({ index: ES_INDEX });
-      if (exists) return;
-
-      await this.es.indices.create({
-        index: ES_INDEX,
-        mappings: {
-          properties: {
-            id:           { type: 'keyword' },
-            type:         { type: 'keyword' },
-            status:       { type: 'keyword' },
-            name:         { type: 'text', analyzer: 'standard' },
-            description:  { type: 'text', analyzer: 'standard' },
-            location:     { type: 'text', analyzer: 'standard', fields: { keyword: { type: 'keyword' } } },
-            price:        { type: 'integer' },
-            currency:     { type: 'keyword' },
-            rating:       { type: 'float' },
-            reviewCount:  { type: 'integer' },
-            hostId:       { type: 'keyword' },
-            hostName:     { type: 'text' },
-            thumbnailUrl: { type: 'keyword', index: false },
-            createdAt:    { type: 'date' },
-            updatedAt:    { type: 'date' },
-          },
-        },
-      });
-
-      this.logger.log(`Elasticsearch index "${ES_INDEX}" created`);
-    } catch (err) {
-      this.logger.warn(`Could not ensure ES index: ${err.message}`);
-    }
   }
 }

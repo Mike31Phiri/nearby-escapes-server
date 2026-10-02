@@ -1,57 +1,30 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const POPULAR_STAYS_KEY = 'popular:stays';
 export const POPULAR_EXPERIENCES_KEY = 'popular:experiences';
 export const POPULAR_METADATA_KEY = 'popular:metadata';
-const CACHE_TTL_SECONDS = 60 * 60 * 48; // 48 hours TTL buffer for midnight 24h cron
 
 @Injectable()
-export class PopularityService implements OnApplicationBootstrap, OnModuleDestroy {
+export class PopularityService implements OnApplicationBootstrap {
   private readonly logger = new Logger(PopularityService.name);
-  private readonly redis: Redis;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {
-    this.redis = new Redis({
-      host: this.config.get<string>('REDIS_HOST') || 'localhost',
-      port: this.config.get<number>('REDIS_PORT') || 6379,
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      retryStrategy: () => null,
-    });
+  // In-memory cache replacing external Redis
+  private cachedStays: any[] = [];
+  private cachedExperiences: any[] = [];
+  private lastCalculatedAt: string | null = null;
 
-    this.redis.on('error', (err) => {
-      this.logger.warn(`Redis connection warning (PopularityService): ${err.message}`);
-    });
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async onApplicationBootstrap() {
     try {
-      await this.redis.connect().catch(() => {});
-      const hasStays = await this.redis.exists(POPULAR_STAYS_KEY);
-      const hasExp = await this.redis.exists(POPULAR_EXPERIENCES_KEY);
-
-      if (!hasStays || !hasExp) {
-        this.logger.log('Initial popular listings cache missing or incomplete. Priming now...');
-        await this.recalculateAll();
-      } else {
-        this.logger.log('Popular listings cache primed and ready in Redis.');
-      }
+      this.logger.log('Priming popular listings cache in memory...');
+      await this.recalculateAll();
+      this.logger.log('Popular listings cache primed and ready in memory.');
     } catch (err: any) {
-      this.logger.warn(`Could not verify or prime Redis popular listings on startup: ${err.message}`);
+      this.logger.warn(`Could not prime popular listings on startup: ${err.message}`);
     }
-  }
-
-  async onModuleDestroy() {
-    try {
-      await this.redis.quit();
-    } catch {}
   }
 
   // ── Scheduled midnight cron (runs every 24 hours at 00:00:00) ──────────────
@@ -82,20 +55,9 @@ export class PopularityService implements OnApplicationBootstrap, OnModuleDestro
     ]);
 
     const timestamp = new Date().toISOString();
-    try {
-      await this.redis.set(
-        POPULAR_METADATA_KEY,
-        JSON.stringify({
-          lastCalculated: timestamp,
-          stayCount: stays.length,
-          experienceCount: experiences.length,
-        }),
-        'EX',
-        CACHE_TTL_SECONDS,
-      );
-    } catch (err: any) {
-      this.logger.warn(`Failed to cache popularity metadata: ${err.message}`);
-    }
+    this.cachedStays = stays;
+    this.cachedExperiences = experiences;
+    this.lastCalculatedAt = timestamp;
 
     return {
       stays: stays.length,
@@ -110,8 +72,6 @@ export class PopularityService implements OnApplicationBootstrap, OnModuleDestro
    * If fewer than N properties have bookings, it backfills with other active listings.
    */
   async calculateAndStorePopular(type: 'STAY' | 'EXPERIENCE', limit = 10): Promise<any[]> {
-    const key = type === 'STAY' ? POPULAR_STAYS_KEY : POPULAR_EXPERIENCES_KEY;
-
     // 1. Group bookings by propertyId where property matches the desired type and is active
     const bookingCounts = await this.prisma.booking.groupBy({
       by: ['propertyId'],
@@ -166,9 +126,8 @@ export class PopularityService implements OnApplicationBootstrap, OnModuleDestro
     }
 
     if (!orderedIds.length) {
-      try {
-        await this.redis.set(key, JSON.stringify([]), 'EX', CACHE_TTL_SECONDS);
-      } catch {}
+      if (type === 'STAY') this.cachedStays = [];
+      else this.cachedExperiences = [];
       return [];
     }
 
@@ -222,57 +181,35 @@ export class PopularityService implements OnApplicationBootstrap, OnModuleDestro
       });
     }
 
-    // 5. Store in Redis
-    try {
-      await this.redis.set(key, JSON.stringify(formatted), 'EX', CACHE_TTL_SECONDS);
-      this.logger.log(`Stored ${formatted.length} popular ${type.toLowerCase()}s in Redis at key "${key}"`);
-    } catch (err: any) {
-      this.logger.warn(`Failed to store popular ${type.toLowerCase()}s in Redis: ${err.message}`);
+    // 5. Store in memory
+    if (type === 'STAY') {
+      this.cachedStays = formatted;
+    } else {
+      this.cachedExperiences = formatted;
     }
 
     return formatted;
   }
 
-  // ── Public Getters (Redis-first with DB fallback) ──────────────────────────
+  // ── Public Getters (Memory-first with DB calculation) ─────────────────────
 
   async getPopularStays(): Promise<any[]> {
-    try {
-      const cached = await this.redis.get(POPULAR_STAYS_KEY);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch (err: any) {
-      this.logger.warn(`Redis get "${POPULAR_STAYS_KEY}" failed: ${err.message}`);
+    if (this.cachedStays && this.cachedStays.length > 0) {
+      return this.cachedStays;
     }
-
-    // Cache miss or Redis unavailable: calculate, cache and return
     return this.calculateAndStorePopular('STAY', 10);
   }
 
   async getPopularExperiences(): Promise<any[]> {
-    try {
-      const cached = await this.redis.get(POPULAR_EXPERIENCES_KEY);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch (err: any) {
-      this.logger.warn(`Redis get "${POPULAR_EXPERIENCES_KEY}" failed: ${err.message}`);
+    if (this.cachedExperiences && this.cachedExperiences.length > 0) {
+      return this.cachedExperiences;
     }
-
-    // Cache miss or Redis unavailable: calculate, cache and return
     return this.calculateAndStorePopular('EXPERIENCE', 10);
   }
 
   async getMetadata(): Promise<any> {
-    try {
-      const cached = await this.redis.get(POPULAR_METADATA_KEY);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch {}
-
     return {
-      lastCalculated: null,
+      lastCalculated: this.lastCalculatedAt,
       cronSchedule: '0 0 * * * (Midnight UTC)',
       frequency: 'Every 24 hours',
       keys: {
