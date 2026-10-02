@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+uploads/
+coverage/
+scratch/
+*.log
+*.md
+.agents/
+.claude/
+agent/
+skills-lock.json
+tmp_check.sql
