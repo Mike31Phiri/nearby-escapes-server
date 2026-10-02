@@ -22,7 +22,7 @@ export class UploadsController {
   @UseInterceptors(FilesInterceptor('files', 10))
   async upload(
     @Req() req: Request,
-    @UploadedFiles() files: Express.MulterS3.File[],
+    @UploadedFiles() files: Express.Multer.File[],
     @Query('propertyId') propertyId?: string,
     @Query('listingId') listingId?: string,
   ) {
