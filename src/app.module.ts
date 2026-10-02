@@ -13,7 +13,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 import { AvailabilityModule } from './availability/availability.module';
-import { UploadsModule } from './uploads/uploads.module';
+// import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
 import { PlatformModule } from './platform/platform.module';
 import { ReadStoreModule } from './read-store/read-store.module';
@@ -37,7 +37,7 @@ import { PopularityModule } from './popularity/popularity.module';
     NotificationsModule,
     WishlistModule,
     AvailabilityModule,
-    UploadsModule,
+    // UploadsModule, //
     AdminModule,
     PlatformModule,
     ReadStoreModule,
