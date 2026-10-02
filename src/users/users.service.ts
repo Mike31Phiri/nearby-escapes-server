@@ -1,14 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { S3Service } from '../uploads/s3.service';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private prisma: PrismaService,
-    private s3?: S3Service,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   findById(id: string) {
     return this.prisma.user.findUnique({ where: { id } });
