@@ -10,16 +10,18 @@ exports.PropertiesModule = void 0;
 const common_1 = require("@nestjs/common");
 const properties_service_1 = require("./properties.service");
 const properties_controller_1 = require("./properties.controller");
+const listings_controller_1 = require("./listings.controller");
 const prisma_module_1 = require("../prisma/prisma.module");
 const read_store_module_1 = require("../read-store/read-store.module");
 const hosts_module_1 = require("../hosts/hosts.module");
+const popularity_module_1 = require("../popularity/popularity.module");
 let PropertiesModule = class PropertiesModule {
 };
 exports.PropertiesModule = PropertiesModule;
 exports.PropertiesModule = PropertiesModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, read_store_module_1.ReadStoreModule, hosts_module_1.HostsModule],
-        controllers: [properties_controller_1.PropertiesController],
+        imports: [prisma_module_1.PrismaModule, read_store_module_1.ReadStoreModule, hosts_module_1.HostsModule, popularity_module_1.PopularityModule],
+        controllers: [properties_controller_1.PropertiesController, listings_controller_1.ListingsController],
         providers: [properties_service_1.PropertiesService],
         exports: [properties_service_1.PropertiesService],
     })

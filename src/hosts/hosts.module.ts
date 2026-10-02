@@ -7,11 +7,13 @@ import { PropertiesService } from '../properties/properties.service';
 import { BookingsModule } from '../bookings/bookings.module';
 
 import { HostOnboardingController } from './host-onboarding.controller';
+import { HostSupportController } from './host-support.controller';
+import { HostSupportService } from './host-support.service';
 
 @Module({
   imports: [BookingsModule],
-  providers: [HostsService, HostDashboardService, PropertiesService],
-  controllers: [HostsController, HostController, HostOnboardingController],
+  providers: [HostsService, HostDashboardService, PropertiesService, HostSupportService],
+  controllers: [HostsController, HostController, HostOnboardingController, HostSupportController],
   exports: [HostsService],
 })
 export class HostsModule {}

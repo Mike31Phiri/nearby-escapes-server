@@ -1,9 +1,15 @@
+import { UpdatePropertyPoliciesDto, CancellationTier } from '../policies/dto/policy.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
-import { UpdatePropertyDto } from './dto/update-property.dto';
+import { UpdatePropertyDto, UpdatePropertyPricingDto, UpdatePropertyPricingResponseDto } from './dto/update-property.dto';
 import { CreateStayDto, UpdateStayDto } from './dto/create-stay.dto';
 import { CreateExperienceDto, UpdateExperienceDto } from './dto/create-experience.dto';
 import { CreateTransportDto, UpdateTransportDto } from './dto/create-transport.dto';
+import { CreateListingPolicyDto, UpdateListingPolicyDto, SetListingPoliciesDto } from './dto/listing-policy.dto';
+import { CreateListingTagDto, CreateListingRecommendationDto, ListingFilterQueryDto } from './dto/listing-tag-recommendation.dto';
+import { PropertyStatus } from '@prisma/client';
+import { CreateUnifiedListingDto, CreateUnifiedListingResponseDto, UpdateListingStatusResponseDto, DeleteListingResponseDto, AdjustInventoryDto, AdjustInventoryResponseDto } from './dto/create-listing-unified.dto';
+export declare function toTagSlug(name: string): string;
 export declare class PropertiesService {
     private readonly prisma;
     private readonly logger;
@@ -13,6 +19,9 @@ export declare class PropertiesService {
         id: any;
         type: any;
         status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
         name: any;
         description: any;
         location: any;
@@ -25,6 +34,8 @@ export declare class PropertiesService {
         images: any;
         amenities: any;
         rules: any;
+        tags: any;
+        recommendations: any;
         hostId: any;
         hostName: any;
         hostAvatar: any;
@@ -38,6 +49,9 @@ export declare class PropertiesService {
         id: any;
         type: any;
         status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
         name: any;
         description: any;
         location: any;
@@ -50,6 +64,8 @@ export declare class PropertiesService {
         images: any;
         amenities: any;
         rules: any;
+        tags: any;
+        recommendations: any;
         hostId: any;
         hostName: any;
         hostAvatar: any;
@@ -65,7 +81,46 @@ export declare class PropertiesService {
     }>;
     addStay(propertyId: string, hostId: string, dto: CreateStayDto): Promise<{
         propertyId: string;
-        stay: {
+        stay: ({
+            tags: {
+                id: string;
+                name: string;
+                createdAt: Date;
+                category: import("@prisma/client").$Enums.TagCategory;
+                slug: string;
+                propertyId: string | null;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                icon: string | null;
+            }[];
+            recommendations: {
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                title: string;
+                propertyId: string | null;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                reason: string | null;
+                audience: import("@prisma/client").$Enums.RecommendationAudience;
+                sortOrder: number;
+                badge: string | null;
+            }[];
+            policies: {
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                category: import("@prisma/client").$Enums.ListingPolicyCategory;
+                title: string;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                body: string;
+                sortOrder: number;
+            }[];
+        } & {
             id: string;
             name: string;
             createdAt: Date;
@@ -73,19 +128,19 @@ export declare class PropertiesService {
             deletedAt: Date | null;
             description: string | null;
             propertyId: string;
+            checkInFrom: string | null;
+            checkInUntil: string | null;
+            checkOutBefore: string | null;
+            maxGuests: number | null;
             sortOrder: number;
-            isActive: boolean;
             price: number;
             roomType: string | null;
             bedrooms: number | null;
             beds: number | null;
             baths: number | null;
-            maxGuests: number | null;
-            checkInFrom: string | null;
-            checkInUntil: string | null;
-            checkOutBefore: string | null;
             cancellationPolicy: import("@prisma/client").$Enums.CancellationPolicy | null;
-        };
+            isActive: boolean;
+        }) | null;
     }>;
     listStays(propertyId: string): Promise<{
         id: string;
@@ -95,18 +150,18 @@ export declare class PropertiesService {
         deletedAt: Date | null;
         description: string | null;
         propertyId: string;
+        checkInFrom: string | null;
+        checkInUntil: string | null;
+        checkOutBefore: string | null;
+        maxGuests: number | null;
         sortOrder: number;
-        isActive: boolean;
         price: number;
         roomType: string | null;
         bedrooms: number | null;
         beds: number | null;
         baths: number | null;
-        maxGuests: number | null;
-        checkInFrom: string | null;
-        checkInUntil: string | null;
-        checkOutBefore: string | null;
         cancellationPolicy: import("@prisma/client").$Enums.CancellationPolicy | null;
+        isActive: boolean;
     }[]>;
     updateStay(propertyId: string, stayId: string, hostId: string, dto: UpdateStayDto): Promise<{
         propertyId: string;
@@ -118,18 +173,18 @@ export declare class PropertiesService {
             deletedAt: Date | null;
             description: string | null;
             propertyId: string;
+            checkInFrom: string | null;
+            checkInUntil: string | null;
+            checkOutBefore: string | null;
+            maxGuests: number | null;
             sortOrder: number;
-            isActive: boolean;
             price: number;
             roomType: string | null;
             bedrooms: number | null;
             beds: number | null;
             baths: number | null;
-            maxGuests: number | null;
-            checkInFrom: string | null;
-            checkInUntil: string | null;
-            checkOutBefore: string | null;
             cancellationPolicy: import("@prisma/client").$Enums.CancellationPolicy | null;
+            isActive: boolean;
         };
     }>;
     removeStay(propertyId: string, stayId: string, hostId: string): Promise<{
@@ -139,7 +194,45 @@ export declare class PropertiesService {
     }>;
     addExperience(propertyId: string, hostId: string, dto: CreateExperienceDto): Promise<{
         propertyId: string;
-        experience: {
+        experience: ({
+            tags: {
+                id: string;
+                name: string;
+                createdAt: Date;
+                category: import("@prisma/client").$Enums.TagCategory;
+                slug: string;
+                propertyId: string | null;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                icon: string | null;
+            }[];
+            recommendations: {
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                title: string;
+                propertyId: string | null;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                reason: string | null;
+                audience: import("@prisma/client").$Enums.RecommendationAudience;
+                sortOrder: number;
+                badge: string | null;
+            }[];
+            policies: {
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                category: import("@prisma/client").$Enums.ListingPolicyCategory;
+                title: string;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                body: string;
+                sortOrder: number;
+            }[];
             timeSlots: {
                 id: string;
                 experienceId: string;
@@ -159,14 +252,14 @@ export declare class PropertiesService {
             description: string | null;
             propertyId: string;
             sortOrder: number;
-            isActive: boolean;
             price: number;
+            isActive: boolean;
             activityType: string | null;
             duration: string | null;
             maxParticipants: number | null;
             difficultyLevel: string | null;
             meetingPoint: string | null;
-        };
+        }) | null;
     }>;
     listExperiences(propertyId: string): Promise<({
         timeSlots: {
@@ -188,8 +281,8 @@ export declare class PropertiesService {
         description: string | null;
         propertyId: string;
         sortOrder: number;
-        isActive: boolean;
         price: number;
+        isActive: boolean;
         activityType: string | null;
         duration: string | null;
         maxParticipants: number | null;
@@ -218,8 +311,8 @@ export declare class PropertiesService {
             description: string | null;
             propertyId: string;
             sortOrder: number;
-            isActive: boolean;
             price: number;
+            isActive: boolean;
             activityType: string | null;
             duration: string | null;
             maxParticipants: number | null;
@@ -234,7 +327,46 @@ export declare class PropertiesService {
     }>;
     addTransport(propertyId: string, hostId: string, dto: CreateTransportDto): Promise<{
         propertyId: string;
-        transport: {
+        transport: ({
+            tags: {
+                id: string;
+                name: string;
+                createdAt: Date;
+                category: import("@prisma/client").$Enums.TagCategory;
+                slug: string;
+                propertyId: string | null;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                icon: string | null;
+            }[];
+            recommendations: {
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                title: string;
+                propertyId: string | null;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                reason: string | null;
+                audience: import("@prisma/client").$Enums.RecommendationAudience;
+                sortOrder: number;
+                badge: string | null;
+            }[];
+            policies: {
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                category: import("@prisma/client").$Enums.ListingPolicyCategory;
+                title: string;
+                stayId: string | null;
+                experienceId: string | null;
+                transportId: string | null;
+                body: string;
+                sortOrder: number;
+            }[];
+        } & {
             id: string;
             name: string;
             createdAt: Date;
@@ -244,13 +376,13 @@ export declare class PropertiesService {
             propertyId: string;
             from: string | null;
             to: string | null;
+            schedule: import("@prisma/client/runtime/client").JsonValue | null;
             sortOrder: number;
             isActive: boolean;
             vehicleType: string | null;
             capacity: number | null;
             pricePerSeat: number | null;
-            schedule: import("@prisma/client/runtime/client").JsonValue | null;
-        };
+        }) | null;
     }>;
     listTransports(propertyId: string): Promise<{
         id: string;
@@ -262,12 +394,12 @@ export declare class PropertiesService {
         propertyId: string;
         from: string | null;
         to: string | null;
+        schedule: import("@prisma/client/runtime/client").JsonValue | null;
         sortOrder: number;
         isActive: boolean;
         vehicleType: string | null;
         capacity: number | null;
         pricePerSeat: number | null;
-        schedule: import("@prisma/client/runtime/client").JsonValue | null;
     }[]>;
     updateTransport(propertyId: string, transportId: string, hostId: string, dto: UpdateTransportDto): Promise<{
         propertyId: string;
@@ -281,12 +413,12 @@ export declare class PropertiesService {
             propertyId: string;
             from: string | null;
             to: string | null;
+            schedule: import("@prisma/client/runtime/client").JsonValue | null;
             sortOrder: number;
             isActive: boolean;
             vehicleType: string | null;
             capacity: number | null;
             pricePerSeat: number | null;
-            schedule: import("@prisma/client/runtime/client").JsonValue | null;
         };
     }>;
     removeTransport(propertyId: string, transportId: string, hostId: string): Promise<{
@@ -333,10 +465,13 @@ export declare class PropertiesService {
         id: string;
         deleted: boolean;
     }>;
-    findByHost(hostId: string): Promise<{
+    findByHost(hostId: string, status?: PropertyStatus): Promise<{
         id: any;
         type: any;
         status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
         name: any;
         description: any;
         location: any;
@@ -349,6 +484,8 @@ export declare class PropertiesService {
         images: any;
         amenities: any;
         rules: any;
+        tags: any;
+        recommendations: any;
         hostId: any;
         hostName: any;
         hostAvatar: any;
@@ -358,10 +495,13 @@ export declare class PropertiesService {
         experiences: any;
         transports: any;
     }[]>;
-    findOneFromDb(id: string): Promise<{
+    findDraftsByHost(hostId: string): Promise<{
         id: any;
         type: any;
         status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
         name: any;
         description: any;
         location: any;
@@ -374,6 +514,190 @@ export declare class PropertiesService {
         images: any;
         amenities: any;
         rules: any;
+        tags: any;
+        recommendations: any;
+        hostId: any;
+        hostName: any;
+        hostAvatar: any;
+        createdAt: any;
+        updatedAt: any;
+        stays: any;
+        experiences: any;
+        transports: any;
+    }[]>;
+    findDraftById(id: string, hostId: string): Promise<{
+        id: any;
+        type: any;
+        status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
+        name: any;
+        description: any;
+        location: any;
+        currency: any;
+        price: number;
+        priceFormatted: string;
+        rating: number;
+        reviewCount: any;
+        thumbnailUrl: any;
+        images: any;
+        amenities: any;
+        rules: any;
+        tags: any;
+        recommendations: any;
+        hostId: any;
+        hostName: any;
+        hostAvatar: any;
+        createdAt: any;
+        updatedAt: any;
+        stays: any;
+        experiences: any;
+        transports: any;
+    }>;
+    saveDraft(hostId: string, dto: CreatePropertyDto): Promise<{
+        id: any;
+        type: any;
+        status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
+        name: any;
+        description: any;
+        location: any;
+        currency: any;
+        price: number;
+        priceFormatted: string;
+        rating: number;
+        reviewCount: any;
+        thumbnailUrl: any;
+        images: any;
+        amenities: any;
+        rules: any;
+        tags: any;
+        recommendations: any;
+        hostId: any;
+        hostName: any;
+        hostAvatar: any;
+        createdAt: any;
+        updatedAt: any;
+        stays: any;
+        experiences: any;
+        transports: any;
+    }>;
+    updateDraft(propertyId: string, hostId: string, dto: UpdatePropertyDto): Promise<{
+        id: any;
+        type: any;
+        status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
+        name: any;
+        description: any;
+        location: any;
+        currency: any;
+        price: number;
+        priceFormatted: string;
+        rating: number;
+        reviewCount: any;
+        thumbnailUrl: any;
+        images: any;
+        amenities: any;
+        rules: any;
+        tags: any;
+        recommendations: any;
+        hostId: any;
+        hostName: any;
+        hostAvatar: any;
+        createdAt: any;
+        updatedAt: any;
+        stays: any;
+        experiences: any;
+        transports: any;
+    }>;
+    publishListing(propertyId: string, hostId: string): Promise<{
+        id: any;
+        type: any;
+        status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
+        name: any;
+        description: any;
+        location: any;
+        currency: any;
+        price: number;
+        priceFormatted: string;
+        rating: number;
+        reviewCount: any;
+        thumbnailUrl: any;
+        images: any;
+        amenities: any;
+        rules: any;
+        tags: any;
+        recommendations: any;
+        hostId: any;
+        hostName: any;
+        hostAvatar: any;
+        createdAt: any;
+        updatedAt: any;
+        stays: any;
+        experiences: any;
+        transports: any;
+    }>;
+    saveWizardStep(propertyId: string, hostId: string, step: number, payload: any): Promise<{
+        savedStep: number;
+        nextStep: number;
+        id: any;
+        type: any;
+        status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
+        name: any;
+        description: any;
+        location: any;
+        currency: any;
+        price: number;
+        priceFormatted: string;
+        rating: number;
+        reviewCount: any;
+        thumbnailUrl: any;
+        images: any;
+        amenities: any;
+        rules: any;
+        tags: any;
+        recommendations: any;
+        hostId: any;
+        hostName: any;
+        hostAvatar: any;
+        createdAt: any;
+        updatedAt: any;
+        stays: any;
+        experiences: any;
+        transports: any;
+    }>;
+    findOneFromDb(id: string): Promise<{
+        id: any;
+        type: any;
+        status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
+        name: any;
+        description: any;
+        location: any;
+        currency: any;
+        price: number;
+        priceFormatted: string;
+        rating: number;
+        reviewCount: any;
+        thumbnailUrl: any;
+        images: any;
+        amenities: any;
+        rules: any;
+        tags: any;
+        recommendations: any;
         hostId: any;
         hostName: any;
         hostAvatar: any;
@@ -387,6 +711,9 @@ export declare class PropertiesService {
         id: any;
         type: any;
         status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
         name: any;
         description: any;
         location: any;
@@ -399,6 +726,8 @@ export declare class PropertiesService {
         images: any;
         amenities: any;
         rules: any;
+        tags: any;
+        recommendations: any;
         hostId: any;
         hostName: any;
         hostAvatar: any;
@@ -409,5 +738,238 @@ export declare class PropertiesService {
         transports: any;
     };
     private assertOwnership;
+    getListingPolicies(unitType: 'stay' | 'experience' | 'transport', unitId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        category: import("@prisma/client").$Enums.ListingPolicyCategory;
+        title: string;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        body: string;
+        sortOrder: number;
+    }[]>;
+    addListingPolicy(unitType: 'stay' | 'experience' | 'transport', unitId: string, hostId: string, dto: CreateListingPolicyDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        category: import("@prisma/client").$Enums.ListingPolicyCategory;
+        title: string;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        body: string;
+        sortOrder: number;
+    }>;
+    setListingPolicies(unitType: 'stay' | 'experience' | 'transport', unitId: string, hostId: string, dto: SetListingPoliciesDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        category: import("@prisma/client").$Enums.ListingPolicyCategory;
+        title: string;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        body: string;
+        sortOrder: number;
+    }[]>;
+    updateListingPolicy(policyId: string, hostId: string, dto: UpdateListingPolicyDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        category: import("@prisma/client").$Enums.ListingPolicyCategory;
+        title: string;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        body: string;
+        sortOrder: number;
+    }>;
+    removeListingPolicy(policyId: string, hostId: string): Promise<{
+        id: string;
+        deleted: boolean;
+    }>;
+    private _assertUnitOwnership;
+    private _getTagTargetClause;
+    getTags(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string): Promise<{
+        id: string;
+        name: string;
+        createdAt: Date;
+        category: import("@prisma/client").$Enums.TagCategory;
+        slug: string;
+        propertyId: string | null;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        icon: string | null;
+    }[]>;
+    setTags(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string, hostId: string, tags: (string | CreateListingTagDto)[]): Promise<{
+        id: string;
+        name: string;
+        createdAt: Date;
+        category: import("@prisma/client").$Enums.TagCategory;
+        slug: string;
+        propertyId: string | null;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        icon: string | null;
+    }[]>;
+    addTag(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string, hostId: string, dto: CreateListingTagDto): Promise<{
+        id: string;
+        name: string;
+        createdAt: Date;
+        category: import("@prisma/client").$Enums.TagCategory;
+        slug: string;
+        propertyId: string | null;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        icon: string | null;
+    }>;
+    removeTag(tagId: string, hostId: string): Promise<{
+        id: string;
+        deleted: boolean;
+    }>;
+    getRecommendations(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        propertyId: string | null;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        reason: string | null;
+        audience: import("@prisma/client").$Enums.RecommendationAudience;
+        sortOrder: number;
+        badge: string | null;
+    }[]>;
+    setRecommendations(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string, hostId: string, dtos: CreateListingRecommendationDto[]): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        propertyId: string | null;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        reason: string | null;
+        audience: import("@prisma/client").$Enums.RecommendationAudience;
+        sortOrder: number;
+        badge: string | null;
+    }[]>;
+    addRecommendation(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string, hostId: string, dto: CreateListingRecommendationDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        title: string;
+        propertyId: string | null;
+        stayId: string | null;
+        experienceId: string | null;
+        transportId: string | null;
+        reason: string | null;
+        audience: import("@prisma/client").$Enums.RecommendationAudience;
+        sortOrder: number;
+        badge: string | null;
+    }>;
+    removeRecommendation(recId: string, hostId: string): Promise<{
+        id: string;
+        deleted: boolean;
+    }>;
+    getAllAvailableTags(): Promise<Record<string, {
+        name: string;
+        slug: string;
+        icon?: string | null;
+    }[]>>;
+    filterByTags(query: ListingFilterQueryDto): Promise<{
+        id: any;
+        type: any;
+        status: any;
+        isDraft: boolean;
+        draftStep: any;
+        draftData: any;
+        name: any;
+        description: any;
+        location: any;
+        currency: any;
+        price: number;
+        priceFormatted: string;
+        rating: number;
+        reviewCount: any;
+        thumbnailUrl: any;
+        images: any;
+        amenities: any;
+        rules: any;
+        tags: any;
+        recommendations: any;
+        hostId: any;
+        hostName: any;
+        hostAvatar: any;
+        createdAt: any;
+        updatedAt: any;
+        stays: any;
+        experiences: any;
+        transports: any;
+    }[]>;
+    getSampleImages(category?: string, limit?: number): Promise<{
+        id: string;
+        url: string;
+        category: string | null;
+        source: string | null;
+        caption: string | null;
+    }[]>;
+    createUnifiedListing(hostId: string, dto: CreateUnifiedListingDto): Promise<CreateUnifiedListingResponseDto>;
+    updateListingStatus(id: string, hostId: string, statusStr: string): Promise<UpdateListingStatusResponseDto>;
+    deleteListing(id: string, hostId: string): Promise<DeleteListingResponseDto>;
+    adjustInventoryCount(id: string, hostId: string, dto: AdjustInventoryDto): Promise<AdjustInventoryResponseDto>;
+    updatePropertyPricing(id: string, hostId: string, dto: UpdatePropertyPricingDto): Promise<UpdatePropertyPricingResponseDto>;
+    updatePropertyPolicies(propertyId: string, hostId: string, dto: UpdatePropertyPoliciesDto): Promise<{
+        propertyId: string;
+        updatedAt: string;
+        cancellationSummary: string;
+        rulesCount: number;
+        depositRequired: boolean;
+        success: boolean;
+        message: string;
+        data: {
+            propertyId: string;
+            updatedAt: string;
+            cancellationSummary: string;
+            rulesCount: number;
+            depositRequired: boolean;
+        };
+    }>;
+    getPropertyPolicies(propertyOrListingId: string): Promise<{
+        propertyId: string;
+        title: string;
+        cancellation: {
+            tier: CancellationTier;
+            headline: string;
+            description: any;
+            freeCancellationDeadline: string;
+        };
+        checkInWindow: string;
+        checkOutBefore: any;
+        houseRulesSummary: string[];
+        securityDepositNote: string;
+        goodToKnow: any;
+        success: boolean;
+        data: {
+            propertyId: string;
+            title: string;
+            cancellation: {
+                tier: CancellationTier;
+                headline: string;
+                description: any;
+                freeCancellationDeadline: string;
+            };
+            checkInWindow: string;
+            checkOutBefore: any;
+            houseRulesSummary: string[];
+            securityDepositNote: string;
+            goodToKnow: any;
+        };
+    }>;
 }
-export declare const ListingsService: typeof PropertiesService;

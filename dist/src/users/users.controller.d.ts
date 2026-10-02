@@ -4,6 +4,22 @@ import type { User } from '@prisma/client';
 export declare class UsersController {
     private usersService;
     constructor(usersService: UsersService);
+    me(user: User): Promise<{
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        avatar: string | null;
+        role: string;
+        homeCity: string | null;
+        bio: string | null;
+        joinedAt: Date;
+        stats: {
+            totalBookings: number;
+            totalReviews: number;
+            memberSince: string;
+        };
+    }>;
     profile(user: User): Promise<{
         id: string;
         name: string;
@@ -23,8 +39,8 @@ export declare class UsersController {
     findOne(id: string): Promise<{
         role: string;
         joinedAt: Date;
-        id: string;
         name: string;
+        id: string;
         avatar: string | null;
         homeCity: string | null;
         bio: string | null;

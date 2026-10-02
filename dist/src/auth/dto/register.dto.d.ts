@@ -3,5 +3,4 @@ export declare class RegisterDto {
     password: string;
     name: string;
     phone?: string;
-    role?: 'guest' | 'host';
 }

@@ -1,3 +1,4 @@
+import { AddHostPayoutMethodDto } from './dto/host-finances.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHostDto } from './dto/create-host.dto';
 export declare class HostsService {
@@ -11,20 +12,20 @@ export declare class HostsService {
         verified: boolean;
     }>;
     findById(id: string): Promise<{
+        id: string;
         email: string;
         name: string;
-        id: string;
         avatar: string | null;
         businessName: string | null;
         isApproved: boolean;
         createdAt: Date;
     }>;
     findByUserId(userId: string): Promise<{
+        id: string;
         email: string;
         name: string;
-        role: import("@prisma/client").$Enums.Role;
-        id: string;
         avatar: string | null;
+        role: import("@prisma/client").$Enums.Role;
         businessName: string | null;
         isApproved: boolean;
     }>;
@@ -42,11 +43,11 @@ export declare class HostsService {
         role: "host" | "host_pending";
     }>;
     findApprovedByUserId(userId: string): Promise<{
+        id: string;
         email: string;
         name: string;
-        role: import("@prisma/client").$Enums.Role;
-        id: string;
         avatar: string | null;
+        role: import("@prisma/client").$Enums.Role;
         businessName: string | null;
         isApproved: boolean;
     }>;
@@ -74,5 +75,44 @@ export declare class HostsService {
             payoutAccount: string | null;
             isApproved: boolean;
         };
+    }>;
+    submitApplication(userId: string, dto: import('./dto/onboard-host.dto').OnboardHostDto): Promise<{
+        applicationId: string;
+        userId: string;
+        businessName: string;
+        status: string;
+        submittedAt: Date;
+        message: string;
+    }>;
+    getApplicationStatus(userId: string): Promise<{
+        applicationId: null;
+        status: string;
+        businessName: string | null;
+        submittedAt: null;
+        reviewerNotes: null;
+    } | {
+        applicationId: string;
+        status: string;
+        businessName: string;
+        submittedAt: Date;
+        reviewerNotes: string | null;
+    }>;
+    addPayoutMethod(userId: string, dto: AddHostPayoutMethodDto): Promise<{
+        success: boolean;
+        message: string;
+        payoutMethod: {
+            id: string;
+            type: "bank_transfer" | "mobile_money";
+            isDefault: boolean;
+            details: import("./dto/host-finances.dto").HostPayoutMethodDetailsDto;
+        };
+    }>;
+    removePayoutMethod(userId: string, id: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    setDefaultPayoutMethod(userId: string, id: string): Promise<{
+        success: boolean;
+        message: string;
     }>;
 }

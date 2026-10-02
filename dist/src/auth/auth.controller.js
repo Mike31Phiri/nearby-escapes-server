@@ -34,12 +34,16 @@ let AuthController = class AuthController {
     async register(dto, res) {
         const { token, user } = await this.authService.register(dto);
         this.setCookie(res, token);
-        return { user, message: 'Registration successful. Welcome to Nearby Escapes!' };
+        return {
+            user,
+            accessToken: token,
+            message: 'Registration successful. Welcome to Nearby Escapes!',
+        };
     }
     async login(dto, res) {
         const { token, user } = await this.authService.login(dto);
         this.setCookie(res, token);
-        return { user };
+        return { user, accessToken: token };
     }
     logout(res) {
         res.clearCookie(COOKIE_NAME, { path: '/' });

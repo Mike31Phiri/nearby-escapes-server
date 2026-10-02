@@ -1,8 +1,44 @@
 export declare class BlockDatesDto {
+    propertyId?: string;
     stayId?: string;
     listingId?: string;
-    dateFrom: string;
-    dateTo: string;
+    unitId?: string;
+    count?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    startDate?: string;
+    endDate?: string;
+    reason?: string;
+}
+export declare class BlockDatesResponseDto {
+    success: boolean;
+    blockedRangeId: string;
+    listingId: string;
+    startDate: string;
+    endDate: string;
+    reason?: string;
+}
+export declare class UnblockDatesDto {
+    propertyId?: string;
+    listingId?: string;
+    startDate: string;
+    endDate: string;
+    unitId?: string;
+    count?: number;
+}
+export declare class UnblockDatesResponseDto {
+    success: boolean;
+    message?: string;
+}
+export declare class ExperienceSlotBlockDto {
+    propertyId?: string;
+    experienceId?: string;
+    date: string;
+    slot: string;
+}
+export declare class ExperienceSlotActionResponseDto {
+    success: boolean;
+    message: string;
 }
 export declare class SeasonalPricingDto {
     stayId?: string;

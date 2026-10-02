@@ -13,11 +13,11 @@ export declare class HostsController {
         verified: boolean;
     }>;
     myHostProfile(user: User): Promise<{
+        id: string;
         email: string;
         name: string;
-        role: import("@prisma/client").$Enums.Role;
-        id: string;
         avatar: string | null;
+        role: import("@prisma/client").$Enums.Role;
         businessName: string | null;
         isApproved: boolean;
     }>;
@@ -54,9 +54,9 @@ export declare class HostsController {
         };
     }>;
     findOne(id: string): Promise<{
+        id: string;
         email: string;
         name: string;
-        id: string;
         avatar: string | null;
         businessName: string | null;
         isApproved: boolean;

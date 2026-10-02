@@ -41,8 +41,8 @@ let PoliciesAdminController = class PoliciesAdminController {
     create(dto, user) {
         return this.policiesService.createPolicy(dto, user?.id);
     }
-    update(id, dto) {
-        return this.policiesService.updatePolicy(id, dto);
+    update(slug, dto, user) {
+        return this.policiesService.updatePolicyBySlugOrId(slug, dto, user?.id);
     }
     createVersion(id, dto, user) {
         return this.policiesService.createVersion(id, dto, user?.id);
@@ -82,7 +82,7 @@ __decorate([
 ], PoliciesAdminController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Create a new platform policy with initial version (Admin only)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Create / Publish New Policy Version (Admin)' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -90,12 +90,13 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PoliciesAdminController.prototype, "create", null);
 __decorate([
-    (0, common_1.Put)(':id'),
-    (0, swagger_1.ApiOperation)({ summary: 'Update policy metadata (title, description, type) (Admin only)' }),
-    __param(0, (0, common_1.Param)('id')),
+    (0, common_1.Put)(':slug'),
+    (0, swagger_1.ApiOperation)({ summary: 'Update Existing Policy Document by slug or ID (Admin)' }),
+    __param(0, (0, common_1.Param)('slug')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, policy_dto_1.UpdatePolicyDto]),
+    __metadata("design:paramtypes", [String, policy_dto_1.UpdatePolicyDto, Object]),
     __metadata("design:returntype", void 0)
 ], PoliciesAdminController.prototype, "update", null);
 __decorate([

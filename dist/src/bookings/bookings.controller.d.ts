@@ -1,5 +1,7 @@
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto, CancelBookingDto } from './dto/create-booking.dto';
+import { GuestBookingsGroupedDto, GuestBookingItemDto, GetGuestBookingsQueryDto } from './dto/guest-bookings.dto';
+import { HostCancelReservationDto, HostCancelReservationResponseDto } from './dto/host-cancel.dto';
 import type { User } from '@prisma/client';
 export declare class BookingsController {
     private bookingsService;
@@ -8,6 +10,45 @@ export declare class BookingsController {
         id: any;
         bookingRef: any;
         type: any;
+        property: {
+            id: any;
+            name: any;
+            vertical: any;
+            location: any;
+            address: any;
+            image: any;
+        };
+        host: {
+            id: any;
+            name: any;
+            phone: any;
+            whatsapp: any;
+        };
+        dates: {
+            checkIn: string;
+            checkOut: string;
+            nights: number;
+        };
+        guests: {
+            total: any;
+            adults: any;
+            children: number;
+        };
+        financials: {
+            currency: any;
+            nightlyRateNgwee: any;
+            accommodationTotalNgwee: number;
+            cleaningFeeNgwee: any;
+            serviceFeeNgwee: number;
+            taxesNgwee: number;
+            grandTotalNgwee: any;
+            paymentStatus: any;
+        };
+        instructions: {
+            checkInProcedure: string;
+            directions: string;
+            houseRules: string[];
+        };
         propertyId: any;
         propertyName: any;
         listingId: any;
@@ -54,10 +95,53 @@ export declare class BookingsController {
         createdAt: any;
         updatedAt: any;
     }>;
-    myBookings(user: User, as?: string): Promise<{
+    groupedBookings(user: User, userId?: string): Promise<GuestBookingsGroupedDto>;
+    myTrips(user: User, userId?: string): Promise<GuestBookingsGroupedDto>;
+    myBookings(user: User, query: GetGuestBookingsQueryDto & {
+        as?: string;
+    }): Promise<GuestBookingItemDto[]> | Promise<{
         id: any;
         bookingRef: any;
         type: any;
+        property: {
+            id: any;
+            name: any;
+            vertical: any;
+            location: any;
+            address: any;
+            image: any;
+        };
+        host: {
+            id: any;
+            name: any;
+            phone: any;
+            whatsapp: any;
+        };
+        dates: {
+            checkIn: string;
+            checkOut: string;
+            nights: number;
+        };
+        guests: {
+            total: any;
+            adults: any;
+            children: number;
+        };
+        financials: {
+            currency: any;
+            nightlyRateNgwee: any;
+            accommodationTotalNgwee: number;
+            cleaningFeeNgwee: any;
+            serviceFeeNgwee: number;
+            taxesNgwee: number;
+            grandTotalNgwee: any;
+            paymentStatus: any;
+        };
+        instructions: {
+            checkInProcedure: string;
+            directions: string;
+            houseRules: string[];
+        };
         propertyId: any;
         propertyName: any;
         listingId: any;
@@ -108,6 +192,45 @@ export declare class BookingsController {
         id: any;
         bookingRef: any;
         type: any;
+        property: {
+            id: any;
+            name: any;
+            vertical: any;
+            location: any;
+            address: any;
+            image: any;
+        };
+        host: {
+            id: any;
+            name: any;
+            phone: any;
+            whatsapp: any;
+        };
+        dates: {
+            checkIn: string;
+            checkOut: string;
+            nights: number;
+        };
+        guests: {
+            total: any;
+            adults: any;
+            children: number;
+        };
+        financials: {
+            currency: any;
+            nightlyRateNgwee: any;
+            accommodationTotalNgwee: number;
+            cleaningFeeNgwee: any;
+            serviceFeeNgwee: number;
+            taxesNgwee: number;
+            grandTotalNgwee: any;
+            paymentStatus: any;
+        };
+        instructions: {
+            checkInProcedure: string;
+            directions: string;
+            houseRules: string[];
+        };
         propertyId: any;
         propertyName: any;
         listingId: any;
@@ -154,7 +277,7 @@ export declare class BookingsController {
         createdAt: any;
         updatedAt: any;
     }>;
-    cancel(user: User, id: string, dto?: CancelBookingDto): Promise<{
+    cancel(user: User, id: string, dto?: HostCancelReservationDto & CancelBookingDto): Promise<HostCancelReservationResponseDto | {
         status: string;
         refundEligible: boolean;
         refundAmount: number;
@@ -171,6 +294,45 @@ export declare class BookingsController {
             id: any;
             bookingRef: any;
             type: any;
+            property: {
+                id: any;
+                name: any;
+                vertical: any;
+                location: any;
+                address: any;
+                image: any;
+            };
+            host: {
+                id: any;
+                name: any;
+                phone: any;
+                whatsapp: any;
+            };
+            dates: {
+                checkIn: string;
+                checkOut: string;
+                nights: number;
+            };
+            guests: {
+                total: any;
+                adults: any;
+                children: number;
+            };
+            financials: {
+                currency: any;
+                nightlyRateNgwee: any;
+                accommodationTotalNgwee: number;
+                cleaningFeeNgwee: any;
+                serviceFeeNgwee: number;
+                taxesNgwee: number;
+                grandTotalNgwee: any;
+                paymentStatus: any;
+            };
+            instructions: {
+                checkInProcedure: string;
+                directions: string;
+                houseRules: string[];
+            };
             propertyId: any;
             propertyName: any;
             listingId: any;
@@ -232,6 +394,45 @@ export declare class BookingsController {
             id: any;
             bookingRef: any;
             type: any;
+            property: {
+                id: any;
+                name: any;
+                vertical: any;
+                location: any;
+                address: any;
+                image: any;
+            };
+            host: {
+                id: any;
+                name: any;
+                phone: any;
+                whatsapp: any;
+            };
+            dates: {
+                checkIn: string;
+                checkOut: string;
+                nights: number;
+            };
+            guests: {
+                total: any;
+                adults: any;
+                children: number;
+            };
+            financials: {
+                currency: any;
+                nightlyRateNgwee: any;
+                accommodationTotalNgwee: number;
+                cleaningFeeNgwee: any;
+                serviceFeeNgwee: number;
+                taxesNgwee: number;
+                grandTotalNgwee: any;
+                paymentStatus: any;
+            };
+            instructions: {
+                checkInProcedure: string;
+                directions: string;
+                houseRules: string[];
+            };
             propertyId: any;
             propertyName: any;
             listingId: any;
@@ -283,6 +484,45 @@ export declare class BookingsController {
         id: any;
         bookingRef: any;
         type: any;
+        property: {
+            id: any;
+            name: any;
+            vertical: any;
+            location: any;
+            address: any;
+            image: any;
+        };
+        host: {
+            id: any;
+            name: any;
+            phone: any;
+            whatsapp: any;
+        };
+        dates: {
+            checkIn: string;
+            checkOut: string;
+            nights: number;
+        };
+        guests: {
+            total: any;
+            adults: any;
+            children: number;
+        };
+        financials: {
+            currency: any;
+            nightlyRateNgwee: any;
+            accommodationTotalNgwee: number;
+            cleaningFeeNgwee: any;
+            serviceFeeNgwee: number;
+            taxesNgwee: number;
+            grandTotalNgwee: any;
+            paymentStatus: any;
+        };
+        instructions: {
+            checkInProcedure: string;
+            directions: string;
+            houseRules: string[];
+        };
         propertyId: any;
         propertyName: any;
         listingId: any;

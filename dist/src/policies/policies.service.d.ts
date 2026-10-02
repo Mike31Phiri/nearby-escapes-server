@@ -7,40 +7,55 @@ export declare class PoliciesService {
     constructor(prisma: PrismaService);
     createPolicy(dto: CreatePolicyDto, adminId?: string): Promise<{
         type: string;
-        currentVersionData: {
-            id: string;
-            createdAt: Date;
-            createdById: string | null;
-            policyId: string;
-            version: string;
-            content: string;
-            summary: string | null;
-            documentUrl: string | null;
-            metadata: Prisma.JsonValue | null;
-            effectiveDate: Date;
-        };
-        versions: {
-            id: string;
-            createdAt: Date;
-            createdById: string | null;
-            policyId: string;
-            version: string;
-            content: string;
-            summary: string | null;
-            documentUrl: string | null;
-            metadata: Prisma.JsonValue | null;
-            effectiveDate: Date;
-        }[];
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        deletedAt: Date | null;
-        slug: string;
-        title: string;
-        description: string | null;
         isPublished: boolean;
         currentVersion: string;
-        createdById: string | null;
+        id: string;
+        slug: string;
+        title: string;
+        category: string;
+        version: string;
+        status: string;
+        summaryOfChanges: string;
+        contentMarkdown: string;
+        effectiveDate: string;
+        updatedByAdminId: string;
+        updatedByAdminName: string;
+        createdAt: string;
+        updatedAt: string;
+        success: boolean;
+        data: {
+            id: string;
+            slug: string;
+            title: string;
+            category: string;
+            version: string;
+            status: string;
+            summaryOfChanges: string;
+            contentMarkdown: string;
+            effectiveDate: string;
+            updatedByAdminId: string;
+            updatedByAdminName: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+    }>;
+    updatePolicyBySlugOrId(slugOrId: string, dto: UpdatePolicyDto, adminId?: string): Promise<{
+        id: string;
+        title: string;
+        type: string;
+        slug: string;
+        version: string;
+        status: string;
+        effectiveDate: string;
+        updatedAt: string;
+        success: boolean;
+        data: {
+            slug: string;
+            version: string;
+            status: string;
+            effectiveDate: string;
+            updatedAt: string;
+        };
     }>;
     createVersion(policyId: string, dto: CreatePolicyVersionDto, adminId?: string): Promise<{
         type: string;
@@ -85,34 +100,22 @@ export declare class PoliciesService {
         createdById: string | null;
     }>;
     updatePolicy(id: string, dto: UpdatePolicyDto): Promise<{
-        type: string;
-        createdBy: {
-            id: string;
-            email: string;
-            name: string;
-        } | null;
-        versions: {
-            id: string;
-            createdAt: Date;
-            createdById: string | null;
-            policyId: string;
-            version: string;
-            content: string;
-            summary: string | null;
-            documentUrl: string | null;
-            metadata: Prisma.JsonValue | null;
-            effectiveDate: Date;
-        }[];
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        deletedAt: Date | null;
-        slug: string;
         title: string;
-        description: string | null;
-        isPublished: boolean;
-        currentVersion: string;
-        createdById: string | null;
+        type: string;
+        slug: string;
+        version: string;
+        status: string;
+        effectiveDate: string;
+        updatedAt: string;
+        success: boolean;
+        data: {
+            slug: string;
+            version: string;
+            status: string;
+            effectiveDate: string;
+            updatedAt: string;
+        };
     }>;
     setPublishStatus(id: string, isPublished: boolean): Promise<{
         message: string;
@@ -204,6 +207,15 @@ export declare class PoliciesService {
         currentVersion: string;
     }[]>;
     getPolicyBySlug(slug: string): Promise<{
+        success: boolean;
+        data: {
+            slug: string;
+            title: string;
+            version: string;
+            contentMarkdown: string;
+            effectiveDate: string;
+            lastUpdated: string;
+        };
         id: string;
         slug: string;
         title: string;

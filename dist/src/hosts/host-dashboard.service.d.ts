@@ -1,7 +1,16 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { HostOverviewDto } from './dto/host-overview.dto';
+import { HostScheduleTodayDto } from './dto/host-schedule.dto';
+import { GetHostBookingsQueryDto, HostBookingListItemDto } from './dto/host-bookings.dto';
+import { HostFinancesSummaryDto } from './dto/host-finances.dto';
 export declare class HostDashboardService {
     private prisma;
     constructor(prisma: PrismaService);
+    private formatDateOnly;
+    getBookings(userId: string, query: GetHostBookingsQueryDto): Promise<HostBookingListItemDto[]>;
+    getFinancesSummary(userId: string): Promise<HostFinancesSummaryDto>;
+    getOverview(userId: string): Promise<HostOverviewDto>;
+    getTodaySchedule(userId: string): Promise<HostScheduleTodayDto>;
     getDashboard(userId: string): Promise<{
         stats: {
             totalListings: number;
@@ -67,7 +76,7 @@ export declare class HostDashboardService {
         listingId: string;
         type: string;
         name: string;
-        location: string;
+        location: string | null;
         thumbnailUrl: any;
         price: number;
         priceFormatted: string;
@@ -84,7 +93,7 @@ export declare class HostDashboardService {
         listingId: string;
         type: string;
         name: string;
-        location: string;
+        location: string | null;
         thumbnailUrl: any;
         price: number;
         priceFormatted: string;
@@ -95,4 +104,33 @@ export declare class HostDashboardService {
         unitsCount: number;
         createdAt: Date;
     }[]>;
+    getBookingDetail(hostId: string, bookingId: string): Promise<{
+        id: string;
+        bookingRef: string;
+        listingId: string;
+        listingName: string;
+        listingType: "stay" | "experience" | "transport";
+        listingImage: any;
+        status: string;
+        paymentStatus: string;
+        guestName: string;
+        guestEmail: string;
+        guestPhone: string;
+        guests: number;
+        checkIn: string | null;
+        checkOut: string | null;
+        timeSlot: string | null;
+        stayProgress: string | null;
+        createdAt: string;
+        pricing: {
+            currency: string;
+            baseRateNgwee: number;
+            nightsCount: number;
+            subtotalNgwee: number;
+            cleaningFeeNgwee: number;
+            serviceFeeNgwee: number;
+            totalAmountNgwee: number;
+        };
+        specialRequests: string | null;
+    }>;
 }

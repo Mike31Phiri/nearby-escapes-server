@@ -35,8 +35,37 @@ let AvailabilityController = class AvailabilityController {
     getTransportAvailability(transportId, query) {
         return this.availabilityService.getTransportAvailability(transportId, query.date);
     }
+    getPropertyAvailability(propertyId, year, month) {
+        return this.availabilityService.getPropertyAvailability(propertyId, year ? +year : undefined, month ? +month : undefined);
+    }
     getAvailability(listingId, year, month) {
-        return this.availabilityService.getStayAvailability(listingId, year ? +year : undefined, month ? +month : undefined);
+        return this.availabilityService.getAvailability(listingId, year ? +year : undefined, month ? +month : undefined);
+    }
+    async unblockDatesEndpoint(user, dto) {
+        const result = await this.availabilityService.unblockDates(dto, user.id);
+        return { success: result.success, message: 'Dates unblocked successfully.' };
+    }
+    async blockDatesEndpoint(user, dto) {
+        const listingId = dto.listingId || dto.propertyId || '';
+        const startDate = dto.startDate;
+        const endDate = dto.endDate;
+        const reason = dto.reason;
+        await this.availabilityService.blockDates(dto, user.id);
+        const blockedRangeId = `blk-${Buffer.from(`${listingId}|${startDate}|${endDate}`).toString('base64').replace(/=/g, '').slice(0, 8)}`;
+        return {
+            success: true,
+            blockedRangeId,
+            listingId,
+            startDate,
+            endDate,
+            ...(reason ? { reason } : {}),
+        };
+    }
+    async blockExperienceSlot(user, dto) {
+        return this.availabilityService.blockExperienceSlot(dto, user.id);
+    }
+    async unblockExperienceSlot(user, dto) {
+        return this.availabilityService.unblockExperienceSlot(dto, user.id);
     }
     blockDates(user, dto) {
         return this.availabilityService.blockDates(dto, user.id);
@@ -81,8 +110,18 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AvailabilityController.prototype, "getTransportAvailability", null);
 __decorate([
+    (0, common_1.Get)('properties/:propertyId'),
+    (0, swagger_1.ApiOperation)({ summary: 'Property-level calendar availability grid' }),
+    __param(0, (0, common_1.Param)('propertyId')),
+    __param(1, (0, common_1.Query)('year')),
+    __param(2, (0, common_1.Query)('month')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", void 0)
+], AvailabilityController.prototype, "getPropertyAvailability", null);
+__decorate([
     (0, common_1.Get)(':listingId'),
-    (0, swagger_1.ApiOperation)({ summary: 'Availability check (backwards compatibility)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Availability check (supports propertyId or stayId)' }),
     __param(0, (0, common_1.Param)('listingId')),
     __param(1, (0, common_1.Query)('year')),
     __param(2, (0, common_1.Query)('month')),
@@ -93,9 +132,61 @@ __decorate([
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)('HOST'),
+    (0, common_1.Post)('unblock-dates'),
+    (0, swagger_1.ApiBearerAuth)('access-token'),
+    (0, swagger_1.ApiOperation)({ summary: 'Unblock dates (Host)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: availability_dto_1.UnblockDatesResponseDto }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, availability_dto_1.UnblockDatesDto]),
+    __metadata("design:returntype", Promise)
+], AvailabilityController.prototype, "unblockDatesEndpoint", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('HOST'),
+    (0, common_1.Post)('block-dates'),
+    (0, swagger_1.ApiBearerAuth)('access-token'),
+    (0, swagger_1.ApiOperation)({ summary: 'Block dates (Host) — returns blockedRangeId + echo' }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: availability_dto_1.BlockDatesResponseDto }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, availability_dto_1.UnblockDatesDto]),
+    __metadata("design:returntype", Promise)
+], AvailabilityController.prototype, "blockDatesEndpoint", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('HOST'),
+    (0, common_1.Post)('experiences/block-slot'),
+    (0, swagger_1.ApiBearerAuth)('access-token'),
+    (0, swagger_1.ApiOperation)({ summary: 'Block an experience time slot for a date' }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: availability_dto_1.ExperienceSlotActionResponseDto }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, availability_dto_1.ExperienceSlotBlockDto]),
+    __metadata("design:returntype", Promise)
+], AvailabilityController.prototype, "blockExperienceSlot", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('HOST'),
+    (0, common_1.Post)('experiences/unblock-slot'),
+    (0, swagger_1.ApiBearerAuth)('access-token'),
+    (0, swagger_1.ApiOperation)({ summary: 'Unblock an experience time slot for a date' }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: availability_dto_1.ExperienceSlotActionResponseDto }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, availability_dto_1.ExperienceSlotBlockDto]),
+    __metadata("design:returntype", Promise)
+], AvailabilityController.prototype, "unblockExperienceSlot", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('HOST'),
     (0, common_1.Post)('block'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Block date range (Host)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Block date range (Host) - Legacy' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -107,7 +198,7 @@ __decorate([
     (0, roles_decorator_1.Roles)('HOST'),
     (0, common_1.Post)('unblock'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
-    (0, swagger_1.ApiOperation)({ summary: 'Unblock date range (Host)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Unblock date range (Host) - Legacy' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),

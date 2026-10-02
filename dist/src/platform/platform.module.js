@@ -10,12 +10,15 @@ exports.PlatformModule = void 0;
 const common_1 = require("@nestjs/common");
 const platform_controller_1 = require("./platform.controller");
 const platform_service_1 = require("./platform.service");
+const home_controller_1 = require("./home.controller");
+const read_store_module_1 = require("../read-store/read-store.module");
 let PlatformModule = class PlatformModule {
 };
 exports.PlatformModule = PlatformModule;
 exports.PlatformModule = PlatformModule = __decorate([
     (0, common_1.Module)({
-        controllers: [platform_controller_1.PlatformController],
+        imports: [read_store_module_1.ReadStoreModule],
+        controllers: [platform_controller_1.PlatformController, home_controller_1.HomeController],
         providers: [platform_service_1.PlatformService],
         exports: [platform_service_1.PlatformService],
     })

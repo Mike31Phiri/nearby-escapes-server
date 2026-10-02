@@ -1,4 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { UpdatePropertyPoliciesDto } from '../policies/dto/policy.dto';
+import { PropertiesService } from '../properties/properties.service';
+import {  Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards , Put } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { HostsService } from './hosts.service';
 import { HostDashboardService } from './host-dashboard.service';
@@ -11,7 +13,7 @@ import {
   HostCheckOutResponseDto,
 } from './dto/host-schedule.dto';
 import { GetHostBookingsQueryDto, HostBookingListItemDto } from './dto/host-bookings.dto';
-import { HostFinancesSummaryDto } from './dto/host-finances.dto';
+import { HostFinancesSummaryDto, AddHostPayoutMethodDto } from './dto/host-finances.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -25,6 +27,7 @@ import type { User } from '@prisma/client';
 @Controller('host')
 export class HostController {
   constructor(
+    private propertiesService: PropertiesService,
     private hostsService: HostsService,
     private dashboardService: HostDashboardService,
     private bookingsService: BookingsService,
@@ -172,6 +175,39 @@ export class HostController {
   async checkOut(@CurrentUser() user: User, @Param('id') id: string) {
     return this.bookingsService.checkOut(id, user.id);
   }
+
+  @Post('payout-methods')
+  @ApiOperation({ summary: 'Add or update host payout method (Bank or Mobile Money)' })
+  @ApiResponse({ status: 201, description: 'Payout method saved' })
+  async addPayoutMethod(@CurrentUser() user: User, @Body() dto: AddHostPayoutMethodDto) {
+    return this.hostsService.addPayoutMethod(user.id, dto);
+  }
+
+  @Delete('payout-methods/:id')
+  @ApiOperation({ summary: 'Remove host payout method' })
+  @ApiResponse({ status: 200, description: 'Payout method removed' })
+  async removePayoutMethod(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.hostsService.removePayoutMethod(user.id, id);
+  }
+
+  @Patch('payout-methods/:id/default')
+  @ApiOperation({ summary: 'Set primary default payout method' })
+  @ApiResponse({ status: 200, description: 'Default payout method updated' })
+  async setDefaultPayoutMethod(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.hostsService.setDefaultPayoutMethod(user.id, id);
+  }
+
+
+  @Put('properties/:propertyId/policies')
+  @ApiOperation({ summary: 'Update Host Property Policies' })
+  @ApiResponse({ status: 200, description: 'Property policies updated successfully.' })
+  async updatePropertyPolicies(
+    @CurrentUser() user: User,
+    @Param('propertyId') propertyId: string,
+    @Body() dto: UpdatePropertyPoliciesDto,
+  ) {
+    const host = await this.hostsService.findApprovedByUserId(user.id);
+    return this.propertiesService.updatePropertyPolicies(propertyId, host.id, dto);
+  }
+
 }
-
-

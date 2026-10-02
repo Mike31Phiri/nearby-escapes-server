@@ -9,3 +9,6 @@ uploads/
 coverage/
 scratch/
 *.log
+
+# Devpost learn privacy
+/devpost/learner-profile.md

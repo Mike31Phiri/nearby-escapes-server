@@ -13,6 +13,28 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PoliciesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const client_1 = require("@prisma/client");
+function mapCategoryToPolicyType(category, explicitType) {
+    if (explicitType && Object.values(client_1.PolicyType).includes(explicitType)) {
+        return explicitType;
+    }
+    if (!category)
+        return client_1.PolicyType.OTHER;
+    switch (category.toLowerCase()) {
+        case 'legal':
+            return client_1.PolicyType.TERMS_OF_SERVICE;
+        case 'guest_protection':
+            return client_1.PolicyType.REFUND_POLICY;
+        case 'host_standards':
+            return client_1.PolicyType.HOST_STANDARDS;
+        case 'safety_security':
+            return client_1.PolicyType.TRUST_SAFETY;
+        case 'fee_structure':
+            return client_1.PolicyType.OTHER;
+        default:
+            return client_1.PolicyType.OTHER;
+    }
+}
 let PoliciesService = PoliciesService_1 = class PoliciesService {
     prisma;
     logger = new common_1.Logger(PoliciesService_1.name);
@@ -27,14 +49,29 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
             throw new common_1.ConflictException(`Policy with slug "${dto.slug}" already exists`);
         }
         const versionStr = dto.version?.trim() || '1.0.0';
+        const policyType = mapCategoryToPolicyType(dto.category, dto.type);
+        const content = dto.contentMarkdown || dto.content || '';
+        const summary = dto.summaryOfChanges || dto.summary || 'Initial version';
+        const isPublished = dto.status === 'published' || dto.isPublished === true;
+        const effectiveDate = dto.effectiveDate ? new Date(dto.effectiveDate) : new Date();
+        let adminName = 'Admin';
+        if (adminId) {
+            const adminUser = await this.prisma.user.findUnique({
+                where: { id: adminId },
+                select: { id: true, name: true, email: true },
+            });
+            if (adminUser) {
+                adminName = adminUser.name || adminUser.email || 'Admin';
+            }
+        }
         return this.prisma.$transaction(async (tx) => {
             const policy = await tx.policy.create({
                 data: {
                     slug: dto.slug,
                     title: dto.title,
-                    type: dto.type,
+                    type: policyType,
                     description: dto.description || null,
-                    isPublished: dto.isPublished ?? false,
+                    isPublished,
                     currentVersion: versionStr,
                     createdById: adminId || null,
                 },
@@ -43,19 +80,109 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
                 data: {
                     policyId: policy.id,
                     version: versionStr,
-                    content: dto.content,
-                    summary: dto.summary || 'Initial version',
+                    content,
+                    summary,
                     documentUrl: dto.documentUrl || null,
                     metadata: dto.metadata || undefined,
-                    effectiveDate: dto.effectiveDate ? new Date(dto.effectiveDate) : new Date(),
+                    effectiveDate,
                     createdById: adminId || null,
                 },
             });
+            const responseData = {
+                id: policy.id,
+                slug: policy.slug,
+                title: policy.title,
+                category: dto.category || policy.type.toLowerCase(),
+                version: versionStr,
+                status: isPublished ? 'published' : 'draft',
+                summaryOfChanges: summary,
+                contentMarkdown: content,
+                effectiveDate: effectiveDate.toISOString(),
+                updatedByAdminId: adminId || 'admin',
+                updatedByAdminName: adminName,
+                createdAt: policy.createdAt.toISOString(),
+                updatedAt: policy.updatedAt.toISOString(),
+            };
             return {
-                ...policy,
+                success: true,
+                data: responseData,
+                ...responseData,
                 type: policy.type.toLowerCase(),
-                currentVersionData: initialVersion,
-                versions: [initialVersion],
+                isPublished: policy.isPublished,
+                currentVersion: versionStr,
+            };
+        });
+    }
+    async updatePolicyBySlugOrId(slugOrId, dto, adminId) {
+        const policy = await this.prisma.policy.findFirst({
+            where: {
+                OR: [{ id: slugOrId }, { slug: slugOrId }],
+                deletedAt: null,
+            },
+        });
+        if (!policy) {
+            throw new common_1.NotFoundException(`Policy "${slugOrId}" not found`);
+        }
+        const versionStr = dto.version?.trim() || policy.currentVersion;
+        const content = dto.contentMarkdown || dto.content;
+        const summary = dto.summaryOfChanges || dto.summary;
+        const effectiveDate = dto.effectiveDate ? new Date(dto.effectiveDate) : new Date();
+        const isPublished = dto.status === 'published'
+            ? true
+            : dto.status === 'draft' || dto.status === 'archived'
+                ? false
+                : dto.isPublished !== undefined
+                    ? dto.isPublished
+                    : policy.isPublished;
+        return this.prisma.$transaction(async (tx) => {
+            if (content !== undefined) {
+                await tx.policyVersion.upsert({
+                    where: {
+                        policyId_version: {
+                            policyId: policy.id,
+                            version: versionStr,
+                        },
+                    },
+                    update: {
+                        content,
+                        summary: summary || undefined,
+                        effectiveDate,
+                        createdById: adminId || null,
+                    },
+                    create: {
+                        policyId: policy.id,
+                        version: versionStr,
+                        content,
+                        summary: summary || 'Updated version',
+                        effectiveDate,
+                        createdById: adminId || null,
+                    },
+                });
+            }
+            const updatedPolicy = await tx.policy.update({
+                where: { id: policy.id },
+                data: {
+                    currentVersion: versionStr,
+                    isPublished,
+                    ...(dto.title ? { title: dto.title } : {}),
+                    ...(dto.description !== undefined ? { description: dto.description } : {}),
+                    ...(dto.type || dto.category ? { type: mapCategoryToPolicyType(dto.category, dto.type) } : {}),
+                },
+            });
+            const responseData = {
+                slug: updatedPolicy.slug,
+                version: versionStr,
+                status: isPublished ? 'published' : 'draft',
+                effectiveDate: effectiveDate.toISOString(),
+                updatedAt: updatedPolicy.updatedAt.toISOString(),
+            };
+            return {
+                success: true,
+                data: responseData,
+                ...responseData,
+                id: updatedPolicy.id,
+                title: updatedPolicy.title,
+                type: updatedPolicy.type.toLowerCase(),
             };
         });
     }
@@ -79,13 +206,15 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
             throw new common_1.ConflictException(`Version "${versionStr}" already exists for policy "${policy.slug}"`);
         }
         const setAsCurrent = dto.setAsCurrent ?? true;
+        const content = dto.contentMarkdown || dto.content || '';
+        const summary = dto.summaryOfChanges || dto.summary || null;
         return this.prisma.$transaction(async (tx) => {
             const version = await tx.policyVersion.create({
                 data: {
                     policyId,
                     version: versionStr,
-                    content: dto.content,
-                    summary: dto.summary || null,
+                    content,
+                    summary,
                     documentUrl: dto.documentUrl || null,
                     metadata: dto.metadata || undefined,
                     effectiveDate: dto.effectiveDate ? new Date(dto.effectiveDate) : new Date(),
@@ -113,39 +242,20 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
         });
     }
     async updatePolicy(id, dto) {
-        const policy = await this.prisma.policy.findFirst({
-            where: { id, deletedAt: null },
-        });
-        if (!policy) {
-            throw new common_1.NotFoundException(`Policy with ID "${id}" not found`);
-        }
-        const updated = await this.prisma.policy.update({
-            where: { id },
-            data: {
-                ...(dto.title !== undefined ? { title: dto.title } : {}),
-                ...(dto.description !== undefined ? { description: dto.description } : {}),
-                ...(dto.type !== undefined ? { type: dto.type } : {}),
-                ...(dto.isPublished !== undefined ? { isPublished: dto.isPublished } : {}),
-            },
-            include: {
-                createdBy: { select: { id: true, name: true, email: true } },
-                versions: { orderBy: { createdAt: 'desc' } },
-            },
-        });
-        return {
-            ...updated,
-            type: updated.type.toLowerCase(),
-        };
+        return this.updatePolicyBySlugOrId(id, dto);
     }
     async setPublishStatus(id, isPublished) {
         const policy = await this.prisma.policy.findFirst({
-            where: { id, deletedAt: null },
+            where: {
+                OR: [{ id }, { slug: id }],
+                deletedAt: null,
+            },
         });
         if (!policy) {
-            throw new common_1.NotFoundException(`Policy with ID "${id}" not found`);
+            throw new common_1.NotFoundException(`Policy with ID or slug "${id}" not found`);
         }
         const updated = await this.prisma.policy.update({
-            where: { id },
+            where: { id: policy.id },
             data: { isPublished },
             select: { id: true, slug: true, title: true, isPublished: true, currentVersion: true },
         });
@@ -156,16 +266,19 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
     }
     async deletePolicy(id) {
         const policy = await this.prisma.policy.findFirst({
-            where: { id, deletedAt: null },
+            where: {
+                OR: [{ id }, { slug: id }],
+                deletedAt: null,
+            },
         });
         if (!policy) {
-            throw new common_1.NotFoundException(`Policy with ID "${id}" not found`);
+            throw new common_1.NotFoundException(`Policy with ID or slug "${id}" not found`);
         }
         await this.prisma.policy.update({
-            where: { id },
+            where: { id: policy.id },
             data: { deletedAt: new Date(), isPublished: false },
         });
-        return { id, deleted: true, message: `Policy "${policy.title}" archived successfully` };
+        return { id: policy.id, deleted: true, message: `Policy "${policy.title}" archived successfully` };
     }
     async getAdminPolicies(query) {
         const page = Math.max(1, query.page || 1);
@@ -222,7 +335,10 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
     }
     async getAdminPolicyById(id) {
         const policy = await this.prisma.policy.findFirst({
-            where: { id, deletedAt: null },
+            where: {
+                OR: [{ id }, { slug: id }],
+                deletedAt: null,
+            },
             include: {
                 createdBy: { select: { id: true, name: true, email: true } },
                 versions: {
@@ -232,7 +348,7 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
             },
         });
         if (!policy) {
-            throw new common_1.NotFoundException(`Policy with ID "${id}" not found`);
+            throw new common_1.NotFoundException(`Policy "${id}" not found`);
         }
         return {
             ...policy,
@@ -279,7 +395,17 @@ let PoliciesService = PoliciesService_1 = class PoliciesService {
             throw new common_1.NotFoundException(`Policy with slug "${slug}" not found or not published`);
         }
         const activeVersion = policy.versions.find((v) => v.version === policy.currentVersion) || policy.versions[0];
+        const responseData = {
+            slug: policy.slug,
+            title: policy.title,
+            version: activeVersion?.version || policy.currentVersion,
+            contentMarkdown: activeVersion?.content || '',
+            effectiveDate: (activeVersion?.effectiveDate || policy.updatedAt).toISOString(),
+            lastUpdated: policy.updatedAt.toISOString(),
+        };
         return {
+            success: true,
+            data: responseData,
             id: policy.id,
             slug: policy.slug,
             title: policy.title,

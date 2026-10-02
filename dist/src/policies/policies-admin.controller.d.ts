@@ -67,70 +67,55 @@ export declare class PoliciesAdminController {
     }>;
     create(dto: CreatePolicyDto, user: User): Promise<{
         type: string;
-        currentVersionData: {
+        isPublished: boolean;
+        currentVersion: string;
+        id: string;
+        slug: string;
+        title: string;
+        category: string;
+        version: string;
+        status: string;
+        summaryOfChanges: string;
+        contentMarkdown: string;
+        effectiveDate: string;
+        updatedByAdminId: string;
+        updatedByAdminName: string;
+        createdAt: string;
+        updatedAt: string;
+        success: boolean;
+        data: {
             id: string;
-            createdAt: Date;
-            createdById: string | null;
-            policyId: string;
+            slug: string;
+            title: string;
+            category: string;
             version: string;
-            content: string;
-            summary: string | null;
-            documentUrl: string | null;
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            effectiveDate: Date;
+            status: string;
+            summaryOfChanges: string;
+            contentMarkdown: string;
+            effectiveDate: string;
+            updatedByAdminId: string;
+            updatedByAdminName: string;
+            createdAt: string;
+            updatedAt: string;
         };
-        versions: {
-            id: string;
-            createdAt: Date;
-            createdById: string | null;
-            policyId: string;
-            version: string;
-            content: string;
-            summary: string | null;
-            documentUrl: string | null;
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            effectiveDate: Date;
-        }[];
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        deletedAt: Date | null;
-        slug: string;
-        title: string;
-        description: string | null;
-        isPublished: boolean;
-        currentVersion: string;
-        createdById: string | null;
     }>;
-    update(id: string, dto: UpdatePolicyDto): Promise<{
-        type: string;
-        createdBy: {
-            id: string;
-            email: string;
-            name: string;
-        } | null;
-        versions: {
-            id: string;
-            createdAt: Date;
-            createdById: string | null;
-            policyId: string;
-            version: string;
-            content: string;
-            summary: string | null;
-            documentUrl: string | null;
-            metadata: import("@prisma/client/runtime/client").JsonValue | null;
-            effectiveDate: Date;
-        }[];
+    update(slug: string, dto: UpdatePolicyDto, user: User): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        deletedAt: Date | null;
-        slug: string;
         title: string;
-        description: string | null;
-        isPublished: boolean;
-        currentVersion: string;
-        createdById: string | null;
+        type: string;
+        slug: string;
+        version: string;
+        status: string;
+        effectiveDate: string;
+        updatedAt: string;
+        success: boolean;
+        data: {
+            slug: string;
+            version: string;
+            status: string;
+            effectiveDate: string;
+            updatedAt: string;
+        };
     }>;
     createVersion(id: string, dto: CreatePolicyVersionDto, user: User): Promise<{
         type: string;

@@ -149,6 +149,124 @@ let HostsService = class HostsService {
             },
         };
     }
+    async submitApplication(userId, dto) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        const app = await this.prisma.hostApplication.upsert({
+            where: { userId },
+            create: {
+                userId,
+                businessName: dto.businessName,
+                operatingSince: dto.operatingSince,
+                province: dto.province,
+                town: dto.town,
+                businessEmail: dto.businessEmail,
+                businessPhone: dto.businessPhone,
+                pacraDocs: dto.pacraDocs ?? undefined,
+                ownershipDocs: dto.ownershipDocs ?? undefined,
+                operationDocs: dto.operationDocs ?? undefined,
+                status: 'pending_review',
+            },
+            update: {
+                businessName: dto.businessName,
+                operatingSince: dto.operatingSince,
+                province: dto.province,
+                town: dto.town,
+                businessEmail: dto.businessEmail,
+                businessPhone: dto.businessPhone,
+                pacraDocs: dto.pacraDocs ?? undefined,
+                ownershipDocs: dto.ownershipDocs ?? undefined,
+                operationDocs: dto.operationDocs ?? undefined,
+                status: 'pending_review',
+                reviewerNotes: null,
+            },
+        });
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { businessName: dto.businessName },
+        });
+        return {
+            applicationId: app.id,
+            userId: app.userId,
+            businessName: app.businessName,
+            status: app.status,
+            submittedAt: app.createdAt,
+            message: 'Application submitted. Our verification team will review your documents within 1–3 business days.',
+        };
+    }
+    async getApplicationStatus(userId) {
+        const app = await this.prisma.hostApplication.findUnique({
+            where: { userId },
+        });
+        if (!app) {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { businessName: true, role: true, isApproved: true },
+            });
+            return {
+                applicationId: null,
+                status: user?.isApproved ? 'approved' : 'not_applied',
+                businessName: user?.businessName || null,
+                submittedAt: null,
+                reviewerNotes: null,
+            };
+        }
+        return {
+            applicationId: app.id,
+            status: app.status,
+            businessName: app.businessName,
+            submittedAt: app.createdAt,
+            reviewerNotes: app.reviewerNotes,
+        };
+    }
+    async addPayoutMethod(userId, dto) {
+        const details = dto.details || {
+            bankName: dto.bankName,
+            accountNumber: dto.accountNumber,
+            accountName: dto.accountName,
+            provider: dto.provider,
+            mobileNumber: dto.mobileNumber,
+        };
+        const methodType = dto.type === 'mobile_money' ? 'MOBILE_MONEY' : 'BANK_TRANSFER';
+        const accountStr = JSON.stringify(details);
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                payoutMethod: methodType,
+                payoutAccount: accountStr,
+            },
+        });
+        const newId = `pm_${Date.now()}`;
+        return {
+            success: true,
+            message: 'Payout method saved successfully.',
+            payoutMethod: {
+                id: newId,
+                type: dto.type,
+                isDefault: dto.isDefault ?? true,
+                details,
+            },
+        };
+    }
+    async removePayoutMethod(userId, id) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                payoutAccount: null,
+            },
+        });
+        return {
+            success: true,
+            message: 'Payout method removed successfully.',
+        };
+    }
+    async setDefaultPayoutMethod(userId, id) {
+        return {
+            success: true,
+            message: 'Default payout method updated.',
+        };
+    }
 };
 exports.HostsService = HostsService;
 exports.HostsService = HostsService = __decorate([

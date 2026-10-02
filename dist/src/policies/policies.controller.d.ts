@@ -13,6 +13,15 @@ export declare class PoliciesController {
         currentVersion: string;
     }[]>;
     getBySlug(slug: string): Promise<{
+        success: boolean;
+        data: {
+            slug: string;
+            title: string;
+            version: string;
+            contentMarkdown: string;
+            effectiveDate: string;
+            lastUpdated: string;
+        };
         id: string;
         slug: string;
         title: string;

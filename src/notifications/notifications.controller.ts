@@ -1,115 +1,100 @@
-import { Controller, Get, Patch, Post, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
-
-/** Map backend NotificationType enum → frontend-friendly lowercase string */
-const NOTIFICATION_ACTION_LABELS: Record<string, string> = {
-  booking_confirmed: 'View Booking',
-  booking_request: 'View Booking',
-  booking_cancelled: 'View Booking',
-  checked_in: 'View Booking',
-  checked_out: 'View Booking',
-  review_received: 'View Review',
-  system: 'View',
-  property_approved: 'View Listing',
-  property_rejected: 'View Listing',
-  payout: 'View Finances',
-  message: 'Reply',
-};
 
 @ApiTags('Notifications')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly notifService: NotificationsService) {}
 
   /**
    * GET /api/notifications
-   * Powers the host/guest bell icon popover.
-   * Query: limit (default 10), unreadOnly (boolean)
+   * Full paginated list — powers NotificationsPage.tsx
    */
   @Get()
-  @ApiOperation({ summary: 'Notification list for current user (limit, unreadOnly filters)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiOperation({ summary: 'Get notifications for current user' })
+  @ApiQuery({ name: 'page',       required: false, type: Number  })
+  @ApiQuery({ name: 'limit',      required: false, type: Number  })
+  @ApiQuery({ name: 'type',       required: false, type: String  })
   @ApiQuery({ name: 'unreadOnly', required: false, type: Boolean })
-  async findAll(
+  async getNotifications(
     @CurrentUser() user: User,
-    @Query('limit') limitQuery?: string,
-    @Query('unreadOnly') unreadOnlyQuery?: string,
+    @Query('page')       page?:       string,
+    @Query('limit')      limit?:      string,
+    @Query('type')       type?:       string,
+    @Query('unreadOnly') unreadOnly?: string,
   ) {
-    const limit = Math.min(100, Math.max(1, Number(limitQuery) || 10));
-    const unreadOnly = unreadOnlyQuery === 'true';
+    return this.notifService.getUserNotifications(user.id, {
+      page:       page       ? +page       : 1,
+      limit:      limit      ? +limit      : 20,
+      type,
+      unreadOnly: unreadOnly === 'true',
+    });
+  }
 
-    const where: any = { userId: user.id };
-    if (unreadOnly) where.isRead = false;
-
-    const [notifications, unreadCount] = await Promise.all([
-      this.prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      }),
-      this.prisma.notification.count({ where: { userId: user.id, isRead: false } }),
-    ]);
-
-    return {
-      unreadCount,
-      notifications: notifications.map((n) => {
-        const typeKey = n.type.toLowerCase();
-        return {
-          id: n.id,
-          type: typeKey,
-          title: n.title,
-          description: n.description,
-          timestamp: n.createdAt.toISOString(),  // spec uses "timestamp"
-          read: n.isRead,                         // spec uses "read" not "isRead"
-          actionUrl: n.actionUrl || null,
-          actionLabel: NOTIFICATION_ACTION_LABELS[typeKey] || 'View',
-        };
-      }),
-    };
+  /**
+   * GET /api/notifications/unread-count
+   * Lightweight badge poll — called by Navbar / HostNav
+   */
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Get unread notification count (badge poll)' })
+  async getUnreadCount(@CurrentUser() user: User) {
+    return this.notifService.getUnreadCount(user.id);
   }
 
   /**
    * PATCH /api/notifications/:id/read
-   * Mark a single notification read. Returns { id, read: true }.
+   * Mark a single notification as read
    */
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark single notification as read' })
   async markRead(@CurrentUser() user: User, @Param('id') id: string) {
-    await this.prisma.notification.update({
-      where: { id, userId: user.id },
-      data: { isRead: true },
-    });
-    return { id, read: true };
+    return this.notifService.markAsRead(user.id, id);
   }
 
   /**
    * POST /api/notifications/read-all
-   * Clear all unread. Returns { success, unreadCount: 0 }.
-   * Note: also kept PATCH alias for backwards compatibility.
+   * Mark ALL as read — "Mark all as read" button
    */
   @Post('read-all')
-  @ApiOperation({ summary: 'Mark all notifications as read (POST)' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark all notifications as read' })
   async markAllReadPost(@CurrentUser() user: User) {
-    await this.prisma.notification.updateMany({
-      where: { userId: user.id, isRead: false },
-      data: { isRead: true },
-    });
-    return { success: true, unreadCount: 0 };
+    return this.notifService.markAllAsRead(user.id);
   }
 
+  /**
+   * PATCH /api/notifications/read-all — legacy alias
+   */
   @Patch('read-all')
   @ApiOperation({ summary: 'Mark all notifications as read (PATCH alias)' })
   async markAllReadPatch(@CurrentUser() user: User) {
-    await this.prisma.notification.updateMany({
-      where: { userId: user.id, isRead: false },
-      data: { isRead: true },
-    });
-    return { success: true, unreadCount: 0 };
+    return this.notifService.markAllAsRead(user.id);
+  }
+
+  /**
+   * DELETE /api/notifications/:id
+   * Soft-delete / dismiss a notification
+   */
+  @Delete(':id')
+  @ApiOperation({ summary: 'Dismiss (soft-delete) a notification' })
+  async dismiss(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.notifService.deleteNotification(user.id, id);
   }
 }

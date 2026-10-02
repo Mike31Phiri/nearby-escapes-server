@@ -64,7 +64,11 @@ enum NotificationType {
   SYSTEM
   PROPERTY_APPROVED
   PROPERTY_REJECTED
+  LISTING_APPROVED
+  LISTING_REJECTED
   PAYOUT
+  MESSAGE
+  PROMOTION
 }
 
 enum DisputeStatus {
@@ -513,6 +517,9 @@ model Notification {
   description String
   isRead      Boolean          @default(false)
   actionUrl   String?
+  actionLabel String?
+  metadata    Json?
+  deletedAt   DateTime?
   createdAt   DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id])

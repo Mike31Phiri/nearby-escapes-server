@@ -12,8 +12,8 @@ export declare class WishlistController {
             listingId: string;
             type: string;
             name: string;
-            description: string;
-            location: string;
+            description: string | null;
+            location: string | null;
             thumbnailUrl: any;
             price: number;
             priceFormatted: string;
@@ -34,8 +34,8 @@ export declare class WishlistController {
             listingId: string;
             type: string;
             name: string;
-            description: string;
-            location: string;
+            description: string | null;
+            location: string | null;
             thumbnailUrl: any;
             price: number;
             priceFormatted: string;
@@ -56,8 +56,8 @@ export declare class WishlistController {
             listingId: string;
             type: string;
             name: string;
-            description: string;
-            location: string;
+            description: string | null;
+            location: string | null;
             thumbnailUrl: any;
             price: number;
             priceFormatted: string;

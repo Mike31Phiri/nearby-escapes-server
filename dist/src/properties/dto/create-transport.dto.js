@@ -11,6 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateTransportDto = exports.CreateTransportDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
+const listing_policy_dto_1 = require("./listing-policy.dto");
 class CreateTransportDto {
     name;
     description;
@@ -22,6 +24,9 @@ class CreateTransportDto {
     schedule;
     isActive;
     sortOrder;
+    policies;
+    tags;
+    recommendations;
 }
 exports.CreateTransportDto = CreateTransportDto;
 __decorate([
@@ -74,6 +79,23 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], CreateTransportDto.prototype, "sortOrder", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => listing_policy_dto_1.CreateListingPolicyDto),
+    __metadata("design:type", Array)
+], CreateTransportDto.prototype, "policies", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateTransportDto.prototype, "tags", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateTransportDto.prototype, "recommendations", void 0);
 class UpdateTransportDto {
     name;
     description;

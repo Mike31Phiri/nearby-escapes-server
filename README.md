@@ -139,10 +139,14 @@ REDIS_PORT=6379
 # Elasticsearch
 ELASTICSEARCH_NODE="http://localhost:9200"
 
-# DPO Payment Gateway
-DPO_COMPANY_TOKEN="your-dpo-company-token"
-DPO_SERVICE_TYPE="your-service-type"
-DPO_PAYMENT_URL="https://secure.3gdirectpay.com/payv2.php"
+# Eskrow Payment Gateway
+# TODO: fill these in once you receive the Eskrow API credentials
+ESKROW_API_KEY="your-eskrow-api-key"
+ESKROW_SECRET_KEY="your-eskrow-secret-key"
+ESKROW_WEBHOOK_SECRET="your-eskrow-webhook-secret"
+# APP_URL is used to construct the webhook callback URL sent to Eskrow
+APP_URL="http://localhost:3001"
+
 
 # AWS / Cloudflare R2 Storage
 AWS_ACCESS_KEY_ID="your-access-key"

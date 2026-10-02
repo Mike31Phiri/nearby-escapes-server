@@ -1,3 +1,4 @@
+import { CreateListingPolicyDto } from './listing-policy.dto';
 export declare class CreateTransportDto {
     name: string;
     description?: string;
@@ -9,6 +10,9 @@ export declare class CreateTransportDto {
     schedule?: any;
     isActive?: boolean;
     sortOrder?: number;
+    policies?: CreateListingPolicyDto[];
+    tags?: any[];
+    recommendations?: any[];
 }
 export declare class UpdateTransportDto {
     name?: string;

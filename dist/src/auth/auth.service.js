@@ -44,7 +44,6 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
@@ -79,8 +78,8 @@ let AuthService = class AuthService {
                 password: hashed,
                 name: dto.name,
                 phone: dto.phone || null,
-                role: dto.role === 'host' ? 'HOST' : 'GUEST',
-                businessName: dto.role === 'host' ? `${dto.name}'s Services` : null,
+                role: 'GUEST',
+                businessName: null,
                 isApproved: false,
             },
         });
@@ -125,10 +124,13 @@ let AuthService = class AuthService {
     }
     sanitize(user) {
         const { password, resetToken, resetTokenExpiry, refreshToken, deletedAt, ...rest } = user;
+        const role = (user.role || 'GUEST').toLowerCase();
+        const isHost = role === 'host';
         return {
             ...rest,
-            roles: [user.role.toLowerCase()],
-            role: user.role.toLowerCase(),
+            roles: isHost ? ['guest', 'host'] : [role],
+            role,
+            isHostVerified: isHost ? Boolean(user.isApproved) : false,
         };
     }
     signToken(sub, email) {
@@ -139,7 +141,9 @@ exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(1, (0, common_1.Inject)((0, common_1.forwardRef)(() => users_service_1.UsersService))),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, typeof (_a = typeof users_service_1.UsersService !== "undefined" && users_service_1.UsersService) === "function" ? _a : Object, jwt_1.JwtService,
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        users_service_1.UsersService,
+        jwt_1.JwtService,
         notifications_service_1.NotificationsService,
         config_1.ConfigService])
 ], AuthService);

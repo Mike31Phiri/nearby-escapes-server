@@ -54,7 +54,12 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
         this.ensureIndex();
     }
     async enqueueSync(propertyId, deleted = false) {
-        await this.syncQueue.add(deleted ? 'delete' : 'upsert', { propertyId, deleted }, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
+        try {
+            await this.syncQueue.add(deleted ? 'delete' : 'upsert', { propertyId, deleted }, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
+        }
+        catch (err) {
+            this.logger.warn(`Redis/Queue sync skipped for property ${propertyId}: ${err?.message}`);
+        }
     }
     async upsertProperty(doc) {
         try {
@@ -95,33 +100,48 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
     async getPropertyById(id) {
         try {
             const cached = (await this.redis.get(REDIS_KEY(id))) || (await this.redis.get(`listing:${id}`));
-            if (cached)
-                return JSON.parse(cached);
+            if (cached) {
+                const doc = JSON.parse(cached);
+                if (doc.status?.toLowerCase() !== 'active') {
+                    throw new common_1.NotFoundException('Property not found');
+                }
+                return doc;
+            }
         }
-        catch { }
+        catch (err) {
+            if (err instanceof common_1.NotFoundException)
+                throw err;
+        }
         try {
             const result = await this.es.get({ index: ES_INDEX, id });
             const doc = result._source;
+            if (doc.status?.toLowerCase() !== 'active') {
+                throw new common_1.NotFoundException('Property not found');
+            }
             try {
                 await this.redis.set(REDIS_KEY(id), JSON.stringify(doc));
             }
             catch { }
             return doc;
         }
-        catch { }
+        catch (err) {
+            if (err instanceof common_1.NotFoundException)
+                throw err;
+        }
         return this.getPropertyFromDb(id);
     }
     async getListingById(id) {
         return this.getPropertyById(id);
     }
     async searchProperties(query) {
-        const page = query.page || 1;
-        const limit = query.limit || 20;
+        const page = Math.max(1, Number(query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(query.limit) || 12));
         const from = (page - 1) * limit;
         const must = [{ term: { status: 'active' } }];
         const filter = [];
-        if (query.type && query.type !== 'all') {
-            must.push({ term: { type: query.type.toLowerCase() } });
+        const typeFilter = query.vertical || query.type;
+        if (typeFilter && typeFilter !== 'all') {
+            must.push({ term: { type: typeFilter.toLowerCase() } });
         }
         if (query.q) {
             must.push({
@@ -132,15 +152,23 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
                 },
             });
         }
-        if (query.location && !query.q) {
+        if (query.city) {
+            must.push({ match: { location: { query: query.city, fuzziness: 'AUTO' } } });
+        }
+        if (query.province) {
+            must.push({ match: { location: { query: query.province, fuzziness: 'AUTO' } } });
+        }
+        if (query.location && !query.q && !query.city && !query.province) {
             must.push({ match: { location: { query: query.location, fuzziness: 'AUTO' } } });
         }
-        if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+        const minP = query.minPriceNgwee !== undefined ? Number(query.minPriceNgwee) : query.minPrice !== undefined ? Number(query.minPrice) : undefined;
+        const maxP = query.maxPriceNgwee !== undefined ? Number(query.maxPriceNgwee) : query.maxPrice !== undefined ? Number(query.maxPrice) : undefined;
+        if (minP !== undefined || maxP !== undefined) {
             const rangeFilter = {};
-            if (query.minPrice !== undefined)
-                rangeFilter.gte = query.minPrice;
-            if (query.maxPrice !== undefined)
-                rangeFilter.lte = query.maxPrice;
+            if (minP !== undefined)
+                rangeFilter.gte = minP;
+            if (maxP !== undefined)
+                rangeFilter.lte = maxP;
             filter.push({ range: { price: rangeFilter } });
         }
         if (query.featured === 'gem') {
@@ -150,7 +178,7 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
             must.push({ term: { type: 'experience' } });
         }
         if (query.guests) {
-            filter.push({ range: { 'stays.maxGuests': { gte: query.guests } } });
+            filter.push({ range: { 'stays.maxGuests': { gte: Number(query.guests) } } });
         }
         let sort = [{ createdAt: 'desc' }];
         if (query.sort === 'price_asc')
@@ -159,6 +187,8 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
             sort = [{ price: 'desc' }];
         else if (query.sort === 'rating')
             sort = [{ rating: 'desc' }];
+        else if (query.sort === 'popular')
+            sort = [{ reviewCount: 'desc' }];
         else if (query.sort === 'newest')
             sort = [{ createdAt: 'desc' }];
         try {
@@ -190,7 +220,7 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
         const property = await this.prisma.property.findUnique({
             where: { id },
             include: {
-                host: { select: { name: true, avatar: true, businessName: true } },
+                host: { select: { id: true, name: true, avatar: true, businessName: true, isApproved: true } },
                 stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
                 experiences: {
                     where: { deletedAt: null },
@@ -204,28 +234,77 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
                 reviews: { select: { rating: true } },
             },
         });
-        if (!property || property.deletedAt)
+        if (!property || property.deletedAt || property.status !== 'ACTIVE') {
             throw new common_1.NotFoundException('Property not found');
+        }
         return this.mapToDoc(property);
     }
     async searchPropertiesFromDb(query) {
-        const page = query.page || 1;
-        const limit = query.limit || 20;
+        const page = Math.max(1, Number(query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(query.limit) || 12));
+        const skip = (page - 1) * limit;
         const where = { status: 'ACTIVE', deletedAt: null };
-        if (query.type && query.type !== 'all') {
-            where.type = query.type.toUpperCase();
+        const typeFilter = query.vertical || query.type;
+        if (typeFilter && typeFilter !== 'all') {
+            where.type = typeFilter.toUpperCase();
         }
-        if (query.location) {
-            where.location = { contains: query.location, mode: 'insensitive' };
+        const searchTerms = [];
+        if (query.q) {
+            searchTerms.push({ name: { contains: query.q, mode: 'insensitive' } }, { description: { contains: query.q, mode: 'insensitive' } }, { location: { contains: query.q, mode: 'insensitive' } });
+        }
+        if (query.city) {
+            searchTerms.push({ location: { contains: query.city, mode: 'insensitive' } });
+        }
+        if (query.province) {
+            searchTerms.push({ location: { contains: query.province, mode: 'insensitive' } });
+        }
+        if (query.location && !query.q && !query.city && !query.province) {
+            searchTerms.push({ location: { contains: query.location, mode: 'insensitive' } });
+        }
+        if (searchTerms.length > 0) {
+            where.OR = searchTerms;
+        }
+        if (query.from || query.to) {
+            where.transports = {
+                some: {
+                    isActive: true,
+                    deletedAt: null,
+                    ...(query.from ? { from: { contains: query.from, mode: 'insensitive' } } : {}),
+                    ...(query.to ? { to: { contains: query.to, mode: 'insensitive' } } : {}),
+                },
+            };
+        }
+        if (query.amenities) {
+            const amenityList = String(query.amenities)
+                .split(',')
+                .map((a) => a.trim())
+                .filter(Boolean);
+            if (amenityList.length > 0) {
+                where.amenities = {
+                    some: {
+                        name: { in: amenityList, mode: 'insensitive' },
+                    },
+                };
+            }
+        }
+        if (query.guests || query.bedrooms) {
+            where.stays = {
+                some: {
+                    isActive: true,
+                    deletedAt: null,
+                    ...(query.guests ? { maxGuests: { gte: Number(query.guests) } } : {}),
+                    ...(query.bedrooms ? { bedrooms: { gte: Number(query.bedrooms) } } : {}),
+                },
+            };
         }
         const [properties, total] = await Promise.all([
             this.prisma.property.findMany({
                 where,
-                skip: (page - 1) * limit,
+                skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    host: { select: { name: true, avatar: true, businessName: true } },
+                    host: { select: { id: true, name: true, avatar: true, businessName: true, isApproved: true } },
                     stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
                     experiences: {
                         where: { deletedAt: null },
@@ -241,8 +320,27 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
             }),
             this.prisma.property.count({ where }),
         ]);
+        let docs = properties.map((p) => this.mapToDoc(p));
+        const minP = query.minPriceNgwee !== undefined ? Number(query.minPriceNgwee) : query.minPrice !== undefined ? Number(query.minPrice) : undefined;
+        const maxP = query.maxPriceNgwee !== undefined ? Number(query.maxPriceNgwee) : query.maxPrice !== undefined ? Number(query.maxPrice) : undefined;
+        if (minP !== undefined)
+            docs = docs.filter((d) => d.price >= minP);
+        if (maxP !== undefined)
+            docs = docs.filter((d) => d.price <= maxP);
+        if (query.sort === 'price_asc') {
+            docs.sort((a, b) => a.price - b.price);
+        }
+        else if (query.sort === 'price_desc') {
+            docs.sort((a, b) => b.price - a.price);
+        }
+        else if (query.sort === 'rating') {
+            docs.sort((a, b) => b.rating - a.rating);
+        }
+        else if (query.sort === 'popular') {
+            docs.sort((a, b) => b.reviewCount - a.reviewCount);
+        }
         return {
-            data: properties.map((p) => this.mapToDoc(p)),
+            data: docs,
             meta: {
                 page,
                 limit,
@@ -272,6 +370,17 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
             if (active.length)
                 startingPrice = Math.min(...active.map((t) => t.pricePerSeat));
         }
+        const locationParts = (property.location || '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const city = locationParts[0] || null;
+        const province = locationParts.length > 1 ? locationParts[locationParts.length - 1] : null;
+        const slug = (property.name || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+        const featuredImage = property.images?.[0]?.url || null;
         return {
             id: property.id,
             type: property.type.toLowerCase(),
@@ -280,17 +389,32 @@ let ReadStoreService = ReadStoreService_1 = class ReadStoreService {
             description: property.description,
             location: property.location,
             currency: property.currency,
-            price: startingPrice,
+            price: Math.round(startingPrice / 100),
             priceFormatted: `K${(startingPrice / 100).toFixed(2)}`,
             rating: avgRating,
             reviewCount: ratings.length,
-            thumbnailUrl: property.images?.[0]?.url || null,
+            thumbnailUrl: featuredImage,
             images: (property.images || []).map((img) => ({ url: img.url, sortOrder: img.sortOrder })),
             amenities: (property.amenities || []).map((a) => ({ name: a.name, icon: a.icon })),
             rules: (property.rules || []).map((r) => r.rule),
             hostId: property.hostId,
             hostName: property.host?.businessName || property.host?.name || null,
             hostAvatar: property.host?.avatar || null,
+            vertical: property.type.toLowerCase(),
+            title: property.name,
+            slug,
+            city,
+            province,
+            featuredImage,
+            image: featuredImage,
+            pricePerUnitNgwee: startingPrice,
+            reviews: ratings.length,
+            host: {
+                id: property.hostId,
+                name: property.host?.businessName || property.host?.name || null,
+                avatarUrl: property.host?.avatar || null,
+                superhost: Boolean(property.host?.isApproved),
+            },
             stays: (property.stays || []).map((s) => ({
                 id: s.id,
                 name: s.name,

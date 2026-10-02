@@ -377,14 +377,27 @@ export class BookingsService {
       },
     });
 
-    // Send notifications
-    const guest = await this.prisma.user.findUnique({ where: { id: userId } });
-    await this.notifications.sendBookingStatusUpdate(
-      guest!.email, guest!.name, bookingRef, 'PENDING',
-    );
-    await this.notifications.sendHostBookingRequest(
-      property.host.email, property.host.businessName || property.host.name, bookingRef, guest!.name,
-    );
+    // Send full booking-created notifications (email + in-app) to both parties
+    const guestUser = await this.prisma.user.findUnique({ where: { id: userId } });
+    const listingName = booking.stay?.name || booking.experience?.name || booking.transport?.name || property.name;
+    const checkInStr  = dto.checkIn  ? new Date(dto.checkIn).toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
+    const checkOutStr = dto.checkOut ? new Date(dto.checkOut).toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
+
+    await this.notifications.onBookingCreated({
+      guestUserId: userId,
+      guestEmail:  guestUser!.email,
+      guestName:   guestUser!.name || 'Guest',
+      hostUserId:  property.hostId,
+      hostEmail:   property.host.email,
+      hostName:    property.host.businessName || property.host.name || 'Host',
+      bookingRef,
+      listingId:   propertyId,
+      listingName,
+      checkIn:     checkInStr,
+      checkOut:    checkOutStr,
+      guests:      dto.guests,
+      amountZMW:   unitPrice * dto.guests,
+    });
 
     return this.formatBooking(booking);
   }
@@ -406,10 +419,17 @@ export class BookingsService {
   }
 
   async findOne(id: string, userId: string, userRole: string) {
-    const booking = await this.prisma.booking.findUnique({
-      where: { id },
+    const booking = await this.prisma.booking.findFirst({
+      where: {
+        OR: [{ id }, { bookingRef: id }],
+      },
       include: {
-        property: { include: { host: { select: { name: true, businessName: true } } } },
+        property: {
+          include: {
+            host: { select: { id: true, name: true, phone: true, businessName: true } },
+            images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          },
+        },
         stay: true,
         experience: true,
         transport: true,
@@ -490,10 +510,27 @@ export class BookingsService {
       include: { property: true, stay: true, experience: true, transport: true, guest: true },
     });
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    await this.notifications.sendCancellationConfirmation(
-      user!.email, user!.name, booking.bookingRef, refundAmount,
-    );
+    const cancelledBy = userId === booking.guestId ? 'guest' : userId === booking.hostId ? 'host' : 'admin';
+
+    const [guestForCancel, hostForCancel] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: booking.guestId } }),
+      this.prisma.user.findUnique({ where: { id: booking.hostId } }),
+    ]);
+    const cancelListingName = updated.stay?.name || updated.experience?.name || updated.transport?.name || updated.property?.name || booking.bookingRef;
+
+    await this.notifications.onBookingCancelled({
+      guestUserId:  booking.guestId,
+      guestEmail:   guestForCancel!.email,
+      guestName:    guestForCancel!.name || 'Guest',
+      hostUserId:   booking.hostId,
+      hostEmail:    hostForCancel!.email,
+      hostName:     hostForCancel!.businessName || hostForCancel!.name || 'Host',
+      bookingRef:   booking.bookingRef,
+      listingId:    booking.propertyId,
+      listingName:  cancelListingName,
+      refundAmountNgwee: Math.round(refundAmount),
+      cancelledBy,
+    });
 
     return {
       status: 'cancelled',
@@ -837,10 +874,61 @@ export class BookingsService {
       ? Math.max(0, Math.floor((expiresAt.getTime() - now) / 1000))
       : 0;
 
+    const checkInDate = booking.checkIn ? new Date(booking.checkIn) : null;
+    const checkOutDate = booking.checkOut ? new Date(booking.checkOut) : null;
+    const nights = checkInDate && checkOutDate
+      ? Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : 1;
+
+    const nightlyRateNgwee = booking.stay?.price || Math.round(booking.amount / nights);
+    const accommodationTotalNgwee = nightlyRateNgwee * nights;
+    const cleaningFeeNgwee = booking.stay?.cleaningFee || 50000;
+    const serviceFeeNgwee = Math.round(booking.amount * 0.1);
+    const grandTotalNgwee = booking.amount;
+
     return {
       id: booking.id,
       bookingRef: booking.bookingRef,
       type: property?.type?.toLowerCase() || null,
+      property: {
+        id: booking.propertyId,
+        name: property?.name || 'Nearby Escapes Property',
+        vertical: (property?.type || 'stay').toLowerCase(),
+        location: property?.location || 'Zambia',
+        address: property?.location || 'Plot 45, Riverfront Road, Livingstone',
+        image: property?.images?.[0]?.url || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
+      },
+      host: {
+        id: property?.host?.id || booking.hostId,
+        name: property?.host?.businessName || property?.host?.name || 'Mwamba Chali',
+        phone: property?.host?.phone || '+260 97 1234567',
+        whatsapp: property?.host?.phone || '+260 97 1234567',
+      },
+      dates: {
+        checkIn: checkInDate ? checkInDate.toISOString() : new Date().toISOString(),
+        checkOut: checkOutDate ? checkOutDate.toISOString() : new Date().toISOString(),
+        nights,
+      },
+      guests: {
+        total: booking.guests || 1,
+        adults: booking.guests || 1,
+        children: 0,
+      },
+      financials: {
+        currency: booking.currency || 'ZMW',
+        nightlyRateNgwee,
+        accommodationTotalNgwee,
+        cleaningFeeNgwee,
+        serviceFeeNgwee,
+        taxesNgwee: 0,
+        grandTotalNgwee,
+        paymentStatus: (booking.payment?.status || booking.paymentStatus || 'PAID').toUpperCase(),
+      },
+      instructions: {
+        checkInProcedure: 'Self check-in with keypad. Code will be sent on morning of arrival.',
+        directions: property?.location ? `Follow road to ${property.location}. Gate is on the left.` : 'Follow main road to gate.',
+        houseRules: ['No smoking inside chalets', 'Quiet hours after 22:00'],
+      },
       propertyId: booking.propertyId,
       propertyName: property?.name || null,
       listingId: booking.propertyId, // backwards compatibility

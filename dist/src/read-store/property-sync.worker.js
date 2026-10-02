@@ -66,7 +66,7 @@ let PropertySyncWorker = PropertySyncWorker_1 = class PropertySyncWorker extends
                 reviews: { select: { rating: true } },
             },
         });
-        if (!property || property.deletedAt) {
+        if (!property || property.deletedAt || property.status !== 'ACTIVE') {
             await this.readStore.deleteProperty(propertyId);
             return;
         }
@@ -98,8 +98,8 @@ let PropertySyncWorker = PropertySyncWorker_1 = class PropertySyncWorker extends
             type: property.type.toLowerCase(),
             status: property.status.toLowerCase(),
             name: property.name,
-            description: property.description,
-            location: property.location,
+            description: property.description || '',
+            location: property.location || '',
             currency: property.currency,
             price: startingPrice,
             priceFormatted: `K${(startingPrice / 100).toFixed(2)}`,

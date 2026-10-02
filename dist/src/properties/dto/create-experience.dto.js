@@ -11,6 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateExperienceDto = exports.CreateExperienceDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
+const listing_policy_dto_1 = require("./listing-policy.dto");
 class CreateExperienceDto {
     name;
     description;
@@ -24,6 +26,9 @@ class CreateExperienceDto {
     inclusions;
     isActive;
     sortOrder;
+    policies;
+    tags;
+    recommendations;
 }
 exports.CreateExperienceDto = CreateExperienceDto;
 __decorate([
@@ -88,6 +93,23 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], CreateExperienceDto.prototype, "sortOrder", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => listing_policy_dto_1.CreateListingPolicyDto),
+    __metadata("design:type", Array)
+], CreateExperienceDto.prototype, "policies", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateExperienceDto.prototype, "tags", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateExperienceDto.prototype, "recommendations", void 0);
 class UpdateExperienceDto {
     name;
     description;

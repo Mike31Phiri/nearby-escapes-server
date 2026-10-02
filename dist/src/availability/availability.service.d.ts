@@ -1,15 +1,16 @@
 import { PrismaService } from '../prisma/prisma.service';
-import { BlockDatesDto, SeasonalPricingDto } from './dto/availability.dto';
+import { BlockDatesDto, UnblockDatesDto, SeasonalPricingDto, ExperienceSlotBlockDto } from './dto/availability.dto';
 export declare class AvailabilityService {
     private prisma;
     constructor(prisma: PrismaService);
-    getStayAvailability(stayId: string, year?: number, month?: number): Promise<any[]>;
-    getAvailability(stayId: string, year?: number, month?: number): Promise<any[]>;
-    getExperienceAvailability(experienceId: string, dateStr: string): Promise<{
+    getPropertyAvailability(propertyId: string, year?: number, month?: number): Promise<{
         experienceId: string;
         propertyId: string;
         name: string;
         date: string;
+        totalSlotsCount: number;
+        availableSlotsCount: number;
+        unavailableSlotsCount: number;
         slots: {
             slot: string;
             available: boolean;
@@ -17,30 +18,272 @@ export declare class AvailabilityService {
             capacity: number;
             bookedSpots: number;
             remainingSpots: number;
+            isBlocked: boolean;
+            isHeld: boolean;
+            holdExpiresAt: string | null;
+            price: number;
+            priceFormatted: string;
+        }[];
+    } | {
+        transportId: string;
+        propertyId: string;
+        name: string;
+        vehicleType: string | null;
+        inventoryType: string;
+        date: string;
+        available: boolean;
+        totalVehicles: number;
+        bookedVehicles: number;
+        availableVehicles: number;
+        pricePerUnit: number | null;
+        priceFormatted: string;
+        capacity?: undefined;
+        totalSeats?: undefined;
+        bookedSeats?: undefined;
+        remainingSeats?: undefined;
+        pricePerSeat?: undefined;
+        schedule?: undefined;
+    } | {
+        transportId: string;
+        propertyId: string;
+        name: string;
+        vehicleType: string | null;
+        inventoryType: string;
+        date: string;
+        available: boolean;
+        capacity: number;
+        totalSeats: number;
+        bookedSeats: number;
+        remainingSeats: number;
+        pricePerSeat: number | null;
+        priceFormatted: string;
+        schedule: import("@prisma/client/runtime/client").JsonValue;
+        totalVehicles?: undefined;
+        bookedVehicles?: undefined;
+        availableVehicles?: undefined;
+        pricePerUnit?: undefined;
+    } | {
+        propertyId: string;
+        propertyName: string;
+        vertical: string;
+        totalInventory: any;
+        year: number;
+        month: number;
+        days: any[];
+    }>;
+    getStayAvailability(stayId: string, year?: number, month?: number): Promise<any[] | {
+        experienceId: string;
+        propertyId: string;
+        name: string;
+        date: string;
+        totalSlotsCount: number;
+        availableSlotsCount: number;
+        unavailableSlotsCount: number;
+        slots: {
+            slot: string;
+            available: boolean;
+            status: string;
+            capacity: number;
+            bookedSpots: number;
+            remainingSpots: number;
+            isBlocked: boolean;
+            isHeld: boolean;
+            holdExpiresAt: string | null;
+            price: number;
+            priceFormatted: string;
+        }[];
+    } | {
+        transportId: string;
+        propertyId: string;
+        name: string;
+        vehicleType: string | null;
+        inventoryType: string;
+        date: string;
+        available: boolean;
+        totalVehicles: number;
+        bookedVehicles: number;
+        availableVehicles: number;
+        pricePerUnit: number | null;
+        priceFormatted: string;
+        capacity?: undefined;
+        totalSeats?: undefined;
+        bookedSeats?: undefined;
+        remainingSeats?: undefined;
+        pricePerSeat?: undefined;
+        schedule?: undefined;
+    } | {
+        transportId: string;
+        propertyId: string;
+        name: string;
+        vehicleType: string | null;
+        inventoryType: string;
+        date: string;
+        available: boolean;
+        capacity: number;
+        totalSeats: number;
+        bookedSeats: number;
+        remainingSeats: number;
+        pricePerSeat: number | null;
+        priceFormatted: string;
+        schedule: import("@prisma/client/runtime/client").JsonValue;
+        totalVehicles?: undefined;
+        bookedVehicles?: undefined;
+        availableVehicles?: undefined;
+        pricePerUnit?: undefined;
+    } | {
+        propertyId: string;
+        propertyName: string;
+        vertical: string;
+        totalInventory: any;
+        year: number;
+        month: number;
+        days: any[];
+    }>;
+    getAvailability(id: string, year?: number, month?: number): Promise<any[] | {
+        experienceId: string;
+        propertyId: string;
+        name: string;
+        date: string;
+        totalSlotsCount: number;
+        availableSlotsCount: number;
+        unavailableSlotsCount: number;
+        slots: {
+            slot: string;
+            available: boolean;
+            status: string;
+            capacity: number;
+            bookedSpots: number;
+            remainingSpots: number;
+            isBlocked: boolean;
+            isHeld: boolean;
+            holdExpiresAt: string | null;
+            price: number;
+            priceFormatted: string;
+        }[];
+    } | {
+        transportId: string;
+        propertyId: string;
+        name: string;
+        vehicleType: string | null;
+        inventoryType: string;
+        date: string;
+        available: boolean;
+        totalVehicles: number;
+        bookedVehicles: number;
+        availableVehicles: number;
+        pricePerUnit: number | null;
+        priceFormatted: string;
+        capacity?: undefined;
+        totalSeats?: undefined;
+        bookedSeats?: undefined;
+        remainingSeats?: undefined;
+        pricePerSeat?: undefined;
+        schedule?: undefined;
+    } | {
+        transportId: string;
+        propertyId: string;
+        name: string;
+        vehicleType: string | null;
+        inventoryType: string;
+        date: string;
+        available: boolean;
+        capacity: number;
+        totalSeats: number;
+        bookedSeats: number;
+        remainingSeats: number;
+        pricePerSeat: number | null;
+        priceFormatted: string;
+        schedule: import("@prisma/client/runtime/client").JsonValue;
+        totalVehicles?: undefined;
+        bookedVehicles?: undefined;
+        availableVehicles?: undefined;
+        pricePerUnit?: undefined;
+    } | {
+        propertyId: string;
+        propertyName: string;
+        vertical: string;
+        totalInventory: any;
+        year: number;
+        month: number;
+        days: any[];
+    }>;
+    getExperienceAvailability(propertyOrExpId: string, dateStr: string): Promise<{
+        experienceId: string;
+        propertyId: string;
+        name: string;
+        date: string;
+        totalSlotsCount: number;
+        availableSlotsCount: number;
+        unavailableSlotsCount: number;
+        slots: {
+            slot: string;
+            available: boolean;
+            status: string;
+            capacity: number;
+            bookedSpots: number;
+            remainingSpots: number;
+            isBlocked: boolean;
             isHeld: boolean;
             holdExpiresAt: string | null;
             price: number;
             priceFormatted: string;
         }[];
     }>;
-    getTransportAvailability(transportId: string, dateStr: string): Promise<{
+    blockExperienceSlot(dto: ExperienceSlotBlockDto, userId: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    unblockExperienceSlot(dto: ExperienceSlotBlockDto, userId: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    getTransportAvailability(transportIdOrPropId: string, dateStr: string): Promise<{
         transportId: string;
         propertyId: string;
         name: string;
+        vehicleType: string | null;
+        inventoryType: string;
+        date: string;
+        available: boolean;
+        totalVehicles: number;
+        bookedVehicles: number;
+        availableVehicles: number;
+        pricePerUnit: number | null;
+        priceFormatted: string;
+        capacity?: undefined;
+        totalSeats?: undefined;
+        bookedSeats?: undefined;
+        remainingSeats?: undefined;
+        pricePerSeat?: undefined;
+        schedule?: undefined;
+    } | {
+        transportId: string;
+        propertyId: string;
+        name: string;
+        vehicleType: string | null;
+        inventoryType: string;
         date: string;
         available: boolean;
         capacity: number;
+        totalSeats: number;
         bookedSeats: number;
         remainingSeats: number;
         pricePerSeat: number | null;
         priceFormatted: string;
         schedule: import("@prisma/client/runtime/client").JsonValue;
+        totalVehicles?: undefined;
+        bookedVehicles?: undefined;
+        availableVehicles?: undefined;
+        pricePerUnit?: undefined;
     }>;
-    blockDates(dto: BlockDatesDto, userId: string): Promise<{
+    private resolveStayUnits;
+    blockDates(dto: BlockDatesDto | UnblockDatesDto, userId: string): Promise<{
+        success: boolean;
         message: string;
     }>;
-    unblockDates(dto: BlockDatesDto, userId: string): Promise<{
-        message: string;
+    unblockDates(dto: UnblockDatesDto | BlockDatesDto, userId: string): Promise<{
+        success: boolean;
+        message?: string;
     }>;
     addSeasonalPricing(dto: SeasonalPricingDto, userId: string): Promise<{
         id: string;

@@ -59,7 +59,7 @@ export declare class PlatformService {
                 listingId: string;
                 type: string;
                 name: string;
-                location: string;
+                location: string | null;
                 thumbnailUrl: any;
                 price: number;
                 priceFormatted: string;
@@ -69,7 +69,7 @@ export declare class PlatformService {
                 hostName: string | null;
             }[];
         };
-        locations: string[];
+        locations: (string | null)[];
         settings: Record<string, string>;
     }>;
     getUserBootstrap(userId: string): Promise<{

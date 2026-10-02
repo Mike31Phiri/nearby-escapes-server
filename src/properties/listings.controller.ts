@@ -136,4 +136,11 @@ export class ListingsController {
   findOne(@Param('id') id: string) {
     return this.readStore.getPropertyById(id);
   }
+
+  @Get(':id/policies')
+  @ApiOperation({ summary: 'Public: Fetch Property / Listing Policies' })
+  async getListingPolicies(@Param('id') id: string) {
+    return this.propertiesService.getPropertyPolicies(id);
+  }
+
 }

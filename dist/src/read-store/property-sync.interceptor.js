@@ -24,7 +24,11 @@ let PropertySyncInterceptor = class PropertySyncInterceptor {
             const propertyId = result?.propertyId || result?.id || req?.params?.id;
             const deleted = result?.deleted === true;
             if (propertyId) {
-                await this.readStore.enqueueSync(propertyId, deleted);
+                try {
+                    await this.readStore.enqueueSync(propertyId, deleted);
+                }
+                catch {
+                }
             }
         }));
     }

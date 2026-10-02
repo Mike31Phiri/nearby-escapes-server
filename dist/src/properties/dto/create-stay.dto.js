@@ -11,7 +11,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateStayDto = exports.CreateStayDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
+const listing_policy_dto_1 = require("./listing-policy.dto");
 class CreateStayDto {
     name;
     description;
@@ -27,6 +29,9 @@ class CreateStayDto {
     cancellationPolicy;
     isActive;
     sortOrder;
+    policies;
+    tags;
+    recommendations;
 }
 exports.CreateStayDto = CreateStayDto;
 __decorate([
@@ -102,6 +107,23 @@ __decorate([
     (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
 ], CreateStayDto.prototype, "sortOrder", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => listing_policy_dto_1.CreateListingPolicyDto),
+    __metadata("design:type", Array)
+], CreateStayDto.prototype, "policies", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateStayDto.prototype, "tags", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreateStayDto.prototype, "recommendations", void 0);
 class UpdateStayDto {
     name;
     description;

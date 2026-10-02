@@ -17,6 +17,8 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const bookings_service_1 = require("./bookings.service");
 const create_booking_dto_1 = require("./dto/create-booking.dto");
+const guest_bookings_dto_1 = require("./dto/guest-bookings.dto");
+const host_cancel_dto_1 = require("./dto/host-cancel.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
@@ -29,13 +31,26 @@ let BookingsController = class BookingsController {
     create(user, dto) {
         return this.bookingsService.create(user.id, dto);
     }
-    myBookings(user, as) {
-        return this.bookingsService.findMyBookings(user.id, as);
+    groupedBookings(user, userId) {
+        return this.bookingsService.getGuestBookingsGrouped(userId || user.id);
+    }
+    myTrips(user, userId) {
+        return this.bookingsService.getGuestBookingsGrouped(userId || user.id);
+    }
+    myBookings(user, query) {
+        if (query.as === 'host') {
+            return this.bookingsService.findMyBookings(user.id, 'host');
+        }
+        const targetUserId = query.userId || user.id;
+        return this.bookingsService.getGuestBookings(targetUserId, query);
     }
     findOne(user, id) {
         return this.bookingsService.findOne(id, user.id, user.role);
     }
-    cancel(user, id, dto) {
+    async cancel(user, id, dto) {
+        if (dto?.cancelledBy === 'host' || user.role === 'HOST') {
+            return this.bookingsService.hostCancel(id, user.id, dto?.reason);
+        }
         return this.bookingsService.cancel(id, user.id, dto?.reason);
     }
     releaseHold(user, id) {
@@ -62,12 +77,35 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "create", null);
 __decorate([
-    (0, common_1.Get)(),
-    (0, swagger_1.ApiOperation)({ summary: "User's bookings" }),
+    (0, common_1.Get)('grouped'),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Get user bookings grouped into upcoming, active, recent, and cancelled',
+    }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: guest_bookings_dto_1.GuestBookingsGroupedDto }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('as')),
+    __param(1, (0, common_1.Query)('userId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "groupedBookings", null);
+__decorate([
+    (0, common_1.Get)('my-trips'),
+    (0, swagger_1.ApiOperation)({ summary: 'Alias for grouped user bookings (upcoming, active, recents)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: guest_bookings_dto_1.GuestBookingsGroupedDto }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('userId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], BookingsController.prototype, "myTrips", null);
+__decorate([
+    (0, common_1.Get)(),
+    (0, swagger_1.ApiOperation)({ summary: "User's bookings with optional category filtering (upcoming, active, recent, all)" }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: [guest_bookings_dto_1.GuestBookingItemDto] }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], BookingsController.prototype, "myBookings", null);
 __decorate([
@@ -82,13 +120,14 @@ __decorate([
 __decorate([
     (0, common_1.Post)(':id/cancel'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({ summary: 'Cancel booking (guest or host)' }),
+    (0, swagger_1.ApiOperation)({ summary: '4.1 Cancel reservation by booking ID and reopen inventory' }),
+    (0, swagger_1.ApiResponse)({ status: 200, type: host_cancel_dto_1.HostCancelReservationResponseDto }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
     __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, create_booking_dto_1.CancelBookingDto]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
 ], BookingsController.prototype, "cancel", null);
 __decorate([
     (0, common_1.Post)(':id/release'),
@@ -105,7 +144,7 @@ __decorate([
     (0, roles_decorator_1.Roles)('HOST', 'ADMIN'),
     (0, common_1.Post)(':id/check-in'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({ summary: 'Host confirms guest check-in (triggers release of funds to host)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Host and Admins confirms guest check-in (triggers release of funds to host)' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),

@@ -14,6 +14,13 @@ export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiOperation({ summary: 'Current user profile (/me alias)' })
+  me(@CurrentUser() user: User) {
+    return this.usersService.getProfile(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiOperation({ summary: 'Current user profile' })
   profile(@CurrentUser() user: User) {

@@ -1,4 +1,5 @@
 import { CancellationPolicy } from '@prisma/client';
+import { CreateListingPolicyDto } from './listing-policy.dto';
 export declare class CreateStayDto {
     name: string;
     description?: string;
@@ -14,6 +15,9 @@ export declare class CreateStayDto {
     cancellationPolicy?: CancellationPolicy;
     isActive?: boolean;
     sortOrder?: number;
+    policies?: CreateListingPolicyDto[];
+    tags?: any[];
+    recommendations?: any[];
 }
 export declare class UpdateStayDto {
     name?: string;

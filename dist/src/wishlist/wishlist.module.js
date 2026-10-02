@@ -10,13 +10,14 @@ exports.WishlistModule = void 0;
 const common_1 = require("@nestjs/common");
 const wishlist_service_1 = require("./wishlist.service");
 const wishlist_controller_1 = require("./wishlist.controller");
+const saved_controller_1 = require("./saved.controller");
 let WishlistModule = class WishlistModule {
 };
 exports.WishlistModule = WishlistModule;
 exports.WishlistModule = WishlistModule = __decorate([
     (0, common_1.Module)({
         providers: [wishlist_service_1.WishlistService],
-        controllers: [wishlist_controller_1.WishlistController],
+        controllers: [wishlist_controller_1.WishlistController, saved_controller_1.SavedController],
         exports: [wishlist_service_1.WishlistService],
     })
 ], WishlistModule);

@@ -62,15 +62,19 @@ export class PoliciesAdminController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create a new platform policy with initial version (Admin only)' })
+  @ApiOperation({ summary: 'Create / Publish New Policy Version (Admin)' })
   create(@Body() dto: CreatePolicyDto, @CurrentUser() user: User) {
     return this.policiesService.createPolicy(dto, user?.id);
   }
 
-  @Put(':id')
-  @ApiOperation({ summary: 'Update policy metadata (title, description, type) (Admin only)' })
-  update(@Param('id') id: string, @Body() dto: UpdatePolicyDto) {
-    return this.policiesService.updatePolicy(id, dto);
+  @Put(':slug')
+  @ApiOperation({ summary: 'Update Existing Policy Document by slug or ID (Admin)' })
+  update(
+    @Param('slug') slug: string,
+    @Body() dto: UpdatePolicyDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.policiesService.updatePolicyBySlugOrId(slug, dto, user?.id);
   }
 
   @Post(':id/versions')

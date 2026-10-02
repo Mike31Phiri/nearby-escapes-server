@@ -1,3 +1,4 @@
+import { UpdatePropertyPoliciesDto, CancellationTier } from '../policies/dto/policy.dto';
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -2249,7 +2250,205 @@ export class PropertiesService {
       updatedAt: new Date().toISOString(),
     };
   }
-}
 
-// Backwards compatibility alias
-export const ListingsService = PropertiesService;
+  // ── Host & Property Policies ───────────────────────────────────────────────
+
+  async updatePropertyPolicies(
+    propertyId: string,
+    hostId: string,
+    dto: UpdatePropertyPoliciesDto,
+  ) {
+    const property = await this.assertOwnership(propertyId, hostId);
+
+    const existingDraft =
+      property.draftData && typeof property.draftData === 'object'
+        ? (property.draftData as Record<string, any>)
+        : {};
+
+    const updatedDraft = {
+      ...existingDraft,
+      policies: JSON.parse(JSON.stringify(dto)) as any,
+    };
+
+    // Update Property record
+    const updated = await this.prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        draftData: updatedDraft,
+      },
+      include: {
+        rules: true,
+        stays: true,
+      },
+    });
+
+    // Cascade to Stay records if applicable
+    let cancellationEnum: CancellationPolicy | null = null;
+    if (dto.cancellation?.tier) {
+      const tierUpper = dto.cancellation.tier.toUpperCase();
+      if (['FLEXIBLE', 'MODERATE', 'STRICT'].includes(tierUpper)) {
+        cancellationEnum = tierUpper as CancellationPolicy;
+      } else {
+        cancellationEnum = CancellationPolicy.MODERATE;
+      }
+    }
+
+    if (dto.schedule || cancellationEnum) {
+      await this.prisma.stay.updateMany({
+        where: { propertyId },
+        data: {
+          ...(cancellationEnum ? { cancellationPolicy: cancellationEnum } : {}),
+          ...(dto.schedule?.checkInFrom ? { checkInFrom: dto.schedule.checkInFrom } : {}),
+          ...(dto.schedule?.checkInUntil ? { checkInUntil: dto.schedule.checkInUntil } : {}),
+          ...(dto.schedule?.checkOutBefore ? { checkOutBefore: dto.schedule.checkOutBefore } : {}),
+        },
+      });
+    }
+
+    // Cascade rules to PropertyRule
+    if (dto.houseRules?.customRules && Array.isArray(dto.houseRules.customRules)) {
+      await this.prisma.propertyRule.deleteMany({ where: { propertyId } });
+      if (dto.houseRules.customRules.length > 0) {
+        await this.prisma.propertyRule.createMany({
+          data: dto.houseRules.customRules.map((r) => ({
+            propertyId,
+            rule: r,
+          })),
+        });
+      }
+    }
+
+    // Compute summary
+    const tier = dto.cancellation?.tier || 'moderate';
+    const tierCapitalized = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const refundPercent = dto.cancellation?.refundPercentagePriorToCutOff ?? 100;
+    const cutOffDays = Math.round((dto.cancellation?.freeCancellationCutOffHours || 120) / 24);
+    const cancellationSummary = `${tierCapitalized} (${refundPercent}% refund up to ${cutOffDays} days before check-in)`;
+
+    let rulesCount = (dto.houseRules?.customRules?.length || 0);
+    if (dto.houseRules) {
+      if (!dto.houseRules.smokingAllowed) rulesCount++;
+      if (!dto.houseRules.petsAllowed) rulesCount++;
+      if (!dto.houseRules.partiesOrEventsAllowed) rulesCount++;
+      if (dto.houseRules.quietHours?.enabled) rulesCount++;
+    }
+
+    const depositRequired = !!dto.securityDeposit?.required;
+
+    const responseData = {
+      propertyId: updated.id,
+      updatedAt: updated.updatedAt.toISOString(),
+      cancellationSummary,
+      rulesCount: Math.max(1, rulesCount),
+      depositRequired,
+    };
+
+    return {
+      success: true,
+      message: 'Property policies updated successfully.',
+      data: responseData,
+      ...responseData,
+    };
+  }
+
+  async getPropertyPolicies(propertyOrListingId: string) {
+    let property = await this.prisma.property.findUnique({
+      where: { id: propertyOrListingId },
+      include: {
+        stays: { take: 1, orderBy: { sortOrder: 'asc' } },
+        rules: true,
+      },
+    });
+
+    if (!property) {
+      const stay = await this.prisma.stay.findUnique({
+        where: { id: propertyOrListingId },
+        include: {
+          property: {
+            include: {
+              stays: { take: 1, orderBy: { sortOrder: 'asc' } },
+              rules: true,
+            },
+          },
+        },
+      });
+      if (stay) {
+        property = stay.property;
+      }
+    }
+
+    if (!property) {
+      throw new NotFoundException(`Property or listing "${propertyOrListingId}" not found`);
+    }
+
+    const stored: any = (property.draftData as any)?.policies || {};
+    const primaryStay = property.stays?.[0];
+
+    const tier = (stored.cancellation?.tier || primaryStay?.cancellationPolicy?.toLowerCase() || 'moderate') as CancellationTier;
+    const tierCapitalized = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const deadlineHours = stored.cancellation?.freeCancellationCutOffHours || 120;
+    const deadlineDate = new Date(Date.now() + deadlineHours * 3600 * 1000).toISOString();
+
+    const cancellation = {
+      tier,
+      headline: `${tierCapitalized} cancellation policy`,
+      description:
+        stored.cancellation?.customText ||
+        (tier === 'flexible'
+          ? 'Full refund up to 24 hours before check-in.'
+          : tier === 'strict'
+          ? 'Full refund up to 7 days before check-in. No refund after cutoff.'
+          : 'Full refund up to 5 days before check-in. Cancellations made within 5 days of arrival receive a 50% refund minus transaction fees.'),
+      freeCancellationDeadline: deadlineDate,
+    };
+
+    const checkInFrom = stored.schedule?.checkInFrom || primaryStay?.checkInFrom || '14:00';
+    const checkInUntil = stored.schedule?.checkInUntil || primaryStay?.checkInUntil || '21:00';
+    const checkOutBefore = stored.schedule?.checkOutBefore || primaryStay?.checkOutBefore || '10:30';
+
+    const houseRulesSummary: string[] = [];
+    if (stored.houseRules) {
+      if (!stored.houseRules.smokingAllowed) houseRulesSummary.push('No smoking indoors');
+      if (!stored.houseRules.petsAllowed) houseRulesSummary.push('No pets allowed');
+      if (!stored.houseRules.partiesOrEventsAllowed) houseRulesSummary.push('No parties or events');
+      if (stored.houseRules.quietHours?.enabled) {
+        houseRulesSummary.push(`Quiet hours: ${stored.houseRules.quietHours.startTime} – ${stored.houseRules.quietHours.endTime}`);
+      }
+      if (Array.isArray(stored.houseRules.customRules)) {
+        houseRulesSummary.push(...stored.houseRules.customRules);
+      }
+    } else if (property.rules?.length) {
+      houseRulesSummary.push(...property.rules.map((r) => r.rule));
+    } else {
+      houseRulesSummary.push('No smoking indoors', 'No pets allowed', 'No parties or events', 'Quiet hours: 22:00 – 06:30');
+    }
+
+    const depositAmount = stored.securityDeposit?.amountNgwee ?? 75000;
+    const depositTimeline = stored.securityDeposit?.refundTimelineHours ?? 48;
+    const securityDepositNote = stored.securityDeposit?.required !== false
+      ? `A refundable security deposit of K${(depositAmount / 100).toFixed(2)} will be held and released within ${depositTimeline} hours of checkout.`
+      : 'No security deposit required.';
+
+    const goodToKnow =
+      stored.goodToKnow?.customPoliciesText ||
+      'Lodge operates on 24-hour solar inverter. High-wattage hair dryers are not supported. Borehole water is UV-filtered and safe for brushing teeth; complimentary bottled mineral water provided in chalets.';
+
+    const responseData = {
+      propertyId: property.id,
+      title: property.name,
+      cancellation,
+      checkInWindow: `${checkInFrom} – ${checkInUntil}`,
+      checkOutBefore,
+      houseRulesSummary,
+      securityDepositNote,
+      goodToKnow,
+    };
+
+    return {
+      success: true,
+      data: responseData,
+      ...responseData,
+    };
+  }
+
+}

@@ -13,10 +13,10 @@ export declare class AdminController {
             pendingDisputes: number;
         };
         recentUsers: {
+            id: string;
             email: string;
             name: string;
             role: import("@prisma/client").$Enums.Role;
-            id: string;
             createdAt: Date;
         }[];
         recentBookings: {
@@ -38,10 +38,10 @@ export declare class AdminController {
         data: {
             role: string;
             verificationStatus: string;
+            id: string;
             email: string;
             name: string;
             phone: string | null;
-            id: string;
             avatar: string | null;
             isVerified: boolean;
             createdAt: Date;
@@ -54,9 +54,9 @@ export declare class AdminController {
         };
     }>;
     updateUserStatus(id: string, status: string): Promise<{
+        id: string;
         email: string;
         name: string;
-        id: string;
         isVerified: boolean;
         verificationStatus: import("@prisma/client").$Enums.VerificationStatus;
     }>;
@@ -68,7 +68,7 @@ export declare class AdminController {
             type: string;
             name: string;
             hostName: string | null;
-            location: string;
+            location: string | null;
             price: number;
             priceFormatted: string;
             status: string;
@@ -91,7 +91,7 @@ export declare class AdminController {
             type: string;
             name: string;
             hostName: string | null;
-            location: string;
+            location: string | null;
             price: number;
             priceFormatted: string;
             status: string;
@@ -142,17 +142,17 @@ export declare class AdminController {
         data: {
             status: string;
             priority: string;
-            description: string | null;
             id: string;
-            hostId: string;
-            bookingRef: string;
+            description: string | null;
             guestId: string;
+            bookingRef: string;
+            hostId: string;
             amount: number;
-            propertyName: string;
-            propertyType: string;
             guestName: string;
             hostName: string;
             reason: string;
+            propertyName: string;
+            propertyType: string;
             raisedBy: string;
             raisedAt: Date;
             resolvedAt: Date | null;
@@ -168,17 +168,17 @@ export declare class AdminController {
     updateDispute(id: string, status: string, resolution?: string): Promise<{
         status: string;
         priority: string;
-        description: string | null;
         id: string;
-        hostId: string;
-        bookingRef: string;
+        description: string | null;
         guestId: string;
+        bookingRef: string;
+        hostId: string;
         amount: number;
-        propertyName: string;
-        propertyType: string;
         guestName: string;
         hostName: string;
         reason: string;
+        propertyName: string;
+        propertyType: string;
         raisedBy: string;
         raisedAt: Date;
         resolvedAt: Date | null;
@@ -255,16 +255,16 @@ export declare class AdminController {
     }>;
     getSettings(): Promise<{
         settings: {
-            type: string;
-            description: string | null;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             category: string;
-            key: string;
-            label: string;
-            value: string;
+            type: string;
+            description: string | null;
             options: string[];
+            label: string;
+            key: string;
+            value: string;
         }[];
     }>;
     updateSettings(settings: {
@@ -273,26 +273,68 @@ export declare class AdminController {
     }[]): Promise<{
         updated: number;
         settings: {
-            type: string;
-            description: string | null;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             category: string;
-            key: string;
-            label: string;
-            value: string;
+            type: string;
+            description: string | null;
             options: string[];
+            label: string;
+            key: string;
+            value: string;
         }[];
     }>;
+    getHostApplications(status?: string, page?: number, limit?: number): Promise<{
+        items: ({
+            user: {
+                id: string;
+                email: string;
+                name: string;
+                phone: string | null;
+                avatar: string | null;
+            };
+        } & {
+            id: string;
+            businessName: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: string;
+            userId: string;
+            operatingSince: string | null;
+            province: string | null;
+            town: string | null;
+            businessEmail: string | null;
+            businessPhone: string | null;
+            pacraDocs: import("@prisma/client/runtime/client").JsonValue | null;
+            ownershipDocs: import("@prisma/client/runtime/client").JsonValue | null;
+            operationDocs: import("@prisma/client/runtime/client").JsonValue | null;
+            reviewerNotes: string | null;
+            reviewedAt: Date | null;
+        })[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    }>;
+    reviewHostApplication(id: string, dto: import('./dto/review-host-application.dto').ReviewHostApplicationDto): Promise<{
+        applicationId: string;
+        userId: string;
+        status: string;
+        decision: "approved" | "rejected";
+        reviewedAt: Date | null;
+        reviewerNotes: string | null;
+        message: string;
+    }>;
     approveHost(id: string): Promise<{
-        email: string;
-        password: string;
-        name: string;
-        phone: string | null;
-        role: import("@prisma/client").$Enums.Role;
         id: string;
+        email: string;
+        resetToken: string | null;
+        name: string;
+        password: string;
+        phone: string | null;
         avatar: string | null;
+        role: import("@prisma/client").$Enums.Role;
         homeCity: string | null;
         bio: string | null;
         isVerified: boolean;
@@ -303,7 +345,6 @@ export declare class AdminController {
         defaultCheckOutTime: string | null;
         payoutMethod: string | null;
         payoutAccount: string | null;
-        resetToken: string | null;
         resetTokenExpiry: Date | null;
         refreshToken: string | null;
         createdAt: Date;
@@ -311,9 +352,9 @@ export declare class AdminController {
         deletedAt: Date | null;
     }>;
     promoteToAdmin(id: string): Promise<{
+        id: string;
         email: string;
         name: string;
         role: import("@prisma/client").$Enums.Role;
-        id: string;
     }>;
 }

@@ -41,7 +41,7 @@ export declare class PlatformController {
                 listingId: string;
                 type: string;
                 name: string;
-                location: string;
+                location: string | null;
                 thumbnailUrl: any;
                 price: number;
                 priceFormatted: string;
@@ -51,7 +51,7 @@ export declare class PlatformController {
                 hostName: string | null;
             }[];
         };
-        locations: string[];
+        locations: (string | null)[];
         settings: Record<string, string>;
     }>;
 }

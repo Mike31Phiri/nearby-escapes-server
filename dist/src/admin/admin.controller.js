@@ -72,6 +72,12 @@ let AdminController = class AdminController {
     updateSettings(settings) {
         return this.adminService.updateSettings(settings);
     }
+    getHostApplications(status, page, limit) {
+        return this.adminService.getHostApplications(status, page, limit);
+    }
+    reviewHostApplication(id, dto) {
+        return this.adminService.reviewHostApplication(id, dto);
+    }
     approveHost(id) {
         return this.adminService.approveHost(id);
     }
@@ -223,6 +229,25 @@ __decorate([
     __metadata("design:paramtypes", [Array]),
     __metadata("design:returntype", void 0)
 ], AdminController.prototype, "updateSettings", null);
+__decorate([
+    (0, common_1.Get)('host-applications'),
+    (0, swagger_1.ApiOperation)({ summary: 'List host applications / KYC submissions' }),
+    __param(0, (0, common_1.Query)('status')),
+    __param(1, (0, common_1.Query)('page')),
+    __param(2, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Number, Number]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "getHostApplications", null);
+__decorate([
+    (0, common_1.Patch)('host-applications/:id/review'),
+    (0, swagger_1.ApiOperation)({ summary: 'Review host application (approve/reject KYC)' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AdminController.prototype, "reviewHostApplication", null);
 __decorate([
     (0, common_1.Patch)('hosts/:id/approve'),
     (0, swagger_1.ApiOperation)({ summary: 'Approve host account' }),

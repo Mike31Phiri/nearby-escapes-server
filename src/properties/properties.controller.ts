@@ -1,8 +1,9 @@
+import { UpdatePropertyPoliciesDto } from '../policies/dto/policy.dto';
 import {
   Body, Controller, Delete, Get, Param, Patch, Post, Put,
   Query, UseGuards, UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { ReadStoreService } from '../read-store/read-store.service';
 import { PropertySyncInterceptor } from '../read-store/property-sync.interceptor';
@@ -29,7 +30,7 @@ import {
   SetListingRecommendationsDto,
   ListingFilterQueryDto,
 } from './dto/listing-tag-recommendation.dto';
-import { AdjustInventoryDto } from './dto/create-listing-unified.dto';
+import { AdjustInventoryDto, UpdateListingStatusDto, UpdateListingStatusResponseDto } from './dto/create-listing-unified.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -211,6 +212,22 @@ export class PropertiesController {
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.updateDraft(id, host.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('HOST')
+  @Patch(':id/status')
+  @UseInterceptors(PropertySyncInterceptor)
+  @ApiOperation({ summary: 'Update property status (active, draft, paused, archived, inactive)' })
+  @ApiResponse({ status: 200, type: UpdateListingStatusResponseDto })
+  @ApiBearerAuth('access-token')
+  async updateStatus(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdateListingStatusDto,
+  ): Promise<UpdateListingStatusResponseDto> {
+    const host = await this.hostsService.findApprovedByUserId(user.id);
+    return this.propertiesService.updateListingStatus(id, host.id, dto.status);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -756,4 +773,25 @@ export class PropertiesController {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.setRecommendations(unitType, unitId, host.id, dto.recommendations);
   }
+
+  @Get(':id/policies')
+  @ApiOperation({ summary: 'Public: Fetch Property Policies' })
+  async getPropertyPolicies(@Param('id') id: string) {
+    return this.propertiesService.getPropertyPolicies(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('HOST')
+  @Put(':id/policies')
+  @ApiOperation({ summary: 'Host: Update Property Policies' })
+  @ApiBearerAuth('access-token')
+  async updatePropertyPolicies(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdatePropertyPoliciesDto,
+  ) {
+    const host = await this.hostsService.findApprovedByUserId(user.id);
+    return this.propertiesService.updatePropertyPolicies(id, host.id, dto);
+  }
+
 }

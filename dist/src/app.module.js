@@ -26,7 +26,9 @@ const uploads_module_1 = require("./uploads/uploads.module");
 const admin_module_1 = require("./admin/admin.module");
 const platform_module_1 = require("./platform/platform.module");
 const read_store_module_1 = require("./read-store/read-store.module");
+const schedule_1 = require("@nestjs/schedule");
 const policies_module_1 = require("./policies/policies.module");
+const popularity_module_1 = require("./popularity/popularity.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -34,6 +36,7 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
+            schedule_1.ScheduleModule.forRoot(),
             throttler_1.ThrottlerModule.forRoot([{ ttl: 60000, limit: 600 }]),
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
@@ -51,6 +54,7 @@ exports.AppModule = AppModule = __decorate([
             platform_module_1.PlatformModule,
             read_store_module_1.ReadStoreModule,
             policies_module_1.PoliciesModule,
+            popularity_module_1.PopularityModule,
         ],
         providers: [{ provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard }],
     })

@@ -1,3 +1,4 @@
+import { CreateListingPolicyDto } from './listing-policy.dto';
 export declare class CreateExperienceDto {
     name: string;
     description?: string;
@@ -11,6 +12,9 @@ export declare class CreateExperienceDto {
     inclusions?: string[];
     isActive?: boolean;
     sortOrder?: number;
+    policies?: CreateListingPolicyDto[];
+    tags?: any[];
+    recommendations?: any[];
 }
 export declare class UpdateExperienceDto {
     name?: string;

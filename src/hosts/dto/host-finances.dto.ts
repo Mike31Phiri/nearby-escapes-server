@@ -56,3 +56,29 @@ export class HostFinancesSummaryDto {
   @ApiProperty({ type: [HostPayoutMethodItemDto] })
   payoutMethods: HostPayoutMethodItemDto[];
 }
+
+export class AddHostPayoutMethodDto {
+  @ApiProperty({ enum: ['bank_transfer', 'mobile_money'], example: 'mobile_money' })
+  type: 'bank_transfer' | 'mobile_money';
+
+  @ApiPropertyOptional({ example: true })
+  isDefault?: boolean;
+
+  @ApiPropertyOptional({ type: HostPayoutMethodDetailsDto })
+  details?: HostPayoutMethodDetailsDto;
+
+  @ApiPropertyOptional({ example: 'Absa Bank Zambia' })
+  bankName?: string;
+
+  @ApiPropertyOptional({ example: '1234567890' })
+  accountNumber?: string;
+
+  @ApiPropertyOptional({ example: 'Mwamba Chali' })
+  accountName?: string;
+
+  @ApiPropertyOptional({ example: 'Airtel Money' })
+  provider?: 'Airtel Money' | 'MTN Mobile Money';
+
+  @ApiPropertyOptional({ example: '+260971234567' })
+  mobileNumber?: string;
+}

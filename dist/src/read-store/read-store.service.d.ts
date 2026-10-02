@@ -18,18 +18,7 @@ export declare class ReadStoreService {
     deleteListing(listingId: string): Promise<void>;
     getPropertyById(id: string): Promise<ReadPropertyDocument>;
     getListingById(id: string): Promise<ReadPropertyDocument>;
-    searchProperties(query: {
-        type?: string;
-        location?: string;
-        minPrice?: number;
-        maxPrice?: number;
-        guests?: number;
-        sort?: string;
-        page?: number;
-        limit?: number;
-        featured?: string;
-        q?: string;
-    }): Promise<{
+    searchProperties(query: any): Promise<{
         data: ReadPropertyDocument[];
         meta: any;
     }>;

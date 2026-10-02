@@ -17,6 +17,337 @@ let HostDashboardService = class HostDashboardService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    formatDateOnly(d) {
+        if (!d)
+            return undefined;
+        const dateObj = typeof d === 'string' ? new Date(d) : d;
+        if (isNaN(dateObj.getTime()))
+            return undefined;
+        return dateObj.toISOString().slice(0, 10);
+    }
+    async getBookings(userId, query) {
+        const page = Math.max(1, Number(query.page) || 1);
+        const limit = Math.max(1, Math.min(100, Number(query.limit) || 20));
+        const skip = (page - 1) * limit;
+        const where = {
+            OR: [{ hostId: userId }, { property: { hostId: userId } }],
+        };
+        if (query.listingId) {
+            where.propertyId = query.listingId;
+        }
+        if (query.status) {
+            if (query.status === 'confirmed') {
+                where.status = { in: ['CONFIRMED', 'CHECKED_IN'] };
+            }
+            else if (query.status === 'cancelled') {
+                where.status = { in: ['CANCELLED', 'EXPIRED'] };
+            }
+            else if (query.status === 'completed') {
+                where.status = 'COMPLETED';
+            }
+        }
+        const bookings = await this.prisma.booking.findMany({
+            where,
+            include: {
+                property: {
+                    select: {
+                        id: true,
+                        name: true,
+                        type: true,
+                    },
+                },
+                guest: {
+                    select: {
+                        id: true,
+                        name: true,
+                        phone: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+        });
+        return bookings.map((b) => {
+            let status = 'confirmed';
+            if (b.status === 'COMPLETED' || b.checkedOutAt) {
+                status = 'completed';
+            }
+            else if (b.status === 'CANCELLED' || b.status === 'EXPIRED') {
+                status = 'cancelled';
+            }
+            else {
+                status = 'confirmed';
+            }
+            const vertical = (b.property?.type?.toLowerCase() || 'stay');
+            return {
+                id: b.id,
+                bookingRef: b.bookingRef,
+                listingId: b.propertyId,
+                listingTitle: b.property?.name || 'Listing',
+                vertical,
+                status,
+                checkIn: this.formatDateOnly(b.checkIn) || null,
+                checkOut: this.formatDateOnly(b.checkOut) || null,
+                date: this.formatDateOnly(b.date) || null,
+                guests: b.guests,
+                totalNgwee: b.amount,
+                guestName: b.customerName || b.guest?.name || 'Guest',
+                guestPhone: b.customerPhone || b.guest?.phone || '',
+                createdAt: b.createdAt.toISOString(),
+            };
+        });
+    }
+    async getFinancesSummary(userId) {
+        const host = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                payoutMethod: true,
+                payoutAccount: true,
+            },
+        });
+        const lifetimeAggr = await this.prisma.payment.aggregate({
+            where: { booking: { hostId: userId }, status: 'PAID' },
+            _sum: { hostAmount: true, amount: true },
+        });
+        const lifetimeEarningsNgwee = Number(lifetimeAggr._sum.hostAmount ?? lifetimeAggr._sum.amount ?? 0);
+        const pendingPayoutsAggr = await this.prisma.payout.aggregate({
+            where: {
+                hostId: userId,
+                status: { in: ['PENDING', 'PROCESSING'] },
+            },
+            _sum: { netAmount: true, amount: true },
+        });
+        const pendingPayoutsNgwee = Number(pendingPayoutsAggr._sum.netAmount ?? pendingPayoutsAggr._sum.amount ?? 0);
+        const paidPayoutsAggr = await this.prisma.payout.aggregate({
+            where: {
+                hostId: userId,
+                status: 'PAID',
+            },
+            _sum: { netAmount: true, amount: true },
+        });
+        const paidPayoutsNgwee = Number(paidPayoutsAggr._sum.netAmount ?? paidPayoutsAggr._sum.amount ?? 0);
+        const availableBalanceNgwee = Math.max(0, lifetimeEarningsNgwee - paidPayoutsNgwee - pendingPayoutsNgwee);
+        const now = new Date();
+        const nextPayout = new Date(now);
+        const dayOfWeek = nextPayout.getDay();
+        const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
+        nextPayout.setDate(nextPayout.getDate() + daysUntilFriday);
+        const nextPayoutDate = nextPayout.toISOString().slice(0, 10);
+        const payoutMethods = [];
+        if (host?.payoutAccount) {
+            let details = {};
+            let isMobile = false;
+            try {
+                details = JSON.parse(host.payoutAccount);
+                isMobile = !!(details.mobileNumber || details.provider);
+            }
+            catch {
+                const raw = host.payoutAccount.trim();
+                if (host.payoutMethod === 'MOBILE_MONEY' ||
+                    raw.startsWith('+') ||
+                    raw.startsWith('09') ||
+                    raw.startsWith('07')) {
+                    isMobile = true;
+                    details = {
+                        mobileNumber: raw,
+                        provider: raw.includes('97') || raw.includes('77') ? 'Airtel Money' : 'MTN Mobile Money',
+                    };
+                }
+                else {
+                    details = {
+                        accountNumber: raw,
+                        bankName: 'Bank Account',
+                    };
+                }
+            }
+            payoutMethods.push({
+                id: 'pm-primary',
+                type: isMobile || host.payoutMethod === 'MOBILE_MONEY' ? 'mobile_money' : 'bank_transfer',
+                isDefault: true,
+                details,
+            });
+        }
+        return {
+            currency: 'ZMW',
+            availableBalanceNgwee,
+            pendingPayoutsNgwee,
+            lifetimeEarningsNgwee,
+            nextPayoutDate,
+            payoutMethods,
+        };
+    }
+    async getOverview(userId) {
+        const host = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true },
+        });
+        if (!host) {
+            return {
+                stats: {
+                    totalRevenueNgwee: 0,
+                    activeListingsCount: 0,
+                    todayCheckInsCount: 0,
+                    todayCheckOutsCount: 0,
+                    currentlyHostingCount: 0,
+                    occupancyRatePercent: 0,
+                    averageRating: 0,
+                },
+                unreadNotificationsCount: 0,
+            };
+        }
+        const [activeListingsCount, totalRevenueAggr, avgRatingAggr, unreadNotificationsCount, schedule] = await Promise.all([
+            this.prisma.property.count({
+                where: { hostId: userId, status: 'ACTIVE', deletedAt: null },
+            }),
+            this.prisma.payment.aggregate({
+                where: { booking: { hostId: userId }, status: 'PAID' },
+                _sum: { hostAmount: true, amount: true },
+            }),
+            this.prisma.review.aggregate({
+                where: { property: { hostId: userId } },
+                _avg: { rating: true },
+            }),
+            this.prisma.notification.count({
+                where: { userId, isRead: false },
+            }),
+            this.getTodaySchedule(userId),
+        ]);
+        const totalRevenueNgwee = Number(totalRevenueAggr._sum.hostAmount ?? totalRevenueAggr._sum.amount ?? 0);
+        const averageRating = Number((avgRatingAggr._avg?.rating || 0).toFixed(2));
+        const todayCheckInsCount = schedule.arriving.length;
+        const todayCheckOutsCount = schedule.departing.length;
+        const currentlyHostingCount = schedule.hosting.length;
+        const occupancyRatePercent = activeListingsCount > 0
+            ? Math.min(100, Math.round((currentlyHostingCount / activeListingsCount) * 100))
+            : 0;
+        return {
+            stats: {
+                totalRevenueNgwee,
+                activeListingsCount,
+                todayCheckInsCount,
+                todayCheckOutsCount,
+                currentlyHostingCount,
+                occupancyRatePercent,
+                averageRating,
+            },
+            unreadNotificationsCount,
+        };
+    }
+    async getTodaySchedule(userId) {
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        const startOfRecent = new Date();
+        startOfRecent.setDate(startOfRecent.getDate() - 3);
+        startOfRecent.setHours(0, 0, 0, 0);
+        const bookings = await this.prisma.booking.findMany({
+            where: {
+                AND: [
+                    {
+                        OR: [{ hostId: userId }, { property: { hostId: userId } }],
+                    },
+                    {
+                        OR: [
+                            { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+                            { status: 'COMPLETED', updatedAt: { gte: startOfRecent } },
+                        ],
+                    },
+                ],
+            },
+            include: {
+                property: {
+                    include: {
+                        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+                    },
+                },
+                guest: {
+                    select: { id: true, name: true, phone: true, email: true, avatar: true },
+                },
+                stay: true,
+                experience: true,
+                transport: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        const arriving = [];
+        const hosting = [];
+        const departing = [];
+        const statusMap = {
+            CONFIRMED: 'confirmed',
+            CHECKED_IN: 'checked_in',
+            COMPLETED: 'checked_out',
+        };
+        for (const booking of bookings) {
+            const listingType = (booking.property?.type?.toLowerCase() || 'stay');
+            const checkInDateStr = this.formatDateOnly(booking.checkIn) || this.formatDateOnly(booking.date) || todayStr;
+            const checkOutDateStr = this.formatDateOnly(booking.checkOut);
+            let stayProgress = undefined;
+            if (listingType === 'stay' && checkInDateStr && checkOutDateStr) {
+                const checkInTime = new Date(checkInDateStr).getTime();
+                const checkOutTime = new Date(checkOutDateStr).getTime();
+                const totalNights = Math.max(1, Math.round((checkOutTime - checkInTime) / (1000 * 60 * 60 * 24)));
+                const todayTime = new Date(todayStr).getTime();
+                const elapsedDays = Math.floor((todayTime - checkInTime) / (1000 * 60 * 60 * 24));
+                const currentNight = Math.min(totalNights, Math.max(1, elapsedDays + 1));
+                const tomorrowStr = new Date(todayTime + 86400000).toISOString().slice(0, 10);
+                const checkOutTomorrow = checkOutDateStr === tomorrowStr;
+                stayProgress = `Night ${currentNight} of ${totalNights}${checkOutTomorrow ? ' · Check-out tomorrow' : ''}`;
+            }
+            const mappedStatus = statusMap[booking.status] ||
+                (booking.checkedOutAt ? 'checked_out' : booking.checkedInAt ? 'checked_in' : 'confirmed');
+            const baseItem = {
+                id: booking.id,
+                listingType,
+                bookingRef: booking.bookingRef,
+                guestName: booking.customerName || booking.guest?.name || 'Guest',
+                guestPhone: booking.customerPhone || booking.guest?.phone || '',
+                guestEmail: booking.customerEmail || booking.guest?.email || '',
+                guestAvatar: booking.guest?.avatar || undefined,
+                listingId: booking.propertyId,
+                listingName: booking.property?.name || 'Listing',
+                listingImage: booking.property?.images?.[0]?.url || '',
+                checkInDate: checkInDateStr,
+                checkOutDate: checkOutDateStr,
+                timeSlot: booking.timeSlot || undefined,
+                stayProgress,
+                guestCount: booking.guests,
+                totalAmountNgwee: booking.amount,
+                currency: (booking.currency === 'USD' ? 'USD' : 'ZMW'),
+                status: mappedStatus,
+            };
+            if (checkInDateStr === todayStr && booking.status !== 'COMPLETED') {
+                arriving.push({
+                    ...baseItem,
+                    type: 'arriving',
+                });
+            }
+            if (checkOutDateStr === todayStr) {
+                departing.push({
+                    ...baseItem,
+                    type: 'departing',
+                });
+            }
+            const isCurrentlyHosting = booking.status === 'CHECKED_IN' ||
+                (listingType === 'stay' &&
+                    checkInDateStr &&
+                    checkOutDateStr &&
+                    checkInDateStr <= todayStr &&
+                    checkOutDateStr > todayStr &&
+                    booking.status !== 'COMPLETED');
+            if (isCurrentlyHosting) {
+                hosting.push({
+                    ...baseItem,
+                    type: 'hosting',
+                });
+            }
+        }
+        return {
+            arriving,
+            hosting,
+            departing,
+        };
+    }
     async getDashboard(userId) {
         const host = await this.prisma.user.findUnique({
             where: { id: userId },
@@ -160,6 +491,97 @@ let HostDashboardService = class HostDashboardService {
     }
     async getListings(userId) {
         return this.getProperties(userId);
+    }
+    async getBookingDetail(hostId, bookingId) {
+        const booking = await this.prisma.booking.findFirst({
+            where: {
+                id: bookingId,
+                OR: [{ hostId }, { property: { hostId } }],
+            },
+            include: {
+                property: {
+                    include: {
+                        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+                        stays: { take: 1 },
+                    },
+                },
+                guest: {
+                    select: { id: true, name: true, email: true, phone: true, avatar: true },
+                },
+                payment: { select: { status: true } },
+            },
+        });
+        if (!booking) {
+            const { NotFoundException } = await import('@nestjs/common');
+            throw new NotFoundException('Booking not found');
+        }
+        const listingType = (booking.property?.type?.toLowerCase() || 'stay');
+        const checkIn = this.formatDateOnly(booking.checkIn) || this.formatDateOnly(booking.date) || null;
+        const checkOut = this.formatDateOnly(booking.checkOut) || null;
+        const todayStr = new Date().toISOString().slice(0, 10);
+        let stayProgress = undefined;
+        if (listingType === 'stay' && checkIn && checkOut) {
+            const checkInTime = new Date(checkIn).getTime();
+            const checkOutTime = new Date(checkOut).getTime();
+            const totalNights = Math.max(1, Math.round((checkOutTime - checkInTime) / (1000 * 60 * 60 * 24)));
+            const todayTime = new Date(todayStr).getTime();
+            const elapsedDays = Math.floor((todayTime - checkInTime) / (1000 * 60 * 60 * 24));
+            if (elapsedDays < 0) {
+                stayProgress = 'Arriving today';
+            }
+            else if (checkOut === todayStr) {
+                stayProgress = 'Departing today';
+            }
+            else {
+                const currentNight = Math.min(totalNights, Math.max(1, elapsedDays + 1));
+                const tomorrowStr = new Date(todayTime + 86400000).toISOString().slice(0, 10);
+                stayProgress = `Night ${currentNight} of ${totalNights}${checkOut === tomorrowStr ? ' · Check-out tomorrow' : ''}`;
+            }
+        }
+        const totalAmountNgwee = booking.amount;
+        const nights = (listingType === 'stay' && checkIn && checkOut)
+            ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
+            : 1;
+        const serviceFeeNgwee = Math.round(totalAmountNgwee * 0.05);
+        const cleaningFeeNgwee = 0;
+        const subtotalNgwee = totalAmountNgwee - serviceFeeNgwee - cleaningFeeNgwee;
+        const baseRateNgwee = nights > 0 ? Math.round(subtotalNgwee / nights) : subtotalNgwee;
+        const mappedStatus = booking.status === 'CHECKED_IN'
+            ? 'checked_in'
+            : booking.status === 'COMPLETED'
+                ? 'checked_out'
+                : booking.status === 'CANCELLED' || booking.status === 'EXPIRED'
+                    ? 'cancelled'
+                    : booking.status.toLowerCase();
+        return {
+            id: booking.id,
+            bookingRef: booking.bookingRef,
+            listingId: booking.propertyId,
+            listingName: booking.property?.name || 'Listing',
+            listingType,
+            listingImage: booking.property?.images?.[0]?.url || '',
+            status: mappedStatus,
+            paymentStatus: (booking.payment?.status || 'UNPAID').toLowerCase(),
+            guestName: booking.customerName || booking.guest?.name || 'Guest',
+            guestEmail: booking.customerEmail || booking.guest?.email || '',
+            guestPhone: booking.customerPhone || booking.guest?.phone || '',
+            guests: booking.guests,
+            checkIn,
+            checkOut,
+            timeSlot: booking.timeSlot || null,
+            stayProgress: stayProgress || null,
+            createdAt: booking.createdAt.toISOString(),
+            pricing: {
+                currency: booking.currency || 'ZMW',
+                baseRateNgwee,
+                nightsCount: nights,
+                subtotalNgwee,
+                cleaningFeeNgwee,
+                serviceFeeNgwee,
+                totalAmountNgwee,
+            },
+            specialRequests: booking.specialRequests || null,
+        };
     }
 };
 exports.HostDashboardService = HostDashboardService;

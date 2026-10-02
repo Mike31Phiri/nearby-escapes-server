@@ -461,6 +461,93 @@ let AdminService = AdminService_1 = class AdminService {
         });
         return updated;
     }
+    async getHostApplications(status, page = 1, limit = 20) {
+        const skip = (Number(page) - 1) * Number(limit);
+        const take = Number(limit);
+        const where = status ? { status } : {};
+        const [items, total] = await Promise.all([
+            this.prisma.hostApplication.findMany({
+                where,
+                skip,
+                take,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    user: {
+                        select: { id: true, name: true, email: true, phone: true, avatar: true },
+                    },
+                },
+            }),
+            this.prisma.hostApplication.count({ where }),
+        ]);
+        return {
+            items,
+            total,
+            page: Number(page),
+            limit: Number(limit),
+            totalPages: Math.ceil(total / take),
+        };
+    }
+    async reviewHostApplication(applicationId, dto) {
+        const app = await this.prisma.hostApplication.findUnique({
+            where: { id: applicationId },
+            include: { user: true },
+        });
+        if (!app)
+            throw new common_1.NotFoundException('Host application not found');
+        const isApproved = dto.decision === 'approved';
+        const status = isApproved ? 'approved' : 'rejected';
+        const updatedApp = await this.prisma.hostApplication.update({
+            where: { id: applicationId },
+            data: {
+                status,
+                reviewerNotes: dto.notes || null,
+                reviewedAt: new Date(),
+            },
+        });
+        if (isApproved) {
+            await this.prisma.user.update({
+                where: { id: app.userId },
+                data: {
+                    role: 'HOST',
+                    isApproved: true,
+                    businessName: app.businessName || app.user.businessName,
+                },
+            });
+            await this.prisma.notification.create({
+                data: {
+                    userId: app.userId,
+                    type: 'SYSTEM',
+                    title: 'Host Application Approved!',
+                    description: dto.notes ||
+                        'Congratulations! Your host application has been approved. You can now access your host dashboard and list properties.',
+                    actionUrl: '/host',
+                },
+            });
+        }
+        else {
+            await this.prisma.notification.create({
+                data: {
+                    userId: app.userId,
+                    type: 'SYSTEM',
+                    title: 'Host Application Update',
+                    description: dto.notes ||
+                        'Your host application was not approved. Please review your documents or contact support.',
+                    actionUrl: '/become-host',
+                },
+            });
+        }
+        return {
+            applicationId: updatedApp.id,
+            userId: updatedApp.userId,
+            status: updatedApp.status,
+            decision: dto.decision,
+            reviewedAt: updatedApp.reviewedAt,
+            reviewerNotes: updatedApp.reviewerNotes,
+            message: isApproved
+                ? 'Application approved and host role granted.'
+                : 'Application rejected.',
+        };
+    }
 };
 exports.AdminService = AdminService;
 exports.AdminService = AdminService = AdminService_1 = __decorate([

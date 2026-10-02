@@ -1,3 +1,4 @@
+import { AddHostPayoutMethodDto } from './dto/host-finances.dto';
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHostDto } from './dto/create-host.dto';
@@ -225,6 +226,57 @@ export class HostsService {
       reviewerNotes: app.reviewerNotes,
     };
   }
+
+  async addPayoutMethod(userId: string, dto: AddHostPayoutMethodDto) {
+    const details = dto.details || {
+      bankName: dto.bankName,
+      accountNumber: dto.accountNumber,
+      accountName: dto.accountName,
+      provider: dto.provider,
+      mobileNumber: dto.mobileNumber,
+    };
+    const methodType = dto.type === 'mobile_money' ? 'MOBILE_MONEY' : 'BANK_TRANSFER';
+    const accountStr = JSON.stringify(details);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        payoutMethod: methodType,
+        payoutAccount: accountStr,
+      },
+    });
+
+    const newId = `pm_${Date.now()}`;
+    return {
+      success: true,
+      message: 'Payout method saved successfully.',
+      payoutMethod: {
+        id: newId,
+        type: dto.type,
+        isDefault: dto.isDefault ?? true,
+        details,
+      },
+    };
+  }
+
+  async removePayoutMethod(userId: string, id: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        payoutAccount: null,
+      },
+    });
+    return {
+      success: true,
+      message: 'Payout method removed successfully.',
+    };
+  }
+
+  async setDefaultPayoutMethod(userId: string, id: string) {
+    return {
+      success: true,
+      message: 'Default payout method updated.',
+    };
+  }
+
 }
-
-

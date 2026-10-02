@@ -10,11 +10,14 @@ exports.BookingsModule = void 0;
 const common_1 = require("@nestjs/common");
 const bookings_service_1 = require("./bookings.service");
 const bookings_controller_1 = require("./bookings.controller");
+const read_store_module_1 = require("../read-store/read-store.module");
+const notifications_module_1 = require("../notifications/notifications.module");
 let BookingsModule = class BookingsModule {
 };
 exports.BookingsModule = BookingsModule;
 exports.BookingsModule = BookingsModule = __decorate([
     (0, common_1.Module)({
+        imports: [read_store_module_1.ReadStoreModule, notifications_module_1.NotificationsModule],
         providers: [bookings_service_1.BookingsService],
         controllers: [bookings_controller_1.BookingsController],
         exports: [bookings_service_1.BookingsService],

@@ -14,14 +14,17 @@ const host_controller_1 = require("./host.controller");
 const host_dashboard_service_1 = require("./host-dashboard.service");
 const properties_service_1 = require("../properties/properties.service");
 const bookings_module_1 = require("../bookings/bookings.module");
+const host_onboarding_controller_1 = require("./host-onboarding.controller");
+const host_support_controller_1 = require("./host-support.controller");
+const host_support_service_1 = require("./host-support.service");
 let HostsModule = class HostsModule {
 };
 exports.HostsModule = HostsModule;
 exports.HostsModule = HostsModule = __decorate([
     (0, common_1.Module)({
         imports: [bookings_module_1.BookingsModule],
-        providers: [hosts_service_1.HostsService, host_dashboard_service_1.HostDashboardService, properties_service_1.PropertiesService],
-        controllers: [hosts_controller_1.HostsController, host_controller_1.HostController],
+        providers: [hosts_service_1.HostsService, host_dashboard_service_1.HostDashboardService, properties_service_1.PropertiesService, host_support_service_1.HostSupportService],
+        controllers: [hosts_controller_1.HostsController, host_controller_1.HostController, host_onboarding_controller_1.HostOnboardingController, host_support_controller_1.HostSupportController],
         exports: [hosts_service_1.HostsService],
     })
 ], HostsModule);
