@@ -116,7 +116,7 @@ export class BookingsService {
       currency: (b.currency === 'USD' ? 'USD' : 'ZMW') as 'ZMW' | 'USD',
       paymentStatus:
         b.payment?.status?.toLowerCase() || b.paymentStatus?.toLowerCase() || 'unpaid',
-      hostName: property?.host?.businessName || property?.host?.name || 'Host',
+      hostName: (property?.host as any)?.hostProfile?.businessName || property?.host?.name || 'Host',
       hostPhone: property?.host?.phone || undefined,
       createdAt: b.createdAt.toISOString(),
     };
@@ -129,7 +129,7 @@ export class BookingsService {
         property: {
           include: {
             images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-            host: { select: { id: true, name: true, businessName: true, phone: true } },
+            host: { select: { id: true, name: true, phone: true, hostProfile: { select: { businessName: true } } } },
           },
         },
         payment: true,
@@ -195,7 +195,7 @@ export class BookingsService {
     const property = await this.prisma.property.findUnique({
       where: { id: propertyId },
       include: {
-        host: { select: { id: true, name: true, email: true, businessName: true } },
+        host: { select: { id: true, name: true, email: true, hostProfile: { select: { businessName: true } } } },
         stays: { where: { deletedAt: null } },
         experiences: { where: { deletedAt: null } },
         transports: { where: { deletedAt: null } },
@@ -389,7 +389,7 @@ export class BookingsService {
       guestName:   guestUser!.name || 'Guest',
       hostUserId:  property.hostId,
       hostEmail:   property.host.email,
-      hostName:    property.host.businessName || property.host.name || 'Host',
+      hostName:    (property.host as any)?.hostProfile?.businessName || property.host.name || 'Host',
       bookingRef,
       listingId:   propertyId,
       listingName,
@@ -426,7 +426,7 @@ export class BookingsService {
       include: {
         property: {
           include: {
-            host: { select: { id: true, name: true, phone: true, businessName: true } },
+            host: { select: { id: true, name: true, phone: true, hostProfile: { select: { businessName: true } } } },
             images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           },
         },
@@ -455,7 +455,7 @@ export class BookingsService {
     const bookings = await this.prisma.booking.findMany({
       where,
       include: {
-        property: { include: { host: { select: { name: true, businessName: true } } } },
+        property: { include: { host: { select: { name: true, hostProfile: { select: { businessName: true } } } } } },
         stay: true,
         experience: true,
         transport: true,
@@ -524,7 +524,7 @@ export class BookingsService {
       guestName:    guestForCancel!.name || 'Guest',
       hostUserId:   booking.hostId,
       hostEmail:    hostForCancel!.email,
-      hostName:     hostForCancel!.businessName || hostForCancel!.name || 'Host',
+      hostName:     (hostForCancel as any)?.hostProfile?.businessName || hostForCancel!.name || 'Host',
       bookingRef:   booking.bookingRef,
       listingId:    booking.propertyId,
       listingName:  cancelListingName,
@@ -691,7 +691,7 @@ export class BookingsService {
         stay: true,
         experience: true,
         transport: true,
-        host: true,
+        host: { include: { hostProfile: true } },
         payout: true,
       },
     });
@@ -733,7 +733,7 @@ export class BookingsService {
           commission,
           netAmount,
           status: 'PROCESSING',
-          method: booking.host.payoutMethod || 'BANK_TRANSFER',
+          method: (booking.host as any)?.hostProfile?.payoutMethod || 'BANK_TRANSFER',
           bookingRefs: [booking.bookingRef],
           processedAt: new Date(),
         },
@@ -900,7 +900,7 @@ export class BookingsService {
       },
       host: {
         id: property?.host?.id || booking.hostId,
-        name: property?.host?.businessName || property?.host?.name || 'Mwamba Chali',
+        name: (property?.host as any)?.hostProfile?.businessName || property?.host?.name || 'Mwamba Chali',
         phone: property?.host?.phone || '+260 97 1234567',
         whatsapp: property?.host?.phone || '+260 97 1234567',
       },

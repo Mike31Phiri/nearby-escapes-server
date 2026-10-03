@@ -158,18 +158,8 @@ model User {
   phone              String?
   avatar             String?
   role               Role               @default(GUEST)
-  homeCity           String?
-  bio                String?
   isVerified         Boolean            @default(false)
   verificationStatus VerificationStatus @default(PENDING)
-
-  // Host-specific fields (null for guests/admins)
-  businessName        String?
-  isApproved          Boolean            @default(false)
-  defaultCheckInTime  String?            @default("14:00")
-  defaultCheckOutTime String?            @default("10:00")
-  payoutMethod        String?            @default("BANK_TRANSFER")
-  payoutAccount       String?
 
   // Auth tokens
   resetToken         String?            @unique
@@ -181,6 +171,7 @@ model User {
   deletedAt          DateTime?
 
   // Relations
+  hostProfile           HostProfile?
   properties            Property[]
   bookingsAsGuest        Booking[]              @relation("GuestBookings")
   bookingsAsHost         Booking[]              @relation("HostBookings")
@@ -193,6 +184,26 @@ model User {
   hostApplication        HostApplication?
   createdPolicies        Policy[]               @relation("CreatedPolicies")
   createdPolicyVersions  PolicyVersion[]        @relation("CreatedPolicyVersions")
+}
+
+// ─── Host Profile (Sub-entity) ───────────────────────────────────────────────
+// Separated from User so guest/user accounts don't carry host-specific columns.
+// Connected to User via 1:1 relation on userId UUID.
+
+model HostProfile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName        String?
+  isApproved          Boolean  @default(false)
+  defaultCheckInTime  String?  @default("14:00")
+  defaultCheckOutTime String?  @default("10:00")
+  payoutMethod        String?  @default("BANK_TRANSFER")
+  payoutAccount       String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
 }
 
 // ─── Property ────────────────────────────────────────────────────────────────

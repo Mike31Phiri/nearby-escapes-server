@@ -141,7 +141,7 @@ export class AdminService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          host: { select: { name: true, businessName: true } },
+          host: { select: { name: true, hostProfile: { select: { businessName: true } } } },
           stays: { where: { deletedAt: null, isActive: true }, take: 1 },
           experiences: { where: { deletedAt: null, isActive: true }, take: 1 },
           transports: { where: { deletedAt: null, isActive: true }, take: 1 },
@@ -164,7 +164,7 @@ export class AdminService {
           listingId: p.id,
           type: p.type.toLowerCase(),
           name: p.name,
-          hostName: p.host?.businessName || p.host?.name || null,
+          hostName: p.host?.hostProfile?.businessName || p.host?.name || null,
           location: p.location,
           price,
           priceFormatted: `K${(price / 100).toFixed(2)}`,
@@ -512,7 +512,14 @@ export class AdminService {
 
     const updated = await this.prisma.user.update({
       where: { id: hostId },
-      data: { isApproved: true },
+      data: {
+        hostProfile: {
+          upsert: {
+            create: { isApproved: true },
+            update: { isApproved: true },
+          },
+        },
+      },
     });
 
     // Notify the host
@@ -587,8 +594,18 @@ export class AdminService {
         where: { id: app.userId },
         data: {
           role: 'HOST',
-          isApproved: true,
-          businessName: app.businessName || app.user.businessName,
+          hostProfile: {
+            upsert: {
+              create: {
+                isApproved: true,
+                businessName: app.businessName,
+              },
+              update: {
+                isApproved: true,
+                businessName: app.businessName,
+              },
+            },
+          },
         },
       });
 

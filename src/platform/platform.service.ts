@@ -85,7 +85,7 @@ export class PlatformService {
       this.prisma.property.findMany({
         where: { deletedAt: null, status: 'ACTIVE', reviews: { some: { rating: { gte: 4 } } } },
         include: {
-          host: { select: { name: true, avatar: true, businessName: true } },
+          host: { select: { name: true, avatar: true, hostProfile: { select: { businessName: true } } } },
           reviews: { select: { rating: true } },
           images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           stays: { where: { deletedAt: null, isActive: true }, take: 1 },
@@ -151,7 +151,7 @@ export class PlatformService {
               ? Number((p.reviews.reduce((a: number, b: any) => a + b.rating, 0) / p.reviews.length).toFixed(1))
               : 0,
             reviewCount: p._count?.reviews || 0,
-            hostName: p.host?.businessName || p.host?.name || null,
+            hostName: (p.host as any)?.hostProfile?.businessName || p.host?.name || null,
           };
         }),
       },
@@ -172,7 +172,13 @@ export class PlatformService {
         where: { userId },
         select: { _count: { select: { items: true } } },
       }),
-      this.prisma.user.findUnique({ where: { id: userId, role: 'HOST' }, select: { id: true, businessName: true, isApproved: true } }),
+      this.prisma.user.findUnique({
+        where: { id: userId, role: 'HOST' },
+        select: {
+          id: true,
+          hostProfile: { select: { businessName: true, isApproved: true } },
+        },
+      }),
       this.prisma.booking.findMany({
         where: { guestId: userId },
         orderBy: { createdAt: 'desc' },
@@ -208,11 +214,11 @@ export class PlatformService {
       wishlistCount: wishlist?._count?.items || 0,
       hostStatus: hostStatus
         ? {
-            hasProfile: true,
-            isApproved: hostStatus.isApproved,
+            hasProfile: Boolean(hostStatus.hostProfile),
+            isApproved: Boolean(hostStatus.hostProfile?.isApproved),
             hostId: hostStatus.id,
-            businessName: hostStatus.businessName,
-            role: hostStatus.isApproved ? ('host' as const) : ('host_pending' as const),
+            businessName: hostStatus.hostProfile?.businessName || null,
+            role: hostStatus.hostProfile?.isApproved ? ('host' as const) : ('host_pending' as const),
           }
         : {
             hasProfile: false,

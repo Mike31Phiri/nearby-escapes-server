@@ -11,17 +11,15 @@ import cookieParser from 'cookie-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
   app.use(helmet());
   app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.enableCors({
-    origin: [
-      "http://localhost:3001",
-       process.env.FRONTEND_URL
-    ],
-    credentials: true,
-  });
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()

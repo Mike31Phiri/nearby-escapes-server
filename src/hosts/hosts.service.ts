@@ -12,46 +12,105 @@ export class HostsService {
     if (!user) throw new NotFoundException('User not found');
     if (user.role === 'HOST') throw new BadRequestException('Already registered as a host');
 
-    const updated = await this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        role: 'HOST',
+      data: { role: 'HOST' },
+    });
+
+    const profile = await this.prisma.hostProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
         businessName: dto.businessName,
         isApproved: false,
+      },
+      update: {
+        businessName: dto.businessName,
       },
     });
 
     return {
-      id: updated.id,
-      userId: updated.id,
-      displayName: updated.name,
-      businessName: updated.businessName,
-      verified: updated.isApproved,
+      id: profile.id,
+      userId: user.id,
+      displayName: user.name,
+      businessName: profile.businessName,
+      verified: profile.isApproved,
     };
   }
 
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id, role: 'HOST' },
-      select: { id: true, name: true, email: true, avatar: true, businessName: true, isApproved: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        createdAt: true,
+        hostProfile: {
+          select: {
+            id: true,
+            businessName: true,
+            isApproved: true,
+          },
+        },
+      },
     });
     if (!user) throw new NotFoundException('Host not found');
-    return user;
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      businessName: user.hostProfile?.businessName || null,
+      isApproved: user.hostProfile?.isApproved || false,
+      createdAt: user.createdAt,
+    };
   }
 
   async findByUserId(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, avatar: true, businessName: true, isApproved: true, role: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        role: true,
+        hostProfile: {
+          select: {
+            id: true,
+            businessName: true,
+            isApproved: true,
+          },
+        },
+      },
     });
     if (!user || user.role !== 'HOST') throw new NotFoundException('Host profile not found');
-    return user;
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      role: user.role,
+      businessName: user.hostProfile?.businessName || null,
+      isApproved: user.hostProfile?.isApproved || false,
+    };
   }
 
   async getHostStatus(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true, businessName: true, isApproved: true },
+      select: {
+        role: true,
+        hostProfile: {
+          select: {
+            id: true,
+            businessName: true,
+            isApproved: true,
+          },
+        },
+      },
     });
 
     if (!user || user.role !== 'HOST') {
@@ -64,46 +123,58 @@ export class HostsService {
       };
     }
 
+    const isApproved = Boolean(user.hostProfile?.isApproved);
     return {
-      hasProfile: true,
-      isApproved: user.isApproved,
+      hasProfile: Boolean(user.hostProfile),
+      isApproved,
       hostId: userId,
-      businessName: user.businessName,
-      role: user.isApproved ? ('host' as const) : ('host_pending' as const),
+      businessName: user.hostProfile?.businessName || null,
+      role: isApproved ? ('host' as const) : ('host_pending' as const),
     };
   }
 
   async findApprovedByUserId(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true, avatar: true, businessName: true, isApproved: true, role: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        role: true,
+        hostProfile: {
+          select: {
+            id: true,
+            businessName: true,
+            isApproved: true,
+          },
+        },
+      },
     });
     if (!user || user.role !== 'HOST') throw new NotFoundException('Host profile not found');
-    if (!user.isApproved) throw new ForbiddenException('Your host account is pending admin approval');
-    return user;
+    if (!user.hostProfile?.isApproved) throw new ForbiddenException('Your host account is pending admin approval');
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      role: user.role,
+      businessName: user.hostProfile.businessName,
+      isApproved: user.hostProfile.isApproved,
+    };
   }
 
   async getHostSettings(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        businessName: true,
-        defaultCheckInTime: true,
-        defaultCheckOutTime: true,
-        payoutMethod: true,
-        payoutAccount: true,
-        isApproved: true,
-      },
+    const profile = await this.prisma.hostProfile.findUnique({
+      where: { userId },
     });
-    if (!user) throw new NotFoundException('User not found');
     return {
-      businessName: user.businessName,
-      defaultCheckInTime: user.defaultCheckInTime || '14:00',
-      defaultCheckOutTime: user.defaultCheckOutTime || '10:00',
-      payoutMethod: user.payoutMethod || 'BANK_TRANSFER',
-      payoutAccount: user.payoutAccount,
-      isApproved: user.isApproved,
+      businessName: profile?.businessName || null,
+      defaultCheckInTime: profile?.defaultCheckInTime || '14:00',
+      defaultCheckOutTime: profile?.defaultCheckOutTime || '10:00',
+      payoutMethod: profile?.payoutMethod || 'BANK_TRANSFER',
+      payoutAccount: profile?.payoutAccount || null,
+      isApproved: profile?.isApproved || false,
     };
   }
 
@@ -117,23 +188,22 @@ export class HostsService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
+    const updated = await this.prisma.hostProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
         ...(dto.defaultCheckInTime ? { defaultCheckInTime: dto.defaultCheckInTime } : {}),
         ...(dto.defaultCheckOutTime ? { defaultCheckOutTime: dto.defaultCheckOutTime } : {}),
         ...(dto.businessName !== undefined ? { businessName: dto.businessName } : {}),
         ...(dto.payoutMethod !== undefined ? { payoutMethod: dto.payoutMethod } : {}),
         ...(dto.payoutAccount !== undefined ? { payoutAccount: dto.payoutAccount } : {}),
       },
-      select: {
-        id: true,
-        businessName: true,
-        defaultCheckInTime: true,
-        defaultCheckOutTime: true,
-        payoutMethod: true,
-        payoutAccount: true,
-        isApproved: true,
+      update: {
+        ...(dto.defaultCheckInTime ? { defaultCheckInTime: dto.defaultCheckInTime } : {}),
+        ...(dto.defaultCheckOutTime ? { defaultCheckOutTime: dto.defaultCheckOutTime } : {}),
+        ...(dto.businessName !== undefined ? { businessName: dto.businessName } : {}),
+        ...(dto.payoutMethod !== undefined ? { payoutMethod: dto.payoutMethod } : {}),
+        ...(dto.payoutAccount !== undefined ? { payoutAccount: dto.payoutAccount } : {}),
       },
     });
 
@@ -184,9 +254,15 @@ export class HostsService {
       },
     });
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { businessName: dto.businessName },
+    await this.prisma.hostProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        businessName: dto.businessName,
+      },
+      update: {
+        businessName: dto.businessName,
+      },
     });
 
     return {
@@ -205,14 +281,13 @@ export class HostsService {
     });
 
     if (!app) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { businessName: true, role: true, isApproved: true },
+      const profile = await this.prisma.hostProfile.findUnique({
+        where: { userId },
       });
       return {
         applicationId: null,
-        status: user?.isApproved ? 'approved' : 'not_applied',
-        businessName: user?.businessName || null,
+        status: profile?.isApproved ? 'approved' : 'not_applied',
+        businessName: profile?.businessName || null,
         submittedAt: null,
         reviewerNotes: null,
       };
@@ -238,9 +313,14 @@ export class HostsService {
     const methodType = dto.type === 'mobile_money' ? 'MOBILE_MONEY' : 'BANK_TRANSFER';
     const accountStr = JSON.stringify(details);
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
+    await this.prisma.hostProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        payoutMethod: methodType,
+        payoutAccount: accountStr,
+      },
+      update: {
         payoutMethod: methodType,
         payoutAccount: accountStr,
       },
@@ -260,8 +340,8 @@ export class HostsService {
   }
 
   async removePayoutMethod(userId: string, id: string) {
-    await this.prisma.user.update({
-      where: { id: userId },
+    await this.prisma.hostProfile.updateMany({
+      where: { userId },
       data: {
         payoutAccount: null,
       },

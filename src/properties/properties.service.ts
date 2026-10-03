@@ -74,7 +74,7 @@ export class PropertiesService {
   // ── Full include helper ──────────────────────────────────────────────────────
 
   private readonly fullInclude = {
-    host: { select: { id: true, name: true, avatar: true, businessName: true } },
+    host: { select: { id: true, name: true, avatar: true, hostProfile: { select: { businessName: true, defaultCheckInTime: true, defaultCheckOutTime: true } } } },
     stays: {
       where: { deletedAt: null },
       orderBy: { sortOrder: 'asc' as const },
@@ -220,9 +220,9 @@ export class PropertiesService {
           beds: dto.beds ?? null,
           baths: dto.baths ?? null,
           maxGuests: dto.maxGuests ?? null,
-          checkInFrom: dto.checkInFrom || property.host?.defaultCheckInTime || '14:00',
+          checkInFrom: dto.checkInFrom || (property.host as any)?.hostProfile?.defaultCheckInTime || '14:00',
           checkInUntil: dto.checkInUntil || null,
-          checkOutBefore: dto.checkOutBefore || property.host?.defaultCheckOutTime || '10:00',
+          checkOutBefore: dto.checkOutBefore || (property.host as any)?.hostProfile?.defaultCheckOutTime || '10:00',
           cancellationPolicy: dto.cancellationPolicy || null,
           isActive: dto.isActive ?? true,
           sortOrder: dto.sortOrder ?? 0,
@@ -1025,7 +1025,7 @@ export class PropertiesService {
         sortOrder: r.sortOrder,
       })),
       hostId: property.hostId,
-      hostName: property.host?.businessName || property.host?.name || null,
+      hostName: (property.host as any)?.hostProfile?.businessName || property.host?.name || null,
       hostAvatar: property.host?.avatar || null,
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,
@@ -1093,7 +1093,7 @@ export class PropertiesService {
   private async assertOwnership(id: string, hostId: string) {
     const property = await this.prisma.property.findUnique({
       where: { id },
-      include: { host: { select: { defaultCheckInTime: true, defaultCheckOutTime: true } } },
+      include: { host: { select: { hostProfile: { select: { defaultCheckInTime: true, defaultCheckOutTime: true } } } } },
     });
     if (!property || property.deletedAt) throw new NotFoundException('Property not found');
     if (property.hostId !== hostId) throw new NotFoundException('Property not found');

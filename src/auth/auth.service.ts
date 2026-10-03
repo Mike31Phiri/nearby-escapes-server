@@ -40,8 +40,6 @@ export class AuthService {
         name: dto.name,
         phone: dto.phone || null,
         role: 'GUEST',
-        businessName: null,
-        isApproved: false,
       },
     });
 
@@ -93,7 +91,15 @@ export class AuthService {
   }
 
   sanitize(user: any) {
-    const { password, resetToken, resetTokenExpiry, refreshToken, deletedAt, ...rest } = user;
+    const {
+      password,
+      resetToken,
+      resetTokenExpiry,
+      refreshToken,
+      deletedAt,
+      hostProfile,
+      ...rest
+    } = user;
     const role = (user.role || 'GUEST').toLowerCase();
     const isHost = role === 'host';
 
@@ -102,7 +108,7 @@ export class AuthService {
       // Frontend expects roles: UserRole[] (array) where hosts retain guest booking capabilities
       roles: isHost ? ['guest', 'host'] : [role],
       role,
-      isHostVerified: isHost ? Boolean(user.isApproved) : false,
+      isHostVerified: isHost ? Boolean(hostProfile?.isApproved) : false,
     };
   }
 

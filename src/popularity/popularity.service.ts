@@ -135,7 +135,7 @@ export class PopularityService implements OnApplicationBootstrap {
     const properties = await this.prisma.property.findMany({
       where: { id: { in: orderedIds } },
       include: {
-        host: { select: { id: true, name: true, avatar: true, businessName: true } },
+        host: { select: { id: true, name: true, avatar: true, hostProfile: { select: { businessName: true } } } },
         stays: {
           where: { deletedAt: null },
           orderBy: { sortOrder: 'asc' },
@@ -253,7 +253,7 @@ export class PopularityService implements OnApplicationBootstrap {
       amenities: (property.amenities || []).map((a: any) => ({ name: a.name, icon: a.icon })),
       rules: (property.rules || []).map((r: any) => r.rule),
       hostId: property.hostId,
-      hostName: property.host?.businessName || property.host?.name || null,
+      hostName: (property.host as any)?.hostProfile?.businessName || property.host?.name || null,
       hostAvatar: property.host?.avatar || null,
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,

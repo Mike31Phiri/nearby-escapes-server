@@ -108,8 +108,12 @@ export class HostDashboardService {
       where: { id: userId },
       select: {
         id: true,
-        payoutMethod: true,
-        payoutAccount: true,
+        hostProfile: {
+          select: {
+            payoutMethod: true,
+            payoutAccount: true,
+          },
+        },
       },
     });
 
@@ -162,17 +166,19 @@ export class HostDashboardService {
 
     // Build payout methods array
     const payoutMethods: HostPayoutMethodItemDto[] = [];
-    if (host?.payoutAccount) {
+    const payoutAccount = host?.hostProfile?.payoutAccount;
+    const payoutMethod = host?.hostProfile?.payoutMethod;
+    if (payoutAccount) {
       let details: HostPayoutMethodDetailsDto = {};
       let isMobile = false;
 
       try {
-        details = JSON.parse(host.payoutAccount);
+        details = JSON.parse(payoutAccount);
         isMobile = !!(details.mobileNumber || details.provider);
       } catch {
-        const raw = host.payoutAccount.trim();
+        const raw = payoutAccount.trim();
         if (
-          host.payoutMethod === 'MOBILE_MONEY' ||
+          payoutMethod === 'MOBILE_MONEY' ||
           raw.startsWith('+') ||
           raw.startsWith('09') ||
           raw.startsWith('07')
@@ -193,7 +199,7 @@ export class HostDashboardService {
 
       payoutMethods.push({
         id: 'pm-primary',
-        type: isMobile || host.payoutMethod === 'MOBILE_MONEY' ? 'mobile_money' : 'bank_transfer',
+        type: isMobile || payoutMethod === 'MOBILE_MONEY' ? 'mobile_money' : 'bank_transfer',
         isDefault: true,
         details,
       });
@@ -419,7 +425,11 @@ export class HostDashboardService {
   async getDashboard(userId: string) {
     const host = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, avatar: true, businessName: true },
+      select: {
+        name: true,
+        avatar: true,
+        hostProfile: { select: { businessName: true } },
+      },
     });
     if (!host) return {
       stats: { totalListings: 0, activeListings: 0, totalBookings: 0, pendingBookings: 0, totalRevenue: 0, averageRating: 0, reviewCount: 0 },

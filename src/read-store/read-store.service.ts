@@ -55,7 +55,7 @@ export class ReadStoreService {
     const property = await this.prisma.property.findUnique({
       where: { id },
       include: {
-        host: { select: { id: true, name: true, avatar: true, businessName: true, isApproved: true } },
+        host: { select: { id: true, name: true, avatar: true, hostProfile: { select: { businessName: true, isApproved: true } } } },
         stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
         experiences: {
           where: { deletedAt: null },
@@ -152,7 +152,7 @@ export class ReadStoreService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          host: { select: { id: true, name: true, avatar: true, businessName: true, isApproved: true } },
+          host: { select: { id: true, name: true, avatar: true, hostProfile: { select: { businessName: true, isApproved: true } } } },
           stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
           experiences: {
             where: { deletedAt: null },
@@ -244,7 +244,7 @@ export class ReadStoreService {
       amenities: (property.amenities || []).map((a: any) => ({ name: a.name, icon: a.icon })),
       rules: (property.rules || []).map((r: any) => r.rule),
       hostId: property.hostId,
-      hostName: property.host?.businessName || property.host?.name || null,
+      hostName: (property.host as any)?.hostProfile?.businessName || property.host?.name || null,
       hostAvatar: property.host?.avatar || null,
 
       // Frontend contract aliases
@@ -259,9 +259,9 @@ export class ReadStoreService {
       reviews: ratings.length,
       host: {
         id: property.hostId,
-        name: property.host?.businessName || property.host?.name || null,
+        name: (property.host as any)?.hostProfile?.businessName || property.host?.name || null,
         avatarUrl: property.host?.avatar || null,
-        superhost: Boolean(property.host?.isApproved),
+        superhost: Boolean((property.host as any)?.hostProfile?.isApproved),
       },
       stays: (property.stays || []).map((s: any) => ({
         id: s.id,

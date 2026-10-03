@@ -33,8 +33,6 @@ export class UsersService {
       phone: user.phone,
       avatar: user.avatar,
       role: user.role.toLowerCase(),
-      homeCity: user.homeCity,
-      bio: user.bio,
       joinedAt: user.createdAt,
       stats: {
         totalBookings: user.bookingsAsGuest.length,
@@ -52,18 +50,25 @@ export class UsersService {
         name: true,
         avatar: true,
         role: true,
-        homeCity: true,
-        bio: true,
         createdAt: true,
-        businessName: true,
-        isApproved: true,
+        hostProfile: {
+          select: {
+            businessName: true,
+            isApproved: true,
+          },
+        },
       },
     });
     if (!user) throw new NotFoundException('User not found');
     return {
-      ...user,
-      role: user.role.toLowerCase(),
+      id: user.id,
+      name: user.name,
+      avatar: user.avatar,
+      createdAt: user.createdAt,
       joinedAt: user.createdAt,
+      role: user.role.toLowerCase(),
+      businessName: user.hostProfile?.businessName || null,
+      isApproved: user.hostProfile?.isApproved || false,
     };
   }
 
@@ -73,8 +78,6 @@ export class UsersService {
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.phone !== undefined) data.phone = dto.phone;
     if (dto.avatar !== undefined) data.avatar = dto.avatar;
-    if (dto.homeCity !== undefined) data.homeCity = dto.homeCity;
-    if (dto.bio !== undefined) data.bio = dto.bio;
 
     if (Object.keys(data).length === 0) {
       return this.getProfile(id);

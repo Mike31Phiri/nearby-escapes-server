@@ -13,7 +13,7 @@ export class WishlistService {
           include: {
             property: {
               include: {
-                host: { select: { name: true, businessName: true } },
+                host: { select: { name: true, hostProfile: { select: { businessName: true } } } },
                 images: { orderBy: { sortOrder: 'asc' }, take: 1 },
                 stays: { where: { deletedAt: null, isActive: true }, take: 1 },
                 experiences: { where: { deletedAt: null, isActive: true }, take: 1 },
@@ -34,7 +34,7 @@ export class WishlistService {
             include: {
               property: {
                 include: {
-                  host: { select: { name: true, businessName: true } },
+                  host: { select: { name: true, hostProfile: { select: { businessName: true } } } },
                   images: { orderBy: { sortOrder: 'asc' }, take: 1 },
                   stays: { where: { deletedAt: null, isActive: true }, take: 1 },
                   experiences: { where: { deletedAt: null, isActive: true }, take: 1 },
@@ -71,7 +71,7 @@ export class WishlistService {
           priceFormatted: `K${(price / 100).toFixed(2)}`,
           currency: p.currency,
           reviewCount: p._count?.reviews || 0,
-          hostName: (p as any).host?.businessName || (p as any).host?.name || null,
+          hostName: (p as any).host?.hostProfile?.businessName || (p as any).host?.name || null,
           createdAt: p.createdAt,
         };
       }),
