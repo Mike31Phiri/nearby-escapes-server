@@ -7,6 +7,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,6 +21,19 @@ async function bootstrap() {
   app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  // Lightweight DB health check — exposes real error in production for diagnostics
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/api/health', async (_req: any, res: any) => {
+    try {
+      const prisma = app.get(PrismaService);
+      await prisma.$queryRaw`SELECT 1`;
+      res.status(200).json({ status: 'ok', db: 'connected' });
+    } catch (e: any) {
+      res.status(503).json({ status: 'error', db: 'disconnected', message: e?.message });
+    }
+  });
+
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
