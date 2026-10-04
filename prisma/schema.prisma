@@ -6,7 +6,545 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Enums ──────────────────────────────────────────────────────────────────
+model User {
+  id                    String             @id @default(uuid())
+  name                  String
+  email                 String             @unique
+  password              String
+  phone                 String?
+  avatar                String?
+  role                  Role               @default(GUEST)
+  isVerified            Boolean            @default(false)
+  verificationStatus    VerificationStatus @default(PENDING)
+  verificationCode      String?
+  verificationCodeExpiry DateTime?
+  resetToken            String?            @unique
+  resetTokenExpiry      DateTime?
+  refreshToken          String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  deletedAt             DateTime?
+  activityLogs          ActivityLog[]
+  bookingsAsGuest       Booking[]          @relation("GuestBookings")
+  bookingsAsHost        Booking[]          @relation("HostBookings")
+  hostApplication       HostApplication?
+  hostProfile           HostProfile?
+  notifications         Notification[]
+  payments              Payment[]
+  payouts               Payout[]
+  createdPolicies       Policy[]           @relation("CreatedPolicies")
+  createdPolicyVersions PolicyVersion[]    @relation("CreatedPolicyVersions")
+  properties            Property[]
+  reviews               Review[]
+  wishlist              Wishlist?
+}
+
+model HostProfile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  businessName        String?
+  isApproved          Boolean  @default(false)
+  defaultCheckInTime  String?  @default("14:00")
+  defaultCheckOutTime String?  @default("10:00")
+  payoutMethod        String?  @default("BANK_TRANSFER")
+  payoutAccount       String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Property {
+  id              String                  @id @default(uuid())
+  hostId          String
+  type            PropertyType
+  status          PropertyStatus          @default(ACTIVE)
+  name            String
+  description     String?                 @default("")
+  location        String?                 @default("")
+  currency        String                  @default("ZMW")
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  deletedAt       DateTime?
+  draftData       Json?
+  draftStep       Int?                    @default(1)
+  bookings        Booking[]
+  experiences     Experience[]
+  recommendations ListingRecommendation[]
+  tags            ListingTag[]
+  host            User                    @relation(fields: [hostId], references: [id])
+  amenities       PropertyAmenity[]
+  images          PropertyImage[]
+  rules           PropertyRule[]
+  reviews         Review[]
+  stays           Stay[]
+  transports      Transport[]
+  wishlistItems   WishlistItem[]
+
+  @@index([status, deletedAt])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Stay {
+  id                 String                  @id @default(uuid())
+  propertyId         String
+  name               String
+  description        String?
+  price              Int
+  roomType           String?
+  bedrooms           Int?
+  beds               Int?
+  baths              Int?
+  maxGuests          Int?
+  checkInFrom        String?
+  checkInUntil       String?
+  checkOutBefore     String?
+  cancellationPolicy CancellationPolicy?
+  isActive           Boolean                 @default(true)
+  sortOrder          Int                     @default(0)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  deletedAt          DateTime?
+  availability       AvailabilitySlot[]
+  bookings           Booking[]               @relation("StayBookings")
+  policies           ListingPolicy[]
+  recommendations    ListingRecommendation[]
+  tags               ListingTag[]
+  seasonalPrices     SeasonalPricing[]
+  property           Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model Experience {
+  id              String                  @id @default(uuid())
+  propertyId      String
+  name            String
+  description     String?
+  price           Int
+  activityType    String?
+  duration        String?
+  maxParticipants Int?
+  difficultyLevel String?
+  meetingPoint    String?
+  isActive        Boolean                 @default(true)
+  sortOrder       Int                     @default(0)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  deletedAt       DateTime?
+  bookings        Booking[]               @relation("ExperienceBookings")
+  property        Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  inclusions      ExperienceInclusion[]
+  timeSlots       ExperienceTimeSlot[]
+  policies        ListingPolicy[]
+  recommendations ListingRecommendation[]
+  tags            ListingTag[]
+}
+
+model Transport {
+  id              String                  @id @default(uuid())
+  propertyId      String
+  name            String
+  description     String?
+  from            String?
+  to              String?
+  vehicleType     String?
+  capacity        Int?
+  pricePerSeat    Int?
+  schedule        Json?
+  isActive        Boolean                 @default(true)
+  sortOrder       Int                     @default(0)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  deletedAt       DateTime?
+  bookings        Booking[]               @relation("TransportBookings")
+  policies        ListingPolicy[]
+  recommendations ListingRecommendation[]
+  tags            ListingTag[]
+  property        Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model PropertyImage {
+  id         String   @id @default(uuid())
+  propertyId String
+  url        String
+  sortOrder  Int      @default(0)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, sortOrder])
+}
+
+model PropertyAmenity {
+  id         String   @id @default(uuid())
+  propertyId String
+  name       String
+  icon       String?
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, name])
+  @@index([propertyId])
+}
+
+model PropertyRule {
+  id         String   @id @default(uuid())
+  propertyId String
+  rule       String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+}
+
+model ExperienceTimeSlot {
+  id           String     @id @default(uuid())
+  experienceId String
+  slot         String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  @@index([experienceId])
+}
+
+model ExperienceInclusion {
+  id           String     @id @default(uuid())
+  experienceId String
+  item         String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  @@index([experienceId])
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  bookingRef      String        @unique
+  propertyId      String
+  stayId          String?
+  experienceId    String?
+  transportId     String?
+  guestId         String
+  hostId          String
+  status          BookingStatus @default(PENDING)
+  amount          Int
+  currency        String        @default("ZMW")
+  paymentStatus   PaymentStatus @default(UNPAID)
+  transToken      String?
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  specialRequests String?
+  checkIn         DateTime?
+  checkOut        DateTime?
+  date            DateTime?
+  guests          Int           @default(1)
+  refundAmount    Int?          @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  expiresAt       DateTime?
+  timeSlot        String?
+  checkedInAt     DateTime?
+  checkedOutAt    DateTime?
+  experience      Experience?   @relation("ExperienceBookings", fields: [experienceId], references: [id])
+  guest           User          @relation("GuestBookings", fields: [guestId], references: [id])
+  host            User          @relation("HostBookings", fields: [hostId], references: [id])
+  property        Property      @relation(fields: [propertyId], references: [id])
+  stay            Stay?         @relation("StayBookings", fields: [stayId], references: [id])
+  transport       Transport?    @relation("TransportBookings", fields: [transportId], references: [id])
+  payment         Payment?
+  payout          Payout?
+
+  @@index([stayId, status, checkIn, checkOut])
+  @@index([experienceId, status, date, timeSlot])
+  @@index([transportId, status, date])
+}
+
+model Payment {
+  id               String        @id @default(uuid())
+  bookingId        String        @unique
+  userId           String
+  amount           Int
+  commissionAmount Int?
+  hostAmount       Int?
+  status           PaymentStatus @default(UNPAID)
+  provider         String?
+  providerRef      String?
+  receiptUrl       String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  booking          Booking       @relation(fields: [bookingId], references: [id])
+  user             User          @relation(fields: [userId], references: [id])
+}
+
+model Payout {
+  id          String       @id @default(uuid())
+  hostId      String
+  amount      Int
+  commission  Int?
+  netAmount   Int?
+  period      String?
+  status      PayoutStatus @default(PENDING)
+  method      String?
+  bookingRefs String[]
+  processedAt DateTime?
+  createdAt   DateTime     @default(now())
+  bookingId   String?      @unique
+  booking     Booking?     @relation(fields: [bookingId], references: [id])
+  host        User         @relation(fields: [hostId], references: [id])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  propertyId String
+  bookingRef String?
+  guestId    String
+  rating     Int
+  text       String?
+  createdAt  DateTime @default(now())
+  guest      User     @relation(fields: [guestId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, guestId, bookingRef])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  description String
+  isRead      Boolean          @default(false)
+  actionUrl   String?
+  createdAt   DateTime         @default(now())
+  actionLabel String?
+  deletedAt   DateTime?
+  metadata    Json?
+  user        User             @relation(fields: [userId], references: [id])
+}
+
+model Wishlist {
+  id        String         @id @default(uuid())
+  userId    String         @unique
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id])
+  items     WishlistItem[]
+}
+
+model WishlistItem {
+  id         String   @id @default(uuid())
+  wishlistId String
+  propertyId String
+  createdAt  DateTime @default(now())
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, propertyId])
+  @@index([propertyId])
+  @@index([wishlistId, createdAt])
+}
+
+model AvailabilitySlot {
+  id     String   @id @default(uuid())
+  stayId String
+  date   DateTime
+  status String   @default("available")
+  price  Int?
+  stay   Stay     @relation(fields: [stayId], references: [id])
+
+  @@unique([stayId, date])
+}
+
+model SeasonalPricing {
+  id     String   @id @default(uuid())
+  stayId String
+  from   DateTime
+  to     DateTime
+  price  Int      @default(0)
+  label  String?
+  stay   Stay     @relation(fields: [stayId], references: [id])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  action    String
+  userId    String?
+  userRole  String?
+  target    String?
+  type      String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Dispute {
+  id           String          @id @default(uuid())
+  bookingRef   String
+  propertyName String
+  propertyType String
+  guestId      String
+  guestName    String
+  hostId       String
+  hostName     String
+  amount       Int
+  reason       String
+  description  String?
+  status       DisputeStatus   @default(OPEN)
+  priority     DisputePriority @default(MEDIUM)
+  raisedBy     String
+  raisedAt     DateTime        @default(now())
+  resolvedAt   DateTime?
+  resolution   String?
+}
+
+model Setting {
+  id          String   @id @default(uuid())
+  category    String
+  key         String   @unique
+  label       String
+  value       String
+  type        String
+  options     String[]
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ListingPolicy {
+  id           String                @id @default(uuid())
+  stayId       String?
+  experienceId String?
+  transportId  String?
+  category     ListingPolicyCategory @default(OTHER)
+  title        String
+  body         String
+  sortOrder    Int                   @default(0)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  experience   Experience?           @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  stay         Stay?                 @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  transport    Transport?            @relation(fields: [transportId], references: [id], onDelete: Cascade)
+
+  @@index([stayId])
+  @@index([experienceId])
+  @@index([transportId])
+}
+
+model ListingTag {
+  id           String      @id @default(uuid())
+  propertyId   String?
+  stayId       String?
+  experienceId String?
+  transportId  String?
+  category     TagCategory @default(CATEGORY)
+  name         String
+  slug         String
+  icon         String?
+  createdAt    DateTime    @default(now())
+  experience   Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  property     Property?   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  stay         Stay?       @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  transport    Transport?  @relation(fields: [transportId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([stayId])
+  @@index([experienceId])
+  @@index([transportId])
+  @@index([category, slug])
+}
+
+model ListingRecommendation {
+  id           String                 @id @default(uuid())
+  propertyId   String?
+  stayId       String?
+  experienceId String?
+  transportId  String?
+  audience     RecommendationAudience @default(GENERAL)
+  title        String
+  reason       String?
+  badge        String?
+  sortOrder    Int                    @default(0)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  experience   Experience?            @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  property     Property?              @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  stay         Stay?                  @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  transport    Transport?             @relation(fields: [transportId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([stayId])
+  @@index([experienceId])
+  @@index([transportId])
+  @@index([audience])
+}
+
+model Policy {
+  id             String          @id @default(uuid())
+  slug           String          @unique
+  title          String
+  type           PolicyType      @default(OTHER)
+  description    String?
+  isPublished    Boolean         @default(false)
+  currentVersion String          @default("1.0.0")
+  createdById    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  createdBy      User?           @relation("CreatedPolicies", fields: [createdById], references: [id])
+  versions       PolicyVersion[]
+
+  @@index([slug])
+  @@index([type])
+  @@index([isPublished])
+}
+
+model PolicyVersion {
+  id            String   @id @default(uuid())
+  policyId      String
+  version       String
+  content       String
+  summary       String?
+  documentUrl   String?
+  metadata      Json?
+  effectiveDate DateTime @default(now())
+  createdById   String?
+  createdAt     DateTime @default(now())
+  createdBy     User?    @relation("CreatedPolicyVersions", fields: [createdById], references: [id])
+  policy        Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, version])
+  @@index([policyId])
+}
+
+model MediaAsset {
+  id        String   @id @default(uuid())
+  url       String   @unique
+  category  String?  @default("GENERAL")
+  caption   String?
+  source    String?  @default("UNSPLASH")
+  createdAt DateTime @default(now())
+
+  @@index([category])
+}
+
+model HostApplication {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  businessName   String
+  operatingSince String?
+  province       String?
+  town           String?
+  businessEmail  String?
+  businessPhone  String?
+  pacraDocs      Json?
+  ownershipDocs  Json?
+  operationDocs  Json?
+  status         String    @default("pending_review")
+  reviewerNotes  String?
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+}
 
 enum Role {
   GUEST
@@ -30,10 +568,10 @@ enum PropertyStatus {
 enum BookingStatus {
   PENDING
   CONFIRMED
-  CHECKED_IN
   CANCELLED
   COMPLETED
   EXPIRED
+  CHECKED_IN
 }
 
 enum PaymentStatus {
@@ -64,9 +602,9 @@ enum NotificationType {
   SYSTEM
   PROPERTY_APPROVED
   PROPERTY_REJECTED
+  PAYOUT
   LISTING_APPROVED
   LISTING_REJECTED
-  PAYOUT
   MESSAGE
   PROMOTION
 }
@@ -94,7 +632,6 @@ enum PayoutStatus {
   FAILED
 }
 
-
 enum PolicyType {
   TERMS_OF_SERVICE
   PRIVACY_POLICY
@@ -106,7 +643,6 @@ enum PolicyType {
   OTHER
 }
 
-// Categories for host-defined per-listing policies
 enum ListingPolicyCategory {
   CANCELLATION
   CHECK_IN
@@ -122,18 +658,16 @@ enum ListingPolicyCategory {
   OTHER
 }
 
-// Categories for listing tags
 enum TagCategory {
-  CATEGORY      // e.g. "Safari Lodge", "Cottage", "Water Adventure", "Luxury Coach"
-  AMENITY       // e.g. "WiFi", "Pool", "Air Conditioning", "USB Charging Ports"
-  ACTIVITY      // e.g. "Game Drive", "Rafting", "Hiking", "Sunset Cruise"
-  LOCATION      // e.g. "Livingstone", "Zambezi River", "Waterfront", "Lusaka"
-  TRIP_TYPE     // e.g. "ONE_WAY" (one-time travel), "ROUND_TRIP" (round travel)
-  VEHICLE_TYPE  // e.g. "Bus", "Minibus", "Luxury Coach", "4x4 Shuttle"
+  CATEGORY
+  AMENITY
+  ACTIVITY
+  LOCATION
+  TRIP_TYPE
+  VEHICLE_TYPE
   OTHER
 }
 
-// Audience / intent categories for curated recommendations
 enum RecommendationAudience {
   COUPLES
   FAMILIES
@@ -145,670 +679,3 @@ enum RecommendationAudience {
   LUXURY
   GENERAL
 }
-
-// ─── User ────────────────────────────────────────────────────────────────────
-// Single table for all roles (GUEST | HOST | ADMIN).
-// Host-specific metadata (businessName, isApproved) lives here on the same row.
-
-model User {
-  id                 String             @id @default(uuid())
-  name               String
-  email              String             @unique
-  password           String
-  phone              String?
-  avatar             String?
-  role               Role               @default(GUEST)
-  isVerified         Boolean            @default(false)
-  verificationStatus VerificationStatus @default(PENDING)
-
-  // Auth tokens
-  resetToken         String?            @unique
-  resetTokenExpiry   DateTime?
-  refreshToken       String?
-
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  deletedAt          DateTime?
-
-  // Relations
-  hostProfile           HostProfile?
-  properties            Property[]
-  bookingsAsGuest        Booking[]              @relation("GuestBookings")
-  bookingsAsHost         Booking[]              @relation("HostBookings")
-  payments               Payment[]
-  reviews                Review[]
-  notifications          Notification[]
-  wishlist               Wishlist?
-  activityLogs           ActivityLog[]
-  payouts                Payout[]
-  hostApplication        HostApplication?
-  createdPolicies        Policy[]               @relation("CreatedPolicies")
-  createdPolicyVersions  PolicyVersion[]        @relation("CreatedPolicyVersions")
-}
-
-// ─── Host Profile (Sub-entity) ───────────────────────────────────────────────
-// Separated from User so guest/user accounts don't carry host-specific columns.
-// Connected to User via 1:1 relation on userId UUID.
-
-model HostProfile {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  businessName        String?
-  isApproved          Boolean  @default(false)
-  defaultCheckInTime  String?  @default("14:00")
-  defaultCheckOutTime String?  @default("10:00")
-  payoutMethod        String?  @default("BANK_TRANSFER")
-  payoutAccount       String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@index([userId])
-}
-
-// ─── Property ────────────────────────────────────────────────────────────────
-// Represents the business / brand entity (e.g. "Zambezi Sun Lodge").
-// Common fields only — ZERO nullable type-specific columns.
-// Type-specific units live in the 1:many child tables below.
-// Images, amenities, rules are proper FK'd rows, not String[].
-
-model Property {
-  id          String         @id @default(uuid())
-  hostId      String
-  type        PropertyType
-  status      PropertyStatus @default(ACTIVE)
-  name        String
-  description String?        @default("")
-  location    String?        @default("")
-  currency    String         @default("ZMW")
-  draftStep   Int?           @default(1)
-  draftData   Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  deletedAt   DateTime?
-
-  host User @relation(fields: [hostId], references: [id])
-
-  // 1:many type-specific unit tables (only the relevant one is populated per property)
-  stays       Stay[]
-  experiences Experience[]
-  transports  Transport[]
-
-  // Property-level shared tables
-  images    PropertyImage[]
-  amenities PropertyAmenity[]
-  rules     PropertyRule[]
-
-  // Cross-cutting relations
-  bookings        Booking[]
-  reviews         Review[]
-  wishlistItems   WishlistItem[]
-  tags            ListingTag[]
-  recommendations ListingRecommendation[]
-
-  @@index([status, deletedAt])
-  @@index([type])
-  @@index([createdAt])
-}
-
-// ─── Stay ────────────────────────────────────────────────────────────────────
-// Individual bookable rooms / chalets / units within a STAY property.
-// e.g. "Lake-View Chalet", "Deluxe Suite", "Family Treehouse"
-
-model Stay {
-  id                 String              @id @default(uuid())
-  propertyId         String
-  name               String              // "Lake-View Chalet", "Standard Double"
-  description        String?
-  price              Int                 // per night (Ngwee)
-  roomType           String?             // "Suite", "Chalet", "Standard", "Family"
-  bedrooms           Int?
-  beds               Int?
-  baths              Int?
-  maxGuests          Int?
-  checkInFrom        String?             // "14:00"
-  checkInUntil       String?             // "20:00"
-  checkOutBefore     String?             // "11:00"
-  cancellationPolicy CancellationPolicy?
-  isActive           Boolean             @default(true)
-  sortOrder          Int                 @default(0)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  deletedAt          DateTime?
-
-  property       Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  bookings       Booking[]        @relation("StayBookings")
-  availability    AvailabilitySlot[]
-  seasonalPrices  SeasonalPricing[]
-  policies        ListingPolicy[]
-  tags            ListingTag[]
-  recommendations ListingRecommendation[]
-}
-
-// ─── Experience ───────────────────────────────────────────────────────────────
-// Individual tour / activity / package units within an EXPERIENCE property.
-// e.g. "White Water Rafting", "Sunset Micro-light", "Morning Bush Walk"
-
-model Experience {
-  id              String   @id @default(uuid())
-  propertyId      String
-  name            String   // "Morning Rafting", "Sunset Safari"
-  description     String?
-  price           Int      // per person (Ngwee)
-  activityType    String?
-  duration        String?  // "4 hours", "Full day"
-  maxParticipants Int?
-  difficultyLevel String?  // "Easy", "Moderate", "Challenging"
-  meetingPoint    String?
-  isActive        Boolean  @default(true)
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
-
-  property   Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  timeSlots       ExperienceTimeSlot[]
-  inclusions      ExperienceInclusion[]
-  bookings        Booking[]            @relation("ExperienceBookings")
-  policies        ListingPolicy[]
-  tags            ListingTag[]
-  recommendations ListingRecommendation[]
-}
-
-// ─── Transport ────────────────────────────────────────────────────────────────
-// Individual route / service units within a TRANSPORT property.
-// e.g. "Lusaka → Livingstone Express", "Airport Shuttle"
-
-model Transport {
-  id           String   @id @default(uuid())
-  propertyId   String
-  name         String   // "Lusaka → Livingstone Express"
-  description  String?
-  from         String?
-  to           String?
-  vehicleType  String?  // "Bus", "Minibus", "4x4", "Boat"
-  capacity     Int?
-  pricePerSeat Int?
-  schedule     Json?    // departure times
-  isActive     Boolean  @default(true)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  deletedAt    DateTime?
-
-  property Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  bookings        Booking[]     @relation("TransportBookings")
-  policies        ListingPolicy[]
-  tags            ListingTag[]
-  recommendations ListingRecommendation[]
-}
-
-// ─── PropertyImage ───────────────────────────────────────────────────────────
-
-model PropertyImage {
-  id         String @id @default(uuid())
-  propertyId String
-  url        String
-  sortOrder  Int    @default(0)
-
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@index([propertyId, sortOrder])
-}
-
-// ─── PropertyAmenity ─────────────────────────────────────────────────────────
-// Free-text, dynamic amenities at property level (WiFi, Pool, Braai Area, etc.)
-
-model PropertyAmenity {
-  id         String  @id @default(uuid())
-  propertyId String
-  name       String  // "WiFi", "Swimming Pool", "Braai Area"
-  icon       String? // optional emoji or icon slug
-
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@unique([propertyId, name])
-  @@index([propertyId])
-}
-
-// ─── PropertyRule ────────────────────────────────────────────────────────────
-
-model PropertyRule {
-  id         String @id @default(uuid())
-  propertyId String
-  rule       String
-
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@index([propertyId])
-}
-
-// ─── ExperienceTimeSlot ───────────────────────────────────────────────────────
-
-model ExperienceTimeSlot {
-  id           String @id @default(uuid())
-  experienceId String
-  slot         String // e.g. "09:00", "14:00"
-
-  experience Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-
-  @@index([experienceId])
-}
-
-// ─── ExperienceInclusion ──────────────────────────────────────────────────────
-
-model ExperienceInclusion {
-  id           String @id @default(uuid())
-  experienceId String
-  item         String // e.g. "Lunch", "Equipment", "Guide"
-
-  experience Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-
-  @@index([experienceId])
-}
-
-// ─── Booking ──────────────────────────────────────────────────────────────────
-// propertyId is always set (which business).
-// Exactly one of stayId / experienceId / transportId is set (which unit was booked).
-
-model Booking {
-  id            String        @id @default(uuid())
-  bookingRef    String        @unique
-  propertyId    String
-  stayId        String?
-  experienceId  String?
-  transportId   String?
-  guestId       String
-  hostId        String
-  status        BookingStatus @default(PENDING)
-  amount        Int
-  currency      String        @default("ZMW")
-  paymentStatus PaymentStatus @default(UNPAID)
-  transToken    String?
-
-  customerName    String
-  customerPhone   String
-  customerEmail   String?
-  specialRequests String?
-
-  checkIn   DateTime?
-  checkOut  DateTime?
-  date      DateTime?
-  timeSlot  String?
-  expiresAt DateTime?
-
-  // Check-in and check-out tracking
-  checkedInAt  DateTime?
-  checkedOutAt DateTime?
-
-  guests       Int  @default(1)
-  refundAmount Int? @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  property    Property    @relation(fields: [propertyId], references: [id])
-  stay        Stay?       @relation("StayBookings",       fields: [stayId],       references: [id])
-  experience  Experience? @relation("ExperienceBookings", fields: [experienceId], references: [id])
-  transport   Transport?  @relation("TransportBookings",  fields: [transportId],  references: [id])
-  guest       User        @relation("GuestBookings",      fields: [guestId],      references: [id])
-  host        User        @relation("HostBookings",       fields: [hostId],       references: [id])
-  payment     Payment?
-  payout      Payout?
-
-  @@index([stayId, status, checkIn, checkOut])
-  @@index([experienceId, status, date, timeSlot])
-  @@index([transportId, status, date])
-}
-
-// ─── Payment ─────────────────────────────────────────────────────────────────
-
-model Payment {
-  id               String        @id @default(uuid())
-  bookingId        String        @unique
-  userId           String
-  amount           Int
-  commissionAmount Int?
-  hostAmount       Int?
-  status           PaymentStatus @default(UNPAID)
-  provider         String?
-  providerRef      String?
-  receiptUrl       String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-
-  booking Booking @relation(fields: [bookingId], references: [id])
-  user    User    @relation(fields: [userId],    references: [id])
-}
-
-// ─── Payout ───────────────────────────────────────────────────────────────────
-
-model Payout {
-  id          String       @id @default(uuid())
-  hostId      String
-  bookingId   String?      @unique
-  amount      Int
-  commission  Int?
-  netAmount   Int?
-  period      String?
-  status      PayoutStatus @default(PENDING)
-  method      String?
-  bookingRefs String[]
-  processedAt DateTime?
-  createdAt   DateTime     @default(now())
-
-  host    User     @relation(fields: [hostId], references: [id])
-  booking Booking? @relation(fields: [bookingId], references: [id])
-}
-
-// ─── Review ───────────────────────────────────────────────────────────────────
-
-model Review {
-  id         String   @id @default(uuid())
-  propertyId String
-  bookingRef String?
-  guestId    String
-  rating     Int
-  text       String?
-  createdAt  DateTime @default(now())
-
-  property Property @relation(fields: [propertyId], references: [id])
-  guest    User     @relation(fields: [guestId],    references: [id])
-
-  @@unique([propertyId, guestId, bookingRef])
-}
-
-// ─── Notification ─────────────────────────────────────────────────────────────
-
-model Notification {
-  id          String           @id @default(uuid())
-  userId      String
-  type        NotificationType
-  title       String
-  description String
-  isRead      Boolean          @default(false)
-  actionUrl   String?
-  actionLabel String?
-  metadata    Json?
-  deletedAt   DateTime?
-  createdAt   DateTime         @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-}
-
-
-// ─── Wishlist ─────────────────────────────────────────────────────────────────
-
-model Wishlist {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user  User          @relation(fields: [userId], references: [id])
-  items WishlistItem[]
-}
-
-model WishlistItem {
-  id         String   @id @default(uuid())
-  wishlistId String
-  propertyId String
-  createdAt  DateTime @default(now())
-
-  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@unique([wishlistId, propertyId])
-  @@index([propertyId])
-  @@index([wishlistId, createdAt])
-}
-
-// ─── Availability ─────────────────────────────────────────────────────────────
-// Tracks blocked / available dates per Stay unit.
-
-model AvailabilitySlot {
-  id      String   @id @default(uuid())
-  stayId  String
-  date    DateTime
-  status  String   @default("available")
-  price   Int?
-
-  stay Stay @relation(fields: [stayId], references: [id])
-
-  @@unique([stayId, date])
-}
-
-model SeasonalPricing {
-  id      String   @id @default(uuid())
-  stayId  String
-  from    DateTime
-  to      DateTime
-  price   Int      @default(0)
-  label   String?
-
-  stay Stay @relation(fields: [stayId], references: [id])
-}
-
-// ─── Activity Log ─────────────────────────────────────────────────────────────
-
-model ActivityLog {
-  id        String   @id @default(uuid())
-  action    String
-  userId    String?
-  userRole  String?
-  target    String?
-  type      String
-  metadata  Json?
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
-}
-
-
-
-// ─── Dispute ──────────────────────────────────────────────────────────────────
-
-model Dispute {
-  id           String          @id @default(uuid())
-  bookingRef   String
-  propertyName String
-  propertyType String
-  guestId      String
-  guestName    String
-  hostId       String
-  hostName     String
-  amount       Int
-  reason       String
-  description  String?
-  status       DisputeStatus   @default(OPEN)
-  priority     DisputePriority @default(MEDIUM)
-  raisedBy     String
-  raisedAt     DateTime        @default(now())
-  resolvedAt   DateTime?
-  resolution   String?
-}
-
-// ─── Setting ──────────────────────────────────────────────────────────────────
-
-model Setting {
-  id          String   @id @default(uuid())
-  category    String
-  key         String   @unique
-  label       String
-  value       String
-  type        String
-  options     String[]
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-// ─── Listing Policies (host-defined, per-unit) ───────────────────────────────
-// Each Stay / Experience / Transport unit can have multiple named policies.
-// e.g. "No smoking inside", "Pets allowed with prior approval", "Check-in from 14:00"
-
-model ListingPolicy {
-  id           String                @id @default(uuid())
-  stayId       String?
-  experienceId String?
-  transportId  String?
-  category     ListingPolicyCategory @default(OTHER)
-  title        String                // "No Smoking", "Cancellation Policy", etc.
-  body         String                @db.Text  // full policy text
-  sortOrder    Int                   @default(0)
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
-
-  stay         Stay?       @relation(fields: [stayId],       references: [id], onDelete: Cascade)
-  experience   Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-  transport    Transport?  @relation(fields: [transportId],  references: [id], onDelete: Cascade)
-
-  @@index([stayId])
-  @@index([experienceId])
-  @@index([transportId])
-}
-
-// ─── Listing Tags ─────────────────────────────────────────────────────────────
-// Multipurpose tags for category filtering, amenities, activities, locations,
-// and transport attributes (one-time vs round travel, vehicle type, bus amenities).
-
-model ListingTag {
-  id           String      @id @default(uuid())
-  propertyId   String?
-  stayId       String?
-  experienceId String?
-  transportId  String?
-
-  category     TagCategory @default(CATEGORY)
-  name         String      // e.g. "Safari Lodge", "WiFi", "Round Travel", "4x4 Shuttle"
-  slug         String      // normalized lowercase: "safari-lodge", "wifi", "round-travel"
-  icon         String?     // optional emoji or icon identifier
-
-  createdAt    DateTime    @default(now())
-
-  property   Property?   @relation(fields: [propertyId],   references: [id], onDelete: Cascade)
-  stay       Stay?       @relation(fields: [stayId],       references: [id], onDelete: Cascade)
-  experience Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-  transport  Transport?  @relation(fields: [transportId],  references: [id], onDelete: Cascade)
-
-  @@index([propertyId])
-  @@index([stayId])
-  @@index([experienceId])
-  @@index([transportId])
-  @@index([category, slug])
-}
-
-// ─── Listing Recommendations ─────────────────────────────────────────────────
-// Curated or host-provided recommendations (e.g. "Best for Couples", "Family Friendly",
-// "Weekend Getaway", "High Adrenaline").
-
-model ListingRecommendation {
-  id           String                 @id @default(uuid())
-  propertyId   String?
-  stayId       String?
-  experienceId String?
-  transportId  String?
-
-  audience     RecommendationAudience @default(GENERAL)
-  title        String                 // "Recommended for Couples", "Top Pick for Families"
-  reason       String?                @db.Text
-  badge        String?                // "Couples' Choice", "Family Pick", "Adventure Top Rated"
-  sortOrder    Int                    @default(0)
-
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-
-  property   Property?   @relation(fields: [propertyId],   references: [id], onDelete: Cascade)
-  stay       Stay?       @relation(fields: [stayId],       references: [id], onDelete: Cascade)
-  experience Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-  transport  Transport?  @relation(fields: [transportId],  references: [id], onDelete: Cascade)
-
-  @@index([propertyId])
-  @@index([stayId])
-  @@index([experienceId])
-  @@index([transportId])
-  @@index([audience])
-}
-
-// ─── Platform Policies ────────────────────────────────────────────────────────
-
-model Policy {
-  id             String          @id @default(uuid())
-  slug           String          @unique
-  title          String
-  type           PolicyType      @default(OTHER)
-  description    String?
-  isPublished    Boolean         @default(false)
-  currentVersion String          @default("1.0.0")
-  createdById    String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  deletedAt      DateTime?
-
-  createdBy      User?           @relation("CreatedPolicies", fields: [createdById], references: [id], onDelete: SetNull)
-  versions       PolicyVersion[]
-
-  @@index([slug])
-  @@index([type])
-  @@index([isPublished])
-}
-
-model PolicyVersion {
-  id            String    @id @default(uuid())
-  policyId      String
-  version       String
-  content       String    @db.Text
-  summary       String?
-  documentUrl   String?
-  metadata      Json?
-  effectiveDate DateTime  @default(now())
-  createdById   String?
-  createdAt     DateTime  @default(now())
-
-  policy        Policy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  createdBy     User?     @relation("CreatedPolicyVersions", fields: [createdById], references: [id], onDelete: SetNull)
-
-  @@unique([policyId, version])
-  @@index([policyId])
-}
-
-// ─── Test & Sample Media Assets ──────────────────────────────────────────────
-// Stock / sample image URLs stored in DB for seeding, testing APIs,
-// mock listing generation, and demo listing wizards.
-
-model MediaAsset {
-  id        String   @id @default(uuid())
-  url       String   @unique
-  category  String?  @default("GENERAL")
-  caption   String?
-  source    String?  @default("UNSPLASH")
-  createdAt DateTime @default(now())
-
-  @@index([category])
-}
-
-// ─── Host Application & KYC ──────────────────────────────────────────────────
-
-model HostApplication {
-  id             String    @id @default(uuid())
-  userId         String    @unique
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  businessName   String
-  operatingSince String?
-  province       String?
-  town           String?
-  businessEmail  String?
-  businessPhone  String?
-  pacraDocs      Json?
-  ownershipDocs  Json?
-  operationDocs  Json?
-  status         String    @default("pending_review") // "pending_review" | "under_review" | "approved" | "rejected"
-  reviewerNotes  String?
-  reviewedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@index([status])
-  @@index([userId])
-}
-

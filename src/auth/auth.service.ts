@@ -15,6 +15,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 
@@ -28,11 +30,18 @@ export class AuthService {
     private config: ConfigService,
   ) {}
 
+  private generateVerificationCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
   async register(dto: RegisterDto) {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new ConflictException('An account with this email already exists');
 
     const hashed = await bcrypt.hash(dto.password, 10);
+    const verificationCode = this.generateVerificationCode();
+    const verificationCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -40,10 +49,88 @@ export class AuthService {
         name: dto.name,
         phone: dto.phone || null,
         role: 'GUEST',
+        isVerified: false,
+        verificationStatus: 'PENDING',
+        verificationCode,
+        verificationCodeExpiry,
       },
     });
 
-    return { token: this.signToken(user.id, user.email), user: this.sanitize(user) };
+    // Send verification email via Resend to the guest
+    await this.notifications.sendVerificationCode(user.email, user.name, verificationCode);
+
+    return {
+      token: this.signToken(user.id, user.email),
+      user: this.sanitize(user),
+      message: 'Registration successful! A 6-digit verification code has been sent to your email.',
+    };
+  }
+
+  async verifyEmail(dto: VerifyEmailDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      throw new BadRequestException('Invalid email or verification code');
+    }
+
+    if (user.isVerified) {
+      return {
+        success: true,
+        message: 'Email is already verified.',
+        user: this.sanitize(user),
+        token: this.signToken(user.id, user.email),
+      };
+    }
+
+    if (!user.verificationCode || user.verificationCode !== dto.code.trim()) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    if (!user.verificationCodeExpiry || user.verificationCodeExpiry < new Date()) {
+      throw new BadRequestException('Verification code has expired. Please request a new code.');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        verificationStatus: 'VERIFIED',
+        verificationCode: null,
+        verificationCodeExpiry: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Email verified successfully!',
+      token: this.signToken(updatedUser.id, updatedUser.email),
+      user: this.sanitize(updatedUser),
+    };
+  }
+
+  async resendVerificationCode(dto: ResendVerificationDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      return { message: 'If an account exists with this email, a verification code has been sent.' };
+    }
+
+    if (user.isVerified) {
+      return { message: 'This email is already verified.' };
+    }
+
+    const code = this.generateVerificationCode();
+    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationCode: code,
+        verificationCodeExpiry: expiry,
+      },
+    });
+
+    await this.notifications.sendVerificationCode(user.email, user.name, code);
+
+    return { message: 'A new verification code has been sent to your email.' };
   }
 
   async login(dto: LoginDto) {
@@ -95,6 +182,8 @@ export class AuthService {
       password,
       resetToken,
       resetTokenExpiry,
+      verificationCode,
+      verificationCodeExpiry,
       refreshToken,
       deletedAt,
       hostProfile,

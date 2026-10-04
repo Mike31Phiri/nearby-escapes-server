@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { NotificationType } from '@prisma/client';
 
 // ─── Action label map (frontend relies on this) ───────────────────────────────
@@ -25,19 +26,29 @@ const ACTION_LABELS: Record<string, string> = {
 @Injectable()
 export class NotificationsService {
   private transporter: nodemailer.Transporter;
+  private resendClient: Resend | null = null;
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {
+    const resendApiKey =
+      config.get<string>('RESEND_API_KEY') ||
+      (config.get<string>('MAIL_PASS')?.startsWith('re_') ? config.get<string>('MAIL_PASS') : null);
+
+    if (resendApiKey) {
+      this.resendClient = new Resend(resendApiKey);
+      this.logger.log('Resend client initialized ✓');
+    }
+
     this.transporter = nodemailer.createTransport({
-      host:    config.get('MAIL_HOST'),
-      port:    config.get<number>('MAIL_PORT'),
+      host:    config.get('MAIL_HOST') || 'smtp.resend.com',
+      port:    config.get<number>('MAIL_PORT') || 465,
       secure:  true,
       requireTLS: true,
       auth: {
-        user: config.get('MAIL_USER'),
+        user: config.get('MAIL_USER') || 'resend',
         pass: config.get('MAIL_PASS'),
       },
       tls: { rejectUnauthorized: true },
@@ -546,6 +557,14 @@ export class NotificationsService {
   //  Legacy email helpers (kept for backward compat)
   // ────────────────────────────────────────────────────────────────────────────
 
+  async sendVerificationCode(to: string, name: string, code: string) {
+    await this.send(
+      to,
+      `${code} is your Nearby Escapes verification code`,
+      this.verificationCodeTpl(name, code),
+    );
+  }
+
   async sendPasswordReset(to: string, name: string, resetUrl: string) {
     await this.send(to, 'Reset Your Password — Nearby Escapes', this.tpl({
       name,
@@ -624,6 +643,53 @@ export class NotificationsService {
     return this.config.get('FRONTEND_URL') ?? 'http://localhost:3000';
   }
 
+  private verificationCodeTpl(name: string, code: string): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Verify Your Email</title>
+</head>
+<body style="margin:0;padding:0;background:#f9f7f4;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f4;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:100%;">
+      <tr><td style="background:linear-gradient(135deg,#1f1433 0%,#3b2a6b 100%);padding:36px 40px;text-align:center;">
+        <p style="margin:0;color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Nearby Escapes</p>
+        <p style="margin:8px 0 0;color:rgba(255,255,255,0.75);font-size:13px;">Your gateway to Zambia's hidden gems 🇿🇲</p>
+      </td></tr>
+      <tr><td style="padding:40px;">
+        <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1f1433;">Verify Your Email Address</h1>
+        <p style="margin:0 0 16px;color:#555;font-size:15px;line-height:1.5;">Hi <strong>${name}</strong>,</p>
+        <p style="margin:0 0 24px;color:#555;font-size:14px;line-height:1.6;">
+          Thank you for joining Nearby Escapes! To verify your email address and secure your guest account, please enter the 6-digit verification code below:
+        </p>
+        
+        <div style="background:#f4f1fb;border:2px dashed #6b46c1;border-radius:12px;padding:24px;text-align:center;margin:28px 0;">
+          <p style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:#6b46c1;font-weight:700;">Verification Code</p>
+          <div style="font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:800;letter-spacing:10px;color:#1f1433;user-select:all;">
+            ${code}
+          </div>
+          <p style="margin:12px 0 0;font-size:12px;color:#777;">
+            ⏱ This code expires in <strong>15 minutes</strong>
+          </p>
+        </div>
+
+        <p style="margin:24px 0 0;color:#777;font-size:13px;line-height:1.5;">
+          If you didn't create an account with Nearby Escapes, you can safely ignore this email. Someone may have entered your email by mistake.
+        </p>
+      </td></tr>
+      <tr><td style="padding:24px 40px;border-top:1px solid #f0eef9;text-align:center;background:#faf9fc;">
+        <p style="margin:0;color:#888;font-size:12px;">© ${new Date().getFullYear()} Nearby Escapes. All rights reserved.<br>Lusaka, Zambia 🇿🇲</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+  }
+
   private tpl(opts: {
     name:       string;
     heading:    string;
@@ -665,13 +731,40 @@ export class NotificationsService {
       this.config.get('NODE_ENV') !== 'production'
         ? (this.config.get('MAIL_DEV_OVERRIDE') ?? to)
         : to;
+    const from = this.config.get('MAIL_FROM') || 'Nearby Escapes <onboarding@resend.dev>';
+
+    // 1. Try sending via official Resend client if available
+    if (this.resendClient) {
+      try {
+        const { data, error } = await this.resendClient.emails.send({
+          from,
+          to: recipient,
+          subject,
+          html,
+        });
+
+        if (!error && data?.id) {
+          this.logger.log(`Email successfully sent via Resend API to ${recipient} (id: ${data.id})`);
+          return;
+        }
+
+        if (error) {
+          this.logger.warn(`Resend API response error: ${error.message}. Attempting fallback to SMTP transporter.`);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Resend API request exception: ${err.message}. Attempting fallback to SMTP transporter.`);
+      }
+    }
+
+    // 2. Fallback to nodemailer transporter (smtp.resend.com)
     try {
       await this.transporter.sendMail({
-        from: this.config.get('MAIL_FROM'),
+        from,
         to:   recipient,
         subject,
         html,
       });
+      this.logger.log(`Email successfully sent via SMTP transporter to ${recipient}`);
     } catch (err: any) {
       this.logger.error(`Failed to send email to ${recipient}: ${err.message}`);
     }
