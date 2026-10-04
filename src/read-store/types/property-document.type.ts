@@ -60,9 +60,22 @@ export interface ExperienceUnitDoc {
   maxParticipants?: number | null;
   difficultyLevel?: string | null;
   meetingPoint?: string | null;
+  meetingPointAddress?: string | null;
   isActive: boolean;
   timeSlots: string[];
+  slots?: any[];
   inclusions: string[];
+  whatsIncluded?: string[];
+  whatsNotIncluded?: string[];
+  exclusions?: string[];
+  whatToBring?: string[];
+  whatToCarry?: string[];
+  whatNotToBring?: string[];
+  importantInformation?: string[];
+  guidelines?: string[];
+  notSuitableFor?: string[];
+  suitability?: string[];
+  itinerary?: any[];
   tags?: ListingTagDoc[];
   recommendations?: ListingRecommendationDoc[];
 }
@@ -129,6 +142,25 @@ export interface ReadPropertyDocument {
     avatarUrl: string | null;
     superhost?: boolean;
   };
+
+  // Experience-specific top-level convenience fields (for ExperienceDetailPage)
+  meetingPoint?: string | null;
+  meetingPointAddress?: string | null;
+  slots?: any[];
+  timeSlots?: string[];
+  inclusions?: string[];
+  whatsIncluded?: string[];
+  whatsNotIncluded?: string[];
+  exclusions?: string[];
+  whatToBring?: string[];
+  whatToCarry?: string[];
+  whatNotToBring?: string[];
+  importantInformation?: string[];
+  guidelines?: string[];
+  notSuitableFor?: string[];
+  suitability?: string[];
+  itinerary?: any[];
+  experienceDetails?: any;
 
   // Units
   stays: StayUnitDoc[];

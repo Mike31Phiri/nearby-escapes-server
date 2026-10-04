@@ -299,6 +299,14 @@ export class PropertiesService {
       throw new BadRequestException('Cannot add an experience unit to a non-experience property');
     }
 
+    const inclusions = dto.inclusions?.length ? dto.inclusions : dto.whatsIncluded?.length ? dto.whatsIncluded : [];
+    const timeSlots = dto.timeSlots?.length ? dto.timeSlots : dto.slots?.length ? dto.slots : [];
+    const whatsNotIncluded = dto.whatsNotIncluded || dto.exclusions || [];
+    const whatToBring = dto.whatToBring || dto.whatToCarry || [];
+    const whatNotToBring = dto.whatNotToBring || [];
+    const importantInformation = dto.importantInformation || dto.guidelines || [];
+    const notSuitableFor = dto.notSuitableFor || dto.suitability || [];
+
     const exp = await this.prisma.$transaction(async (tx) => {
       const e = await tx.experience.create({
         data: {
@@ -311,13 +319,27 @@ export class PropertiesService {
           maxParticipants: dto.maxParticipants ?? null,
           difficultyLevel: dto.difficultyLevel || null,
           meetingPoint: dto.meetingPoint || null,
+          meetingPointAddress: dto.meetingPointAddress || dto.meetingPoint || null,
+          itinerary: dto.itinerary ? (dto.itinerary as any) : undefined,
+          slots: dto.slots?.length ? (dto.slots as any) : undefined,
+          whatsNotIncluded,
+          whatToBring,
+          whatNotToBring,
+          importantInformation,
+          notSuitableFor,
           isActive: dto.isActive ?? true,
           sortOrder: dto.sortOrder ?? 0,
-          timeSlots: dto.timeSlots?.length
-            ? { createMany: { data: dto.timeSlots.map((slot) => ({ slot })) } }
+          timeSlots: timeSlots.length
+            ? {
+                createMany: {
+                  data: timeSlots.map((ts: any) => ({
+                    slot: typeof ts === 'string' ? ts : ts.timeSlot || ts.label || 'Default Slot',
+                  })),
+                },
+              }
             : undefined,
-          inclusions: dto.inclusions?.length
-            ? { createMany: { data: dto.inclusions.map((item) => ({ item })) } }
+          inclusions: inclusions.length
+            ? { createMany: { data: inclusions.map((item) => ({ item })) } }
             : undefined,
         },
         include: {
@@ -1754,13 +1776,24 @@ export class PropertiesService {
         }
       } else if (propertyType === 'EXPERIENCE') {
         const expDetails = dto.experienceDetails;
+        const meetingPoint = expDetails?.meetingPoint || dto.meetingPoint || fullLocation;
+        const meetingPointAddress = expDetails?.meetingPointAddress || dto.meetingPointAddress || meetingPoint;
+        const whatsIncluded = expDetails?.whatsIncluded || expDetails?.inclusions || dto.whatsIncluded || dto.inclusions || [];
+        const whatsNotIncluded = expDetails?.whatsNotIncluded || expDetails?.exclusions || dto.whatsNotIncluded || dto.exclusions || [];
+        const whatToBring = expDetails?.whatToBring || expDetails?.whatToCarry || dto.whatToBring || dto.whatToCarry || [];
+        const whatNotToBring = expDetails?.whatNotToBring || dto.whatNotToBring || [];
+        const importantInformation = expDetails?.importantInformation || expDetails?.guidelines || dto.importantInformation || dto.guidelines || [];
+        const notSuitableFor = expDetails?.notSuitableFor || expDetails?.suitability || dto.notSuitableFor || dto.suitability || [];
+        const itinerary = expDetails?.itinerary || dto.itinerary || null;
+        const rawSlots = expDetails?.slots || expDetails?.timeSlots || dto.slots || dto.timeSlots || [];
+
         const exp = await tx.experience.create({
           data: {
             propertyId: prop.id,
             name: dto.title,
             description: dto.description,
             price: dto.pricePerUnitNgwee,
-            activityType: expDetails?.activityType || 'Activity',
+            activityType: expDetails?.activityType || expDetails?.subtype || dto.subtype || 'Activity',
             duration: expDetails?.durationMinutes
               ? `${expDetails.durationMinutes} mins`
               : '2 hours',
@@ -1768,36 +1801,44 @@ export class PropertiesService {
             difficultyLevel: expDetails?.difficulty
               ? expDetails.difficulty.charAt(0).toUpperCase() + expDetails.difficulty.slice(1)
               : 'Moderate',
-            meetingPoint: expDetails?.meetingPoint || fullLocation,
+            meetingPoint,
+            meetingPointAddress,
+            itinerary: itinerary as any,
+            slots: rawSlots.length > 0 ? (rawSlots as any) : undefined,
+            whatsNotIncluded,
+            whatToBring,
+            whatNotToBring,
+            importantInformation,
+            notSuitableFor,
             isActive: true,
           },
         });
 
-        if (expDetails?.whatsIncluded && expDetails.whatsIncluded.length > 0) {
+        if (whatsIncluded && whatsIncluded.length > 0) {
           await tx.experienceInclusion.createMany({
-            data: expDetails.whatsIncluded.map((item) => ({
+            data: whatsIncluded.map((item) => ({
               experienceId: exp.id,
               item,
             })),
           });
         }
 
-        if (expDetails?.timeSlots && expDetails.timeSlots.length > 0) {
+        if (rawSlots && rawSlots.length > 0) {
           await tx.experienceTimeSlot.createMany({
-            data: expDetails.timeSlots.map((ts) => ({
+            data: rawSlots.map((ts: any) => ({
               experienceId: exp.id,
-              slot: ts.timeSlot,
+              slot: typeof ts === 'string' ? ts : ts.timeSlot || ts.label || '09:00 AM',
             })),
           });
         }
 
-        if (expDetails?.whatToBring && expDetails.whatToBring.length > 0) {
+        if (whatToBring && whatToBring.length > 0) {
           await tx.listingPolicy.create({
             data: {
               experienceId: exp.id,
               category: 'SAFETY',
               title: 'What to Bring',
-              body: expDetails.whatToBring.join(', '),
+              body: whatToBring.join(', '),
             },
           });
         }

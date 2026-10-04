@@ -125,10 +125,31 @@ export class ExperienceTimeSlotItemDto {
   capacity: number;
 }
 
-export class ExperienceDetailsDto {
-  @ApiProperty({ example: 'Safari & Wildlife' })
+export class ExperienceItineraryItemDto {
+  @ApiProperty({ example: '06:00 AM' })
   @IsString()
-  activityType: string;
+  time: string;
+
+  @ApiProperty({ example: 'Sunrise Departure' })
+  @IsString()
+  title: string;
+
+  @ApiPropertyOptional({ example: 'Departing early morning into the reserve...' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+export class ExperienceDetailsDto {
+  @ApiPropertyOptional({ example: 'Safari & Wildlife' })
+  @IsOptional()
+  @IsString()
+  activityType?: string;
+
+  @ApiPropertyOptional({ example: 'game_drive_safari' })
+  @IsOptional()
+  @IsString()
+  subtype?: string;
 
   @ApiPropertyOptional({ example: 180 })
   @IsOptional()
@@ -145,10 +166,29 @@ export class ExperienceDetailsDto {
   @IsIn(['easy', 'moderate', 'challenging'])
   difficulty?: 'easy' | 'moderate' | 'challenging';
 
-  @ApiProperty({ type: [String], example: ['Professional Guide', 'Bottled Water'] })
+  @ApiPropertyOptional({ type: [String], example: ['Professional Guide', 'Bottled Water'] })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  whatsIncluded: string[];
+  whatsIncluded?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['Professional Guide'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  inclusions?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['Tips', 'Alcoholic drinks'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatsNotIncluded?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['Tips'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  exclusions?: string[];
 
   @ApiPropertyOptional({ type: [String], example: ['Sunscreen', 'Hat'] })
   @IsOptional()
@@ -156,16 +196,58 @@ export class ExperienceDetailsDto {
   @IsString({ each: true })
   whatToBring?: string[];
 
+  @ApiPropertyOptional({ type: [String], example: ['Sunscreen'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatToCarry?: string[];
+
   @ApiPropertyOptional({ type: [String], example: ['Drones'] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   whatNotToBring?: string[];
 
+  @ApiPropertyOptional({ type: [String], example: ['Arrive 15 minutes before departure'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  importantInformation?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['Arrive 15 mins early'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  guidelines?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['Wheelchair users', 'Severe mobility impairments'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  notSuitableFor?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['Wheelchair users'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  suitability?: string[];
+
   @ApiPropertyOptional({ example: 'Livingstone Harbor Gate 2' })
   @IsOptional()
   @IsString()
   meetingPoint?: string;
+
+  @ApiPropertyOptional({ example: 'Lusaka Showgrounds - Main Gate 2' })
+  @IsOptional()
+  @IsString()
+  meetingPointAddress?: string;
+
+  @ApiPropertyOptional({ type: [ExperienceItineraryItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExperienceItineraryItemDto)
+  itinerary?: ExperienceItineraryItemDto[];
 
   @ApiPropertyOptional({ type: [ExperienceTimeSlotItemDto] })
   @IsOptional()
@@ -173,6 +255,13 @@ export class ExperienceDetailsDto {
   @ValidateNested({ each: true })
   @Type(() => ExperienceTimeSlotItemDto)
   timeSlots?: ExperienceTimeSlotItemDto[];
+
+  @ApiPropertyOptional({ type: [ExperienceTimeSlotItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExperienceTimeSlotItemDto)
+  slots?: ExperienceTimeSlotItemDto[];
 }
 
 export class TransportFleetUnitItemDto {
@@ -315,6 +404,113 @@ export class CreateUnifiedListingDto {
   @ApiProperty({ enum: ['flexible', 'moderate', 'strict'], example: 'moderate' })
   @IsIn(['flexible', 'moderate', 'strict'])
   cancellationPolicy: 'flexible' | 'moderate' | 'strict';
+
+  @ApiPropertyOptional({ enum: ['stay', 'experience', 'transport'], example: 'experience' })
+  @IsOptional()
+  @IsIn(['stay', 'experience', 'transport'])
+  type?: 'stay' | 'experience' | 'transport';
+
+  @ApiPropertyOptional({ example: 'game_drive_safari' })
+  @IsOptional()
+  @IsString()
+  subtype?: string;
+
+  @ApiPropertyOptional({ example: 'Livingstone Harbor Gate 2' })
+  @IsOptional()
+  @IsString()
+  meetingPoint?: string;
+
+  @ApiPropertyOptional({ example: 'Lusaka Showgrounds - Main Gate 2' })
+  @IsOptional()
+  @IsString()
+  meetingPointAddress?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatsIncluded?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  inclusions?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatsNotIncluded?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  exclusions?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatToBring?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatToCarry?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  whatNotToBring?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  importantInformation?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  guidelines?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  notSuitableFor?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  suitability?: string[];
+
+  @ApiPropertyOptional({ type: [ExperienceItineraryItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExperienceItineraryItemDto)
+  itinerary?: ExperienceItineraryItemDto[];
+
+  @ApiPropertyOptional({ type: [ExperienceTimeSlotItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExperienceTimeSlotItemDto)
+  slots?: ExperienceTimeSlotItemDto[];
+
+  @ApiPropertyOptional({ type: [ExperienceTimeSlotItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExperienceTimeSlotItemDto)
+  timeSlots?: ExperienceTimeSlotItemDto[];
 
   @ApiPropertyOptional({ type: StayDetailsDto })
   @IsOptional()

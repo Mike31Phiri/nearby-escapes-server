@@ -127,6 +127,14 @@ model Experience {
   maxParticipants Int?
   difficultyLevel String?
   meetingPoint    String?
+  meetingPointAddress String?
+  itinerary       Json?
+  slots           Json?
+  whatsNotIncluded String[]                @default([])
+  whatToBring     String[]                @default([])
+  whatNotToBring  String[]                @default([])
+  importantInformation String[]           @default([])
+  notSuitableFor  String[]                @default([])
   isActive        Boolean                 @default(true)
   sortOrder       Int                     @default(0)
   createdAt       DateTime                @default(now())

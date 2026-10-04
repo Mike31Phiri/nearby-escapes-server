@@ -37,14 +37,64 @@ export class CreateExperienceDto {
   meetingPoint?: string;
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  timeSlots?: string[];
+  @IsString()
+  meetingPointAddress?: string;
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  timeSlots?: any[];
+
+  @IsOptional()
+  @IsArray()
+  slots?: any[];
+
+  @IsOptional()
+  @IsArray()
   inclusions?: string[];
+
+  @IsOptional()
+  @IsArray()
+  whatsIncluded?: string[];
+
+  @IsOptional()
+  @IsArray()
+  whatsNotIncluded?: string[];
+
+  @IsOptional()
+  @IsArray()
+  exclusions?: string[];
+
+  @IsOptional()
+  @IsArray()
+  whatToBring?: string[];
+
+  @IsOptional()
+  @IsArray()
+  whatToCarry?: string[];
+
+  @IsOptional()
+  @IsArray()
+  whatNotToBring?: string[];
+
+  @IsOptional()
+  @IsArray()
+  importantInformation?: string[];
+
+  @IsOptional()
+  @IsArray()
+  guidelines?: string[];
+
+  @IsOptional()
+  @IsArray()
+  notSuitableFor?: string[];
+
+  @IsOptional()
+  @IsArray()
+  suitability?: string[];
+
+  @IsOptional()
+  @IsArray()
+  itinerary?: any[];
 
   @IsOptional()
   @IsBoolean()
