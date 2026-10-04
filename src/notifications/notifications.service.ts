@@ -39,29 +39,27 @@ export class NotificationsService {
       process.env.RESEND_API_KEY ||
       process.env.MAIL_PASS;
     const resendApiKey = rawApiKey?.trim().replace(/^["']|["']$/g, '');
+    const host = (config.get<string>('MAIL_HOST') || 'smtp.gmail.com').trim();
+    const port = Number(config.get('MAIL_PORT')) || 587;
+    const user = (config.get<string>('MAIL_USER') || '').trim();
+    const pass = (config.get<string>('MAIL_PASS') || '').trim().replace(/^["']|["']$/g, '');
 
     if (resendApiKey?.startsWith('re_')) {
       this.resendClient = new Resend(resendApiKey);
       this.logger.log(`Resend client initialized ✓ (${resendApiKey.substring(0, 7)}...)`);
     } else {
-      this.logger.warn(`No valid Resend API key found (expected key starting with 're_').`);
+      this.logger.log(`Using SMTP email transporter (${host}:${port})`);
     }
-
-    const host = (config.get<string>('MAIL_HOST') || 'smtp.resend.com').trim();
-    const port = Number(config.get('MAIL_PORT')) || 465;
-    const user = (config.get<string>('MAIL_USER') || 'resend').trim();
-    const pass = (config.get<string>('MAIL_PASS') || '').trim().replace(/^["']|["']$/g, '');
 
     this.transporter = nodemailer.createTransport({
       host,
       port,
       secure: port === 465,
-      requireTLS: true,
       auth: {
         user,
         pass,
       },
-      tls: { rejectUnauthorized: true },
+      tls: { rejectUnauthorized: false },
     });
 
     this.transporter.verify((err) => {
@@ -742,14 +740,14 @@ export class NotificationsService {
     const mailOverride = this.config.get<string>('MAIL_DEV_OVERRIDE') || process.env.MAIL_DEV_OVERRIDE;
     const isProd = this.config.get<string>('NODE_ENV') === 'production';
 
-    // When using unverified onboarding@resend.dev, Resend ONLY allows sending to the account owner (e.g. mike31phiri@gmail.com).
+    // When using unverified onboarding@resend.dev, Resend ONLY allows sending to the account owner.
     // If sending to any other address with onboarding@resend.dev, Resend will reject with HTTP 403.
-    // If mailOverride is set, route to mailOverride to allow testing without bouncing:
+    // When using Gmail or custom SMTP, emails are sent directly to the recipient!
     let recipient = to;
-    if (mailOverride && (!isProd || isTestDomain)) {
+    if (mailOverride && isTestDomain) {
       if (to.toLowerCase() !== mailOverride.toLowerCase()) {
         this.logger.warn(
-          `[Resend Notice] Using test domain (${from}). Re-routing email intended for "${to}" to verified account email: "${mailOverride}". (To send directly to guests, verify your custom domain in Resend and update MAIL_FROM).`
+          `[Test Sandbox Notice] Sender domain is ${from}. Re-routing email intended for "${to}" to verified email: "${mailOverride}".`
         );
       }
       recipient = mailOverride;
