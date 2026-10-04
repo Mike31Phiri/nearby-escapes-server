@@ -36,33 +36,55 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const existing = await this.usersService.findByEmail(dto.email);
-    if (existing) throw new ConflictException('An account with this email already exists');
-
     const hashed = await bcrypt.hash(dto.password, 10);
     const verificationCode = this.generateVerificationCode();
     const verificationCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        password: hashed,
-        name: dto.name,
-        phone: dto.phone || null,
-        role: 'GUEST',
-        isVerified: false,
-        verificationStatus: 'PENDING',
-        verificationCode,
-        verificationCodeExpiry,
-      },
-    });
+    let user;
+    if (existing) {
+      if (existing.isVerified || existing.verificationStatus === 'VERIFIED') {
+        throw new ConflictException('An account with this email already exists and is verified. Please log in.');
+      }
 
-    // Send verification email via Resend to the guest
+      // User did not complete verification and returned to register again:
+      // Overwrite current info except email, and issue a fresh verification code
+      user = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: dto.name,
+          password: hashed,
+          phone: dto.phone || null,
+          isVerified: false,
+          verificationStatus: 'PENDING',
+          verificationCode,
+          verificationCodeExpiry,
+        },
+      });
+    } else {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          password: hashed,
+          name: dto.name,
+          phone: dto.phone || null,
+          role: 'GUEST',
+          isVerified: false,
+          verificationStatus: 'PENDING',
+          verificationCode,
+          verificationCodeExpiry,
+        },
+      });
+    }
+
+    // Send verification email only upon signing up / re-registering
     await this.notifications.sendVerificationCode(user.email, user.name, verificationCode);
 
     return {
       token: this.signToken(user.id, user.email),
       user: this.sanitize(user),
-      message: 'Registration successful! A 6-digit verification code has been sent to your email.',
+      message: existing
+        ? 'Registration updated! A new 6-digit verification code has been sent to your email.'
+        : 'Registration successful! A 6-digit verification code has been sent to your email.',
     };
   }
 
@@ -140,6 +162,16 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid email or password');
 
+    if (!user.isVerified || user.verificationStatus !== 'VERIFIED') {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        message: 'Please verify your email address before logging in.',
+        error: 'Unauthorized',
+        isVerified: false,
+        email: user.email,
+      });
+    }
+
     return { token: this.signToken(user.id, user.email), user: this.sanitize(user) };
   }
 
@@ -197,6 +229,8 @@ export class AuthService {
       // Frontend expects roles: UserRole[] (array) where hosts retain guest booking capabilities
       roles: isHost ? ['guest', 'host'] : [role],
       role,
+      isVerified: Boolean(user.isVerified),
+      verificationStatus: user.verificationStatus || (user.isVerified ? 'VERIFIED' : 'PENDING'),
       isHostVerified: isHost ? Boolean(hostProfile?.isApproved) : false,
     };
   }
