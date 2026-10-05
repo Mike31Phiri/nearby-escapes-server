@@ -40,6 +40,7 @@ export class AuthService {
     const verificationCode = this.generateVerificationCode();
     const verificationCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
+    
     let user;
     if (existing) {
       if (existing.isVerified || existing.verificationStatus === 'VERIFIED') {
