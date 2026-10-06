@@ -77,6 +77,7 @@ export class HostsService {
         email: true,
         avatar: true,
         role: true,
+        verificationStatus: true,
         hostProfile: {
           select: {
             id: true,
@@ -142,6 +143,7 @@ export class HostsService {
         email: true,
         avatar: true,
         role: true,
+        verificationStatus: true,
         hostProfile: {
           select: {
             id: true,
@@ -152,7 +154,7 @@ export class HostsService {
       },
     });
     if (!user || user.role !== 'HOST') throw new NotFoundException('Host profile not found');
-    if (!user.hostProfile?.isApproved) throw new ForbiddenException('Your host account is pending admin approval');
+    if (!user.hostProfile?.isApproved || user.verificationStatus !== 'VERIFIED') throw new ForbiddenException('Your host account is unverified. You cannot create properties or host anything until your verification status is verified.');
     return {
       id: user.id,
       name: user.name,
