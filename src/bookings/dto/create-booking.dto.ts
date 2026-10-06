@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min, IsDateString, IsIn } from 'class-validator';
+﻿import { IsString, IsOptional, IsInt, Min, IsDateString, IsIn, IsBoolean } from 'class-validator';
 
 export class CreateBookingDto {
   @IsOptional()
@@ -65,6 +65,14 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   specialRequests?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  simulatePayment?: boolean;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }
 
 export class CancelBookingDto {

@@ -12,6 +12,7 @@ import {
   HostCancelReservationResponseDto,
 } from './dto/host-cancel.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -19,17 +20,18 @@ import type { User } from '@prisma/client';
 
 @ApiTags('Bookings')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard)
 @Controller('bookings')
 export class BookingsController {
   constructor(private bookingsService: BookingsService) {}
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Post()
   @ApiOperation({ summary: 'Create a new booking' })
-  create(@CurrentUser() user: User, @Body() dto: CreateBookingDto) {
-    return this.bookingsService.create(user.id, dto);
+  create(@CurrentUser() user: User | null, @Body() dto: CreateBookingDto) {
+    return this.bookingsService.create(user?.id, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('grouped')
   @ApiOperation({
     summary: 'Get user bookings grouped into upcoming, active, recent, and cancelled',
@@ -42,6 +44,7 @@ export class BookingsController {
     return this.bookingsService.getGuestBookingsGrouped(userId || user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('my-trips')
   @ApiOperation({ summary: 'Alias for grouped user bookings (upcoming, active, recents)' })
   @ApiResponse({ status: 200, type: GuestBookingsGroupedDto })
@@ -52,6 +55,7 @@ export class BookingsController {
     return this.bookingsService.getGuestBookingsGrouped(userId || user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   @ApiOperation({ summary: "User's bookings with optional category filtering (upcoming, active, recent, all)" })
   @ApiResponse({ status: 200, type: [GuestBookingItemDto] })
@@ -66,12 +70,14 @@ export class BookingsController {
     return this.bookingsService.getGuestBookings(targetUserId, query);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   @ApiOperation({ summary: 'Single booking detail' })
   findOne(@CurrentUser() user: User, @Param('id') id: string) {
     return this.bookingsService.findOne(id, user.id, user.role);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '4.1 Cancel reservation by booking ID and reopen inventory' })
@@ -87,6 +93,7 @@ export class BookingsController {
     return this.bookingsService.cancel(id, user.id, dto?.reason);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/release')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Release a 10-minute hold early if user leaves checkout' })
