@@ -252,14 +252,32 @@ export class AdminService {
 
   // ─── Disputes ──────────────────────────────────────────────────────────────
 
-  async getDisputes(page = 1, limit = 20) {
+  async getDisputes(page = 1, limit = 20, status?: string) {
+    const where: Prisma.DisputeWhereInput = {};
+    if (status) where.status = status.toUpperCase() as any;
+
     const [disputes, total] = await Promise.all([
       this.prisma.dispute.findMany({
+        where,
         orderBy: { raisedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
+        include: {
+          booking: {
+            select: {
+              id: true,
+              bookingRef: true,
+              status: true,
+              checkIn: true,
+              checkOut: true,
+            },
+          },
+          raisedByUser: {
+            select: { id: true, name: true, email: true, role: true },
+          },
+        },
       }),
-      this.prisma.dispute.count(),
+      this.prisma.dispute.count({ where }),
     ]);
 
     return {

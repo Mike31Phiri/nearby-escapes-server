@@ -3,13 +3,15 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { SecurityLevelGuard } from '../auth/guards/security-level.guard';
+import { SecurityLevel } from '../auth/decorators/security-level.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 
 @ApiTags('Admin')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SecurityLevelGuard)
 @Roles('ADMIN')
 @Controller('admin')
 export class AdminController {
@@ -94,13 +96,19 @@ export class AdminController {
   // ─── Disputes ──────────────────────────────────────────────────────────────
 
   @Get('disputes')
-  @ApiOperation({ summary: 'All disputes' })
-  getDisputes(@Query('page') page?: number, @Query('limit') limit?: number) {
-    return this.adminService.getDisputes(page, limit);
+  @SecurityLevel('CONFIDENTIAL')
+  @ApiOperation({ summary: 'All disputes (Confidential — Admin+)' })
+  getDisputes(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getDisputes(page, limit, status);
   }
 
   @Patch('disputes/:id')
-  @ApiOperation({ summary: 'Update dispute (status, resolution)' })
+  @SecurityLevel('CONFIDENTIAL')
+  @ApiOperation({ summary: 'Update dispute status and resolution (Confidential — Admin+)' })
   updateDispute(
     @Param('id') id: string,
     @Body('status') status: string,

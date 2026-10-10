@@ -20,6 +20,7 @@ import { ReadStoreModule } from './read-store/read-store.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PoliciesModule } from './policies/policies.module';
 import { PopularityModule } from './popularity/popularity.module';
+import { DisputesModule } from './disputes/disputes.module';
 /*The consolidation of all the modules */
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { PopularityModule } from './popularity/popularity.module';
     ReadStoreModule,
     PoliciesModule,
     PopularityModule,
+    DisputesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

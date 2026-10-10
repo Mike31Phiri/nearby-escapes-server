@@ -95,9 +95,9 @@ export class HostController {
   ): Promise<HostCheckInResponseDto> {
     const result = await this.bookingsService.checkIn(bookingId, user.id);
     return {
-      bookingRef: result.booking.bookingRef,
+      bookingRef: result.bookingRef,
       status: 'checked_in',
-      checkInTimestamp: result.booking.checkedInAt || new Date().toISOString(),
+      checkInTimestamp: new Date().toISOString(),
     };
   }
 

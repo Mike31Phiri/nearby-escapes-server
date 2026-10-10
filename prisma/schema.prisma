@@ -37,6 +37,7 @@ model User {
   properties            Property[]
   reviews               Review[]
   wishlist              Wishlist?
+  raisedDisputes        Dispute[]          @relation("RaisedDisputes")
 }
 
 model HostProfile {
@@ -257,6 +258,7 @@ model Booking {
   transport       Transport?    @relation("TransportBookings", fields: [transportId], references: [id])
   payment         Payment?
   payout          Payout?
+  disputes        Dispute[]
 
   @@index([stayId, status, checkIn, checkOut])
   @@index([experienceId, status, date, timeSlot])
@@ -383,6 +385,7 @@ model ActivityLog {
 
 model Dispute {
   id           String          @id @default(uuid())
+  bookingId    String
   bookingRef   String
   propertyName String
   propertyType String
@@ -396,9 +399,17 @@ model Dispute {
   status       DisputeStatus   @default(OPEN)
   priority     DisputePriority @default(MEDIUM)
   raisedBy     String
+  raisedById   String
   raisedAt     DateTime        @default(now())
   resolvedAt   DateTime?
   resolution   String?
+  booking      Booking         @relation(fields: [bookingId], references: [id])
+  raisedByUser User            @relation("RaisedDisputes", fields: [raisedById], references: [id])
+
+  @@index([status])
+  @@index([guestId])
+  @@index([hostId])
+  @@index([bookingId])
 }
 
 model Setting {
