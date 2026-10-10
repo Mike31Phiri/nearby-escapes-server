@@ -226,6 +226,18 @@ export class HostsService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
+    const effectiveOtherDocs = dto.otherDocs ?? dto.operationDocs ?? [];
+    const totalDocs =
+      (dto.pacraDocs?.length ?? 0) +
+      (dto.ownershipDocs?.length ?? 0) +
+      effectiveOtherDocs.length;
+
+    if (totalDocs > 10) {
+      throw new BadRequestException(
+        `Maximum of 10 supporting documents allowed. You submitted ${totalDocs} documents.`,
+      );
+    }
+
     const app = await this.prisma.hostApplication.upsert({
       where: { userId },
       create: {
@@ -238,7 +250,7 @@ export class HostsService {
         businessPhone: dto.businessPhone,
         pacraDocs: dto.pacraDocs ?? undefined,
         ownershipDocs: dto.ownershipDocs ?? undefined,
-        operationDocs: dto.operationDocs ?? undefined,
+        operationDocs: effectiveOtherDocs.length > 0 ? effectiveOtherDocs : undefined,
         status: 'pending_review',
       },
       update: {
@@ -250,7 +262,7 @@ export class HostsService {
         businessPhone: dto.businessPhone,
         pacraDocs: dto.pacraDocs ?? undefined,
         ownershipDocs: dto.ownershipDocs ?? undefined,
-        operationDocs: dto.operationDocs ?? undefined,
+        operationDocs: effectiveOtherDocs.length > 0 ? effectiveOtherDocs : undefined,
         status: 'pending_review',
         reviewerNotes: null,
       },

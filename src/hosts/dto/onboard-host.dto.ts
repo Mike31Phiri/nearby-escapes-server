@@ -46,4 +46,9 @@ export class OnboardHostDto {
   @IsOptional()
   @IsArray()
   operationDocs?: any[];
+
+  @ApiPropertyOptional({ example: [{ id: 'doc_4', name: 'supporting.pdf', url: 'https://...', size: 512 }], description: 'Other supporting business documentation' })
+  @IsOptional()
+  @IsArray()
+  otherDocs?: any[];
 }
