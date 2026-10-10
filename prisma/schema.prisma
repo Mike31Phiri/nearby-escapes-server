@@ -558,6 +558,7 @@ enum Role {
   GUEST
   HOST
   ADMIN
+  SUPER_ADMIN
 }
 
 enum PropertyType {

@@ -8,6 +8,9 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+import { RolesGuard } from './guards/roles.guard';
+import { SecurityLevelGuard } from './guards/security-level.guard';
+
 @Module({
   imports: [
     PassportModule,
@@ -22,8 +25,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, RolesGuard, SecurityLevelGuard],
   controllers: [AuthController],
-  exports: [AuthService, JwtModule, PassportModule],
+  exports: [AuthService, JwtModule, PassportModule, RolesGuard, SecurityLevelGuard],
 })
 export class AuthModule {}

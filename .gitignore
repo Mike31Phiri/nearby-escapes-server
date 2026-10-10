@@ -12,7 +12,7 @@ scratch/
 *.log
 
 # Devpost learn privacy
-/devpost/learner-profile.md
+devpost/
 # Agent & Skills files
 .agents/
 .claude/
