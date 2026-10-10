@@ -105,9 +105,17 @@ export class BookingsController {
   @Roles('HOST', 'ADMIN')
   @Post(':id/check-in')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Host and Admins confirms guest check-in (triggers release of funds to host)' })
+  @ApiOperation({ summary: 'Host initiates guest check-in (triggers guest confirmation request)' })
   checkIn(@CurrentUser() user: User, @Param('id') id: string) {
     return this.bookingsService.checkIn(id, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/confirm-check-in')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Guest confirms check-in (triggers release of funds to host)' })
+  confirmCheckIn(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.bookingsService.confirmCheckIn(id, user.id);
   }
 
   @UseGuards(RolesGuard)

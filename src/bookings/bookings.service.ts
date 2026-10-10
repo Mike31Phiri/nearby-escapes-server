@@ -807,7 +807,58 @@ export class BookingsService {
       throw new BadRequestException('Booking cannot be checked in until payment is confirmed');
     }
 
-    // Trigger release of funds to host:
+    // Step 1: Notify Guest to confirm check-in
+    await this.prisma.notification.create({
+      data: {
+        userId: booking.guestId,
+        type: 'CHECKED_IN',
+        title: 'Check-in Confirmation Requested',
+        description: `Host for ${booking.property.name} requested check-in for booking ${booking.bookingRef}. Please confirm your check-in. If not confirmed, it will auto-confirm in 24 hours.`,
+        actionUrl: `/bookings/${booking.id}/confirm-check-in`,
+        actionLabel: 'Confirm Check-In',
+      },
+    }).catch(() => null);
+
+    return {
+      message: 'Check-in initiated. Waiting for guest confirmation. Auto-confirm scheduled in 24 hours.',
+      bookingId: booking.id,
+      bookingRef: booking.bookingRef,
+      checkInPending: true,
+      autoConfirmHours: 24,
+    };
+  }
+
+  async confirmCheckIn(idOrBookingRef: string, userId?: string, isAutoConfirm: boolean = false) {
+    const booking = await this.prisma.booking.findFirst({
+      where: {
+        OR: [{ id: idOrBookingRef }, { bookingRef: idOrBookingRef }],
+      },
+      include: {
+        property: true,
+        stay: true,
+        experience: true,
+        transport: true,
+        host: { include: { hostProfile: true } },
+        payout: true,
+      },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    if (userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (booking.guestId !== userId && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
+        throw new ForbiddenException('Only the guest of this booking can confirm check-in');
+      }
+    }
+
+    if (booking.checkedInAt || booking.status === 'CHECKED_IN') {
+      return {
+        message: 'This booking has already been checked in',
+        booking: this.formatBooking(booking),
+      };
+    }
+
+    // Step 2: Trigger release of funds to host:
     // 15% platform commission, 85% host net payout
     const commission = Math.round(booking.amount * 0.15);
     const netAmount = booking.amount - commission;
@@ -851,22 +902,24 @@ export class BookingsService {
         userId: booking.hostId,
         type: 'PAYOUT',
         title: 'Payout Released',
-        description: `Check-in confirmed for booking ${booking.bookingRef}. Funds of ZMW ${(netAmount / 100).toFixed(2)} have been released.`,
+        description: `Check-in confirmed for booking ${booking.bookingRef}${isAutoConfirm ? ' (24h auto-confirm)' : ''}. Funds of ZMW ${(netAmount / 100).toFixed(2)} have been released.`,
       },
     }).catch(() => null);
 
-    // Notify Guest about check-in
+    // Notify Guest about check-in completion
     await this.prisma.notification.create({
       data: {
         userId: booking.guestId,
         type: 'CHECKED_IN',
-        title: 'Check-in Confirmed',
-        description: `You are checked in to ${booking.property.name}. Enjoy your stay!`,
+        title: 'Check-in Complete',
+        description: `You are confirmed checked in to ${booking.property.name}. Enjoy your stay!`,
       },
     }).catch(() => null);
 
     return {
-      message: 'Check-in confirmed successfully. Payout has been released to host.',
+      message: isAutoConfirm
+        ? 'Check-in auto-confirmed after 24 hours. Payout released to host.'
+        : 'Check-in confirmed successfully. Payout has been released to host.',
       booking: this.formatBooking(updated),
       payout: {
         id: payout.id,
