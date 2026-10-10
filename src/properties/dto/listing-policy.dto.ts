@@ -23,6 +23,7 @@ export enum ListingPolicyCategoryEnum {
   SMOKING_POLICY = 'SMOKING_POLICY',
   REFUND = 'REFUND',
   DAMAGE = 'DAMAGE',
+  NO_SHOW = 'NO_SHOW',
   OTHER = 'OTHER',
 }
 

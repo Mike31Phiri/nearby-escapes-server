@@ -664,6 +664,7 @@ enum ListingPolicyCategory {
   SMOKING_POLICY
   REFUND
   DAMAGE
+  NO_SHOW
   OTHER
 }
 
