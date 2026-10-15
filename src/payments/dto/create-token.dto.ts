@@ -1,4 +1,10 @@
-import { IsString, IsInt, IsOptional, ValidateNested, IsEmail } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsOptional,
+  ValidateNested,
+  IsEmail,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CustomerDto {

@@ -1,9 +1,23 @@
 import { UpdatePropertyPoliciesDto } from '../policies/dto/policy.dto';
 import {
-  Body, Controller, Delete, Get, Param, Patch, Post, Put,
-  Query, UseGuards, UseInterceptors,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { ReadStoreService } from '../read-store/read-store.service';
 import { PropertySyncInterceptor } from '../read-store/property-sync.interceptor';
@@ -14,10 +28,21 @@ import {
   UpdatePropertyPricingResponseDto,
 } from './dto/update-property.dto';
 import { CreateStayDto, UpdateStayDto } from './dto/create-stay.dto';
-import { CreateExperienceDto, UpdateExperienceDto } from './dto/create-experience.dto';
-import { CreateTransportDto, UpdateTransportDto } from './dto/create-transport.dto';
+import {
+  CreateExperienceDto,
+  UpdateExperienceDto,
+} from './dto/create-experience.dto';
+import {
+  CreateTransportDto,
+  UpdateTransportDto,
+} from './dto/create-transport.dto';
 import { PropertiesQueryDto } from './dto/properties-query.dto';
-import { AddImagesDto, RemoveImageDto, AddAmenityDto, AddRuleDto } from './dto/property-extras.dto';
+import {
+  AddImagesDto,
+  RemoveImageDto,
+  AddAmenityDto,
+  AddRuleDto,
+} from './dto/property-extras.dto';
 import {
   CreateListingPolicyDto,
   UpdateListingPolicyDto,
@@ -30,7 +55,11 @@ import {
   SetListingRecommendationsDto,
   ListingFilterQueryDto,
 } from './dto/listing-tag-recommendation.dto';
-import { AdjustInventoryDto, UpdateListingStatusDto, UpdateListingStatusResponseDto } from './dto/create-listing-unified.dto';
+import {
+  AdjustInventoryDto,
+  UpdateListingStatusDto,
+  UpdateListingStatusResponseDto,
+} from './dto/create-listing-unified.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -53,46 +82,66 @@ export class PropertiesController {
   // ── READ PATH (Redis + Elasticsearch) ──────────────────────────────────────
 
   @Get()
-  @ApiOperation({ summary: 'Search and filter properties — served from Elasticsearch' })
+  @ApiOperation({
+    summary: 'Search and filter properties — served from Elasticsearch',
+  })
   findAll(@Query() query: PropertiesQueryDto) {
     return this.readStore.searchProperties(query);
   }
 
   @Get('popular/stays')
-  @ApiOperation({ summary: 'Top 10 popular stays (Redis cached, midnight 24h cron)' })
+  @ApiOperation({
+    summary: 'Top 10 popular stays (Redis cached, midnight 24h cron)',
+  })
   getPopularStays() {
     return this.popularityService.getPopularStays();
   }
 
   @Get('popular/experiences')
-  @ApiOperation({ summary: 'Top 10 popular experiences (Redis cached, midnight 24h cron)' })
+  @ApiOperation({
+    summary: 'Top 10 popular experiences (Redis cached, midnight 24h cron)',
+  })
   getPopularExperiences() {
     return this.popularityService.getPopularExperiences();
   }
 
   @Get('tags/available')
-  @ApiOperation({ summary: 'Get all distinct tags grouped by category for filter pills and chips' })
+  @ApiOperation({
+    summary:
+      'Get all distinct tags grouped by category for filter pills and chips',
+  })
   getAvailableTags() {
     return this.propertiesService.getAllAvailableTags();
   }
 
   @Get('discover')
-  @ApiOperation({ summary: 'Filter and discover properties using tags, category, amenities, activity, trip type, or recommendations' })
+  @ApiOperation({
+    summary:
+      'Filter and discover properties using tags, category, amenities, activity, trip type, or recommendations',
+  })
   filterProperties(@Query() query: ListingFilterQueryDto) {
     return this.propertiesService.filterByTags(query);
   }
 
   @Get('sample-images')
-  @ApiOperation({ summary: 'Get sample/stock image URLs stored in DB for API testing and mock listing creation' })
+  @ApiOperation({
+    summary:
+      'Get sample/stock image URLs stored in DB for API testing and mock listing creation',
+  })
   getSampleImages(
     @Query('category') category?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.propertiesService.getSampleImages(category, limit ? parseInt(limit, 10) : undefined);
+    return this.propertiesService.getSampleImages(
+      category,
+      limit ? parseInt(limit, 10) : undefined,
+    );
   }
 
   @Get('units/:unitType/:unitId/tags')
-  @ApiOperation({ summary: 'Get tags for a specific Stay, Experience, or Transport unit' })
+  @ApiOperation({
+    summary: 'Get tags for a specific Stay, Experience, or Transport unit',
+  })
   getUnitTags(
     @Param('unitType') unitType: 'stay' | 'experience' | 'transport',
     @Param('unitId') unitId: string,
@@ -101,7 +150,10 @@ export class PropertiesController {
   }
 
   @Get('units/:unitType/:unitId/recommendations')
-  @ApiOperation({ summary: 'Get recommendations for a specific Stay, Experience, or Transport unit' })
+  @ApiOperation({
+    summary:
+      'Get recommendations for a specific Stay, Experience, or Transport unit',
+  })
   getUnitRecommendations(
     @Param('unitType') unitType: 'stay' | 'experience' | 'transport',
     @Param('unitId') unitId: string,
@@ -112,7 +164,9 @@ export class PropertiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Get('drafts')
-  @ApiOperation({ summary: 'Get all draft listings for the authenticated host' })
+  @ApiOperation({
+    summary: 'Get all draft listings for the authenticated host',
+  })
   @ApiBearerAuth('access-token')
   async getMyDrafts(@CurrentUser() user: User) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
@@ -122,7 +176,10 @@ export class PropertiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Get('drafts/:id')
-  @ApiOperation({ summary: 'Get a specific draft listing for the authenticated host (wizard resume)' })
+  @ApiOperation({
+    summary:
+      'Get a specific draft listing for the authenticated host (wizard resume)',
+  })
   @ApiBearerAuth('access-token')
   async getMyDraftById(@CurrentUser() user: User, @Param('id') id: string) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
@@ -132,7 +189,10 @@ export class PropertiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Get('my-properties')
-  @ApiOperation({ summary: 'All properties owned by the authenticated host (can filter ?status=ACTIVE or DRAFT)' })
+  @ApiOperation({
+    summary:
+      'All properties owned by the authenticated host (can filter ?status=ACTIVE or DRAFT)',
+  })
   @ApiBearerAuth('access-token')
   async getMyProperties(
     @CurrentUser() user: User,
@@ -153,13 +213,18 @@ export class PropertiesController {
   }
 
   @Get('host/:hostId')
-  @ApiOperation({ summary: 'Public listings for a host profile (GUESTS ONLY — strictly ACTIVE listings)' })
+  @ApiOperation({
+    summary:
+      'Public listings for a host profile (GUESTS ONLY — strictly ACTIVE listings)',
+  })
   findByHost(@Param('hostId') hostId: string) {
     return this.propertiesService.findByHost(hostId, PropertyStatus.ACTIVE);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Single property detail (with all units) — served from Redis' })
+  @ApiOperation({
+    summary: 'Single property detail (with all units) — served from Redis',
+  })
   findOne(@Param('id') id: string) {
     return this.readStore.getPropertyById(id);
   }
@@ -195,7 +260,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Update property master entity' })
   @ApiBearerAuth('access-token')
-  async update(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: UpdatePropertyDto) {
+  async update(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdatePropertyDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.update(id, host.id, dto);
   }
@@ -203,7 +272,9 @@ export class PropertiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Patch(':id/draft')
-  @ApiOperation({ summary: 'Update an existing draft listing (Save & Exit step)' })
+  @ApiOperation({
+    summary: 'Update an existing draft listing (Save & Exit step)',
+  })
   @ApiBearerAuth('access-token')
   async updateDraft(
     @CurrentUser() user: User,
@@ -218,7 +289,10 @@ export class PropertiesController {
   @Roles('HOST')
   @Patch(':id/status')
   @UseInterceptors(PropertySyncInterceptor)
-  @ApiOperation({ summary: 'Update property status (active, draft, paused, archived, inactive)' })
+  @ApiOperation({
+    summary:
+      'Update property status (active, draft, paused, archived, inactive)',
+  })
   @ApiResponse({ status: 200, type: UpdateListingStatusResponseDto })
   @ApiBearerAuth('access-token')
   async updateStatus(
@@ -234,7 +308,9 @@ export class PropertiesController {
   @Roles('HOST')
   @Patch(':id/inventory')
   @UseInterceptors(PropertySyncInterceptor)
-  @ApiOperation({ summary: 'Adjust property inventory count (increase / decrease / set)' })
+  @ApiOperation({
+    summary: 'Adjust property inventory count (increase / decrease / set)',
+  })
   @ApiBearerAuth('access-token')
   async adjustInventory(
     @CurrentUser() user: User,
@@ -249,7 +325,10 @@ export class PropertiesController {
   @Roles('HOST')
   @Patch(':id/pricing')
   @UseInterceptors(PropertySyncInterceptor)
-  @ApiOperation({ summary: 'Update master property pricing table (persists historical bookings)' })
+  @ApiOperation({
+    summary:
+      'Update master property pricing table (persists historical bookings)',
+  })
   @ApiBearerAuth('access-token')
   async updatePricing(
     @CurrentUser() user: User,
@@ -264,7 +343,9 @@ export class PropertiesController {
   @Roles('HOST')
   @Put(':id/wizard/step/:step')
   @UseInterceptors(PropertySyncInterceptor)
-  @ApiOperation({ summary: 'Save stage data when host clicks Next in listing wizard' })
+  @ApiOperation({
+    summary: 'Save stage data when host clicks Next in listing wizard',
+  })
   @ApiBearerAuth('access-token')
   async saveWizardStep(
     @CurrentUser() user: User,
@@ -273,19 +354,23 @@ export class PropertiesController {
     @Body() payload: any,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.saveWizardStep(id, host.id, parseInt(step, 10), payload);
+    return this.propertiesService.saveWizardStep(
+      id,
+      host.id,
+      parseInt(step, 10),
+      payload,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Post(':id/publish')
   @UseInterceptors(PropertySyncInterceptor)
-  @ApiOperation({ summary: 'Publish a draft listing (validates completeness and activates)' })
+  @ApiOperation({
+    summary: 'Publish a draft listing (validates completeness and activates)',
+  })
   @ApiBearerAuth('access-token')
-  async publish(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ) {
+  async publish(@CurrentUser() user: User, @Param('id') id: string) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.publishListing(id, host.id);
   }
@@ -315,7 +400,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Add a room/chalet/unit to a STAY property' })
   @ApiBearerAuth('access-token')
-  async addStay(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: CreateStayDto) {
+  async addStay(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: CreateStayDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.addStay(id, host.id, dto);
   }
@@ -365,7 +454,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Add a tour/package to an EXPERIENCE property' })
   @ApiBearerAuth('access-token')
-  async addExperience(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: CreateExperienceDto) {
+  async addExperience(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: CreateExperienceDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.addExperience(id, host.id, dto);
   }
@@ -383,7 +476,12 @@ export class PropertiesController {
     @Body() dto: UpdateExperienceDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.updateExperience(id, experienceId, host.id, dto);
+    return this.propertiesService.updateExperience(
+      id,
+      experienceId,
+      host.id,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -415,7 +513,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Add a route to a TRANSPORT property' })
   @ApiBearerAuth('access-token')
-  async addTransport(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: CreateTransportDto) {
+  async addTransport(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: CreateTransportDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.addTransport(id, host.id, dto);
   }
@@ -433,7 +535,12 @@ export class PropertiesController {
     @Body() dto: UpdateTransportDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.updateTransport(id, transportId, host.id, dto);
+    return this.propertiesService.updateTransport(
+      id,
+      transportId,
+      host.id,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -459,7 +566,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Add images to property' })
   @ApiBearerAuth('access-token')
-  async addImages(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: AddImagesDto) {
+  async addImages(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: AddImagesDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.addImages(id, host.id, dto.images);
   }
@@ -470,7 +581,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Remove image from property' })
   @ApiBearerAuth('access-token')
-  async removeImage(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: RemoveImageDto) {
+  async removeImage(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: RemoveImageDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.removeImage(id, host.id, dto.imageUrl);
   }
@@ -481,7 +596,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Add dynamic amenity to property' })
   @ApiBearerAuth('access-token')
-  async addAmenity(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: AddAmenityDto) {
+  async addAmenity(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: AddAmenityDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.addAmenity(id, host.id, dto.name, dto.icon);
   }
@@ -492,7 +611,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Remove amenity from property' })
   @ApiBearerAuth('access-token')
-  async removeAmenity(@CurrentUser() user: User, @Param('id') id: string, @Param('amenityId') amenityId: string) {
+  async removeAmenity(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('amenityId') amenityId: string,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.removeAmenity(id, host.id, amenityId);
   }
@@ -503,7 +626,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Add rule to property' })
   @ApiBearerAuth('access-token')
-  async addRule(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: AddRuleDto) {
+  async addRule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: AddRuleDto,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.addRule(id, host.id, dto.rule);
   }
@@ -514,7 +641,11 @@ export class PropertiesController {
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Remove rule from property' })
   @ApiBearerAuth('access-token')
-  async removeRule(@CurrentUser() user: User, @Param('id') id: string, @Param('ruleId') ruleId: string) {
+  async removeRule(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('ruleId') ruleId: string,
+  ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.removeRule(id, host.id, ruleId);
   }
@@ -542,13 +673,20 @@ export class PropertiesController {
     @Body() dto: CreateListingPolicyDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.addListingPolicy('stay', stayId, host.id, dto);
+    return this.propertiesService.addListingPolicy(
+      'stay',
+      stayId,
+      host.id,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Put(':id/stays/:stayId/policies')
-  @ApiOperation({ summary: 'Bulk-replace all policies for a stay unit (PUT = full replace)' })
+  @ApiOperation({
+    summary: 'Bulk-replace all policies for a stay unit (PUT = full replace)',
+  })
   @ApiBearerAuth('access-token')
   async setStayPolicies(
     @CurrentUser() user: User,
@@ -556,7 +694,12 @@ export class PropertiesController {
     @Body() dto: SetListingPoliciesDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.setListingPolicies('stay', stayId, host.id, dto);
+    return this.propertiesService.setListingPolicies(
+      'stay',
+      stayId,
+      host.id,
+      dto,
+    );
   }
 
   // ─ EXPERIENCES policies ─
@@ -564,7 +707,10 @@ export class PropertiesController {
   @Get(':id/experiences/:experienceId/policies')
   @ApiOperation({ summary: 'Get all policies for an experience unit (public)' })
   getExperiencePolicies(@Param('experienceId') experienceId: string) {
-    return this.propertiesService.getListingPolicies('experience', experienceId);
+    return this.propertiesService.getListingPolicies(
+      'experience',
+      experienceId,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -578,13 +724,21 @@ export class PropertiesController {
     @Body() dto: CreateListingPolicyDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.addListingPolicy('experience', experienceId, host.id, dto);
+    return this.propertiesService.addListingPolicy(
+      'experience',
+      experienceId,
+      host.id,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Put(':id/experiences/:experienceId/policies')
-  @ApiOperation({ summary: 'Bulk-replace all policies for an experience unit (PUT = full replace)' })
+  @ApiOperation({
+    summary:
+      'Bulk-replace all policies for an experience unit (PUT = full replace)',
+  })
   @ApiBearerAuth('access-token')
   async setExperiencePolicies(
     @CurrentUser() user: User,
@@ -592,7 +746,12 @@ export class PropertiesController {
     @Body() dto: SetListingPoliciesDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.setListingPolicies('experience', experienceId, host.id, dto);
+    return this.propertiesService.setListingPolicies(
+      'experience',
+      experienceId,
+      host.id,
+      dto,
+    );
   }
 
   // ─ TRANSPORT policies ─
@@ -614,13 +773,21 @@ export class PropertiesController {
     @Body() dto: CreateListingPolicyDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.addListingPolicy('transport', transportId, host.id, dto);
+    return this.propertiesService.addListingPolicy(
+      'transport',
+      transportId,
+      host.id,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Put(':id/transport/:transportId/policies')
-  @ApiOperation({ summary: 'Bulk-replace all policies for a transport unit (PUT = full replace)' })
+  @ApiOperation({
+    summary:
+      'Bulk-replace all policies for a transport unit (PUT = full replace)',
+  })
   @ApiBearerAuth('access-token')
   async setTransportPolicies(
     @CurrentUser() user: User,
@@ -628,7 +795,12 @@ export class PropertiesController {
     @Body() dto: SetListingPoliciesDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.setListingPolicies('transport', transportId, host.id, dto);
+    return this.propertiesService.setListingPolicies(
+      'transport',
+      transportId,
+      host.id,
+      dto,
+    );
   }
 
   // ─ Shared single-policy edit/delete (works for all unit types) ─
@@ -695,10 +867,7 @@ export class PropertiesController {
   @Delete('tags/:tagId')
   @ApiOperation({ summary: 'Delete a tag' })
   @ApiBearerAuth('access-token')
-  async removeTag(
-    @CurrentUser() user: User,
-    @Param('tagId') tagId: string,
-  ) {
+  async removeTag(@CurrentUser() user: User, @Param('tagId') tagId: string) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.removeTag(tagId, host.id);
   }
@@ -714,7 +883,12 @@ export class PropertiesController {
     @Body() dto: CreateListingRecommendationDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.addRecommendation('property', id, host.id, dto);
+    return this.propertiesService.addRecommendation(
+      'property',
+      id,
+      host.id,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -728,7 +902,12 @@ export class PropertiesController {
     @Body() dto: SetListingRecommendationsDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.setRecommendations('property', id, host.id, dto.recommendations);
+    return this.propertiesService.setRecommendations(
+      'property',
+      id,
+      host.id,
+      dto.recommendations,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -747,7 +926,10 @@ export class PropertiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('HOST')
   @Put('units/:unitType/:unitId/tags')
-  @ApiOperation({ summary: 'Bulk replace tags on a specific unit (stay, experience, or transport)' })
+  @ApiOperation({
+    summary:
+      'Bulk replace tags on a specific unit (stay, experience, or transport)',
+  })
   @ApiBearerAuth('access-token')
   async setUnitTags(
     @CurrentUser() user: User,
@@ -771,7 +953,12 @@ export class PropertiesController {
     @Body() dto: SetListingRecommendationsDto,
   ) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
-    return this.propertiesService.setRecommendations(unitType, unitId, host.id, dto.recommendations);
+    return this.propertiesService.setRecommendations(
+      unitType,
+      unitId,
+      host.id,
+      dto.recommendations,
+    );
   }
 
   @Get(':id/policies')
@@ -793,5 +980,4 @@ export class PropertiesController {
     const host = await this.hostsService.findApprovedByUserId(user.id);
     return this.propertiesService.updatePropertyPolicies(id, host.id, dto);
   }
-
 }

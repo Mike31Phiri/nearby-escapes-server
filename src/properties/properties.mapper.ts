@@ -22,6 +22,7 @@ export const fullInclude = {
       policies: { orderBy: { sortOrder: 'asc' as const } },
       tags: { orderBy: { createdAt: 'asc' as const } },
       recommendations: { orderBy: { sortOrder: 'asc' as const } },
+      images: { orderBy: { sortOrder: 'asc' as const } },
     },
   },
   experiences: {
@@ -33,6 +34,7 @@ export const fullInclude = {
       policies: { orderBy: { sortOrder: 'asc' as const } },
       tags: { orderBy: { createdAt: 'asc' as const } },
       recommendations: { orderBy: { sortOrder: 'asc' as const } },
+      images: { orderBy: { sortOrder: 'asc' as const } },
     },
   },
   transports: {
@@ -42,6 +44,7 @@ export const fullInclude = {
       policies: { orderBy: { sortOrder: 'asc' as const } },
       tags: { orderBy: { createdAt: 'asc' as const } },
       recommendations: { orderBy: { sortOrder: 'asc' as const } },
+      images: { orderBy: { sortOrder: 'asc' as const } },
     },
   },
   images: { orderBy: { sortOrder: 'asc' as const } },
@@ -144,6 +147,11 @@ export function formatProperty(property: any) {
       checkOutBefore: s.checkOutBefore,
       cancellationPolicy: s.cancellationPolicy?.toLowerCase() || null,
       isActive: s.isActive,
+      images: (s.images || []).map((img: any) => ({
+        url: img.url,
+        sortOrder: img.sortOrder,
+        altText: img.altText || null,
+      })),
       policies: s.policies || [],
       tags: (s.tags || []).map((t: any) => ({
         id: t.id,
@@ -174,6 +182,11 @@ export function formatProperty(property: any) {
       difficultyLevel: e.difficultyLevel,
       meetingPoint: e.meetingPoint,
       isActive: e.isActive,
+      images: (e.images || []).map((img: any) => ({
+        url: img.url,
+        sortOrder: img.sortOrder,
+        altText: img.altText || null,
+      })),
       timeSlots: (e.timeSlots || []).map((ts: any) => ts.slot),
       inclusions: (e.inclusions || []).map((i: any) => i.item),
       policies: e.policies || [],
@@ -209,6 +222,11 @@ export function formatProperty(property: any) {
           : 'K0.00',
       schedule: t.schedule,
       isActive: t.isActive,
+      images: (t.images || []).map((img: any) => ({
+        url: img.url,
+        sortOrder: img.sortOrder,
+        altText: img.altText || null,
+      })),
       policies: t.policies || [],
       tags: (t.tags || []).map((tag: any) => ({
         id: tag.id,
