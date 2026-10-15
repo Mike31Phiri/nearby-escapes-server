@@ -4,7 +4,9 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ReadStoreService } from '../read-store/read-store.service';
@@ -15,7 +17,11 @@ import {
   GetGuestBookingsQueryDto,
 } from './dto/guest-bookings.dto';
 import { HostCancelReservationResponseDto } from './dto/host-cancel.dto';
-import { BookingStatus, CancellationPolicy } from '@prisma/client';
+import {
+  BookingStatus,
+  CancellationPolicy,
+  PropertyStatus,
+} from '@prisma/client';
 
 @Injectable()
 export class BookingsService {
@@ -25,7 +31,11 @@ export class BookingsService {
     private readStore: ReadStoreService,
   ) {}
 
-  private formatDateOnly(d: Date | string | null | undefined): string | undefined {
+  private readonly logger = new Logger(BookingsService.name);
+
+  private formatDateOnly(
+    d: Date | string | null | undefined,
+  ): string | undefined {
     if (!d) return undefined;
     const dateObj = typeof d === 'string' ? new Date(d) : d;
     if (isNaN(dateObj.getTime())) return undefined;
@@ -40,7 +50,10 @@ export class BookingsService {
       | 'transport';
     const checkInDate = this.formatDateOnly(b.stayBooking?.checkIn) || null;
     const checkOutDate = this.formatDateOnly(b.stayBooking?.checkOut) || null;
-    const date = this.formatDateOnly(b.experienceBooking?.date) || this.formatDateOnly(b.transportBooking?.date) || null;
+    const date =
+      this.formatDateOnly(b.experienceBooking?.date) ||
+      this.formatDateOnly(b.transportBooking?.date) ||
+      null;
 
     let category: 'upcoming' | 'active' | 'recent' | 'cancelled' = 'upcoming';
     if (b.status === 'CANCELLED' || b.status === 'EXPIRED') {
@@ -72,7 +85,11 @@ export class BookingsService {
 
     let nightsCount: number | undefined = undefined;
     let stayProgress: string | undefined = undefined;
-    if (vertical === 'stay' && b.stayBooking?.checkIn && b.stayBooking?.checkOut) {
+    if (
+      vertical === 'stay' &&
+      b.stayBooking?.checkIn &&
+      b.stayBooking?.checkOut
+    ) {
       const checkInTime = new Date(b.stayBooking.checkIn).getTime();
       const checkOutTime = new Date(b.stayBooking.checkOut).getTime();
       nightsCount = Math.max(
@@ -81,8 +98,13 @@ export class BookingsService {
       );
       if (category === 'active') {
         const todayTime = new Date(todayStr).getTime();
-        const elapsedDays = Math.floor((todayTime - checkInTime) / (1000 * 60 * 60 * 24));
-        const currentNight = Math.min(nightsCount, Math.max(1, elapsedDays + 1));
+        const elapsedDays = Math.floor(
+          (todayTime - checkInTime) / (1000 * 60 * 60 * 24),
+        );
+        const currentNight = Math.min(
+          nightsCount,
+          Math.max(1, elapsedDays + 1),
+        );
         stayProgress = `Night ${currentNight} of ${nightsCount}`;
       }
     }
@@ -99,7 +121,7 @@ export class BookingsService {
       bookingRef: b.bookingRef,
       listingId: b.propertyId,
       listingTitle: property?.name || 'Listing',
-      listingImage: (property as any)?.images?.[0]?.url || '',
+      listingImage: property?.images?.[0]?.url || '',
       location: property?.location || '',
       vertical,
       status: mappedStatus,
@@ -110,26 +132,44 @@ export class BookingsService {
       timeSlot: b.experienceBooking?.experienceSlotId || null,
       nightsCount,
       stayProgress,
-      guestsCount: b.stayBooking?.guests ?? b.experienceBooking?.guests ?? (b.transportBooking as any)?.seats ?? 1,
+      guestsCount:
+        b.stayBooking?.guests ??
+        b.experienceBooking?.guests ??
+        b.transportBooking?.seats ??
+        1,
       totalNgwee: b.amount,
       totalFormatted: `K${(b.amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      currency: (b.currency === 'USD' ? 'USD' : 'ZMW') as 'ZMW' | 'USD',
+      currency: b.currency === 'USD' ? 'USD' : 'ZMW',
       paymentStatus:
-        b.payment?.status?.toLowerCase() || b.paymentStatus?.toLowerCase() || 'unpaid',
-      hostName: (property?.host as any)?.hostProfile?.businessName || property?.host?.name || 'Host',
+        b.payment?.status?.toLowerCase() ||
+        b.paymentStatus?.toLowerCase() ||
+        'unpaid',
+      hostName:
+        property?.host?.hostProfile?.businessName ||
+        property?.host?.name ||
+        'Host',
       hostPhone: property?.host?.phone || undefined,
       createdAt: b.createdAt.toISOString(),
     };
   }
 
-  async getGuestBookingsGrouped(userId: string): Promise<GuestBookingsGroupedDto> {
+  async getGuestBookingsGrouped(
+    userId: string,
+  ): Promise<GuestBookingsGroupedDto> {
     const bookings = await this.prisma.booking.findMany({
       where: { guestId: userId },
       include: {
         property: {
           include: {
             images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-            host: { select: { id: true, name: true, phone: true, hostProfile: { select: { businessName: true } } } },
+            host: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                hostProfile: { select: { businessName: true } },
+              },
+            },
           },
         },
         payment: true,
@@ -182,14 +222,19 @@ export class BookingsService {
     } else if (query.category === 'cancelled') {
       list = grouped.cancelled;
     } else {
-      list = [...grouped.active, ...grouped.upcoming, ...grouped.recent, ...grouped.cancelled];
+      list = [
+        ...grouped.active,
+        ...grouped.upcoming,
+        ...grouped.recent,
+        ...grouped.cancelled,
+      ];
     }
 
     const skip = (page - 1) * limit;
     return list.slice(skip, skip + limit);
   }
 
-﻿  async create(userId: string | undefined, dto: CreateBookingDto) {
+  async create(userId: string | undefined, dto: CreateBookingDto) {
     const propertyId = dto.propertyId || dto.listingId;
     if (!propertyId) {
       throw new BadRequestException('propertyId (or listingId) is required');
@@ -198,7 +243,14 @@ export class BookingsService {
     let property = await this.prisma.property.findUnique({
       where: { id: propertyId },
       include: {
-        host: { select: { id: true, name: true, email: true, hostProfile: { select: { businessName: true } } } },
+        host: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            hostProfile: { select: { businessName: true } },
+          },
+        },
         stays: { where: { deletedAt: null } },
         experiences: { where: { deletedAt: null } },
         transports: { where: { deletedAt: null } },
@@ -210,13 +262,22 @@ export class BookingsService {
         where: {
           OR: [
             { name: { contains: propertyId, mode: 'insensitive' } },
-            ...(dto.listingType ? [{ type: dto.listingType.toUpperCase() as any }] : []),
+            ...(dto.listingType
+              ? [{ type: dto.listingType.toUpperCase() as any }]
+              : []),
           ],
           status: 'ACTIVE',
           deletedAt: null,
         },
         include: {
-          host: { select: { id: true, name: true, email: true, hostProfile: { select: { businessName: true } } } },
+          host: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              hostProfile: { select: { businessName: true } },
+            },
+          },
           stays: { where: { deletedAt: null } },
           experiences: { where: { deletedAt: null } },
           transports: { where: { deletedAt: null } },
@@ -226,7 +287,14 @@ export class BookingsService {
         property = await this.prisma.property.findFirst({
           where: { status: 'ACTIVE', deletedAt: null },
           include: {
-            host: { select: { id: true, name: true, email: true, hostProfile: { select: { businessName: true } } } },
+            host: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                hostProfile: { select: { businessName: true } },
+              },
+            },
             stays: { where: { deletedAt: null } },
             experiences: { where: { deletedAt: null } },
             transports: { where: { deletedAt: null } },
@@ -242,9 +310,13 @@ export class BookingsService {
 
     // Resolve guest user
     let guestUserId = userId;
-    let guestUser = guestUserId ? await this.prisma.user.findUnique({ where: { id: guestUserId } }) : null;
+    let guestUser = guestUserId
+      ? await this.prisma.user.findUnique({ where: { id: guestUserId } })
+      : null;
     if (!guestUser) {
-      const email = (dto.customerEmail || 'guest@nearbyescapes.com').toLowerCase().trim();
+      const email = (dto.customerEmail || 'guest@nearbyescapes.com')
+        .toLowerCase()
+        .trim();
       guestUser = await this.prisma.user.findUnique({ where: { email } });
       if (!guestUser) {
         guestUser = await this.prisma.user.create({
@@ -267,7 +339,10 @@ export class BookingsService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
 
-    const isSimulated = dto.simulatePayment === true || dto.paymentMethod === 'SIMULATED' || process.env.SIMULATE_PAYMENTS === 'true';
+    const isSimulated =
+      dto.simulatePayment === true ||
+      dto.paymentMethod === 'SIMULATED' ||
+      process.env.SIMULATE_PAYMENTS === 'true';
     const status: BookingStatus = isSimulated ? 'CONFIRMED' : 'PENDING';
     const paymentStatus = isSimulated ? 'PAID' : 'UNPAID';
     const finalExpiresAt = isSimulated ? null : expiresAt;
@@ -286,13 +361,17 @@ export class BookingsService {
       unitPrice = stay ? stay.rate : 120000;
 
       if (!dto.checkIn || !dto.checkOut) {
-        throw new BadRequestException('checkIn and checkOut dates are required for stays');
+        throw new BadRequestException(
+          'checkIn and checkOut dates are required for stays',
+        );
       }
 
       const checkInDate = new Date(dto.checkIn);
       const checkOutDate = new Date(dto.checkOut);
       if (checkInDate >= checkOutDate) {
-        throw new BadRequestException('checkOut date must be after checkIn date');
+        throw new BadRequestException(
+          'checkOut date must be after checkIn date',
+        );
       }
 
       if (stayId && !isSimulated) {
@@ -323,12 +402,16 @@ export class BookingsService {
       unitPrice = exp ? exp.rate : 85000;
 
       if (!dto.date) {
-        throw new BadRequestException('date is required for experience bookings');
+        throw new BadRequestException(
+          'date is required for experience bookings',
+        );
       }
       const expDate = new Date(dto.date);
 
       if (experienceId && !isSimulated) {
-        const slot = await this.prisma.experienceSlot.findFirst({ where: { experienceId } });
+        const slot = await this.prisma.experienceSlot.findFirst({
+          where: { experienceId },
+        });
         if (slot && slot.available < dto.guests) {
           throw new ConflictException(
             `This experience slot is currently full. Only ${slot.available} spots remaining.`,
@@ -343,11 +426,15 @@ export class BookingsService {
       unitPrice = trans ? trans.rate : 45000;
 
       if (!dto.date) {
-        throw new BadRequestException('date is required for transport bookings');
+        throw new BadRequestException(
+          'date is required for transport bookings',
+        );
       }
 
       if (transportId && !isSimulated) {
-        const inv = await this.prisma.transportInventory.findFirst({ where: { transportId } });
+        const inv = await this.prisma.transportInventory.findFirst({
+          where: { transportId },
+        });
         if (inv && inv.available < dto.guests) {
           throw new ConflictException(
             `This transport is fully booked. Only ${inv.available} seats remaining.`,
@@ -413,7 +500,9 @@ export class BookingsService {
           });
         }
       } else if (property.type === 'EXPERIENCE' && experienceId) {
-        const expSlot = await tx.experienceSlot.findFirst({ where: { experienceId } });
+        const expSlot = await tx.experienceSlot.findFirst({
+          where: { experienceId },
+        });
         if (expSlot) {
           await tx.experienceBooking.create({
             data: {
@@ -426,11 +515,16 @@ export class BookingsService {
           });
           await tx.experienceSlot.update({
             where: { id: expSlot.id },
-            data: { booked: { increment: dto.guests }, available: { decrement: dto.guests } },
+            data: {
+              booked: { increment: dto.guests },
+              available: { decrement: dto.guests },
+            },
           });
         }
       } else if (property.type === 'TRANSPORT' && transportId) {
-        const transInv = await tx.transportInventory.findFirst({ where: { transportId } });
+        const transInv = await tx.transportInventory.findFirst({
+          where: { transportId },
+        });
         if (transInv) {
           await tx.transportBooking.create({
             data: {
@@ -443,10 +537,16 @@ export class BookingsService {
           });
           await tx.transportInventory.update({
             where: { id: transInv.id },
-            data: { booked: { increment: dto.guests }, available: { decrement: dto.guests } },
+            data: {
+              booked: { increment: dto.guests },
+              available: { decrement: dto.guests },
+            },
           });
         }
       }
+
+      // Sync property status: BOOKED if all inventory is now depleted
+      await this.syncPropertyStatus(tx, property.id);
 
       return tx.booking.findUnique({
         where: { id: createdBooking.id },
@@ -464,60 +564,94 @@ export class BookingsService {
     await this.readStore.enqueueSync(property.id).catch(() => null);
 
     const listingName = property.name;
-    const checkInStr  = dto.checkIn  ? new Date(dto.checkIn).toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
-    const checkOutStr = dto.checkOut ? new Date(dto.checkOut).toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
+    const checkInStr = dto.checkIn
+      ? new Date(dto.checkIn).toLocaleDateString('en-ZM', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+      : 'TBD';
+    const checkOutStr = dto.checkOut
+      ? new Date(dto.checkOut).toLocaleDateString('en-ZM', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+      : 'TBD';
 
     if (isSimulated) {
-      await this.notifications.onBookingConfirmed({
-        guestUserId: guestUserId!,
-        guestEmail:  guestUser!.email,
-        guestName:   guestUser!.name || 'Guest',
-        hostUserId:  property.hostId,
-        hostEmail:   property.host.email,
-        hostName:    (property.host as any)?.hostProfile?.businessName || property.host.name || 'Host',
-        bookingRef,
-        listingId:   property.id,
-        listingName,
-        checkIn:     checkInStr,
-        checkOut:    checkOutStr,
-        guests:      dto.guests,
-        amountZMW:   unitPrice * dto.guests,
-      }).catch(() => null);
+      await this.notifications
+        .onBookingConfirmed({
+          guestUserId: guestUserId!,
+          guestEmail: guestUser.email,
+          guestName: guestUser.name || 'Guest',
+          hostUserId: property.hostId,
+          hostEmail: property.host.email,
+          hostName:
+            (property.host as any)?.hostProfile?.businessName ||
+            property.host.name ||
+            'Host',
+          bookingRef,
+          listingId: property.id,
+          listingName,
+          checkIn: checkInStr,
+          checkOut: checkOutStr,
+          guests: dto.guests,
+          amountZMW: unitPrice * dto.guests,
+        })
+        .catch(() => null);
     } else {
-      await this.notifications.onBookingCreated({
-        guestUserId: guestUserId!,
-        guestEmail:  guestUser!.email,
-        guestName:   guestUser!.name || 'Guest',
-        hostUserId:  property.hostId,
-        hostEmail:   property.host.email,
-        hostName:    (property.host as any)?.hostProfile?.businessName || property.host.name || 'Host',
-        bookingRef,
-        listingId:   property.id,
-        listingName,
-        checkIn:     checkInStr,
-        checkOut:    checkOutStr,
-        guests:      dto.guests,
-        amountZMW:   unitPrice * dto.guests,
-      }).catch(() => null);
+      await this.notifications
+        .onBookingCreated({
+          guestUserId: guestUserId!,
+          guestEmail: guestUser.email,
+          guestName: guestUser.name || 'Guest',
+          hostUserId: property.hostId,
+          hostEmail: property.host.email,
+          hostName:
+            (property.host as any)?.hostProfile?.businessName ||
+            property.host.name ||
+            'Host',
+          bookingRef,
+          listingId: property.id,
+          listingName,
+          checkIn: checkInStr,
+          checkOut: checkOutStr,
+          guests: dto.guests,
+          amountZMW: unitPrice * dto.guests,
+        })
+        .catch(() => null);
     }
 
     return this.formatBooking(booking);
   }
 
-
-
   async releaseHold(id: string, userId: string) {
-    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
+      },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.guestId !== userId) throw new ForbiddenException();
     if (booking.status !== 'PENDING') {
       throw new BadRequestException('Only pending holds can be released');
     }
 
-    await this.prisma.booking.update({
-      where: { id },
-      data: { status: 'CANCELLED', expiresAt: null },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id },
+        data: { status: 'CANCELLED', expiresAt: null },
+      });
+
+      await this.restoreInventoryForBooking(tx, booking);
+      await this.syncPropertyStatus(tx, booking.propertyId);
     });
+
+    await this.readStore.enqueueSync(booking.propertyId).catch(() => null);
 
     return { success: true, message: 'Hold released successfully' };
   }
@@ -530,7 +664,14 @@ export class BookingsService {
       include: {
         property: {
           include: {
-            host: { select: { id: true, name: true, phone: true, hostProfile: { select: { businessName: true } } } },
+            host: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                hostProfile: { select: { businessName: true } },
+              },
+            },
             images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           },
         },
@@ -542,7 +683,11 @@ export class BookingsService {
       },
     });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.guestId !== userId && booking.hostId !== userId && userRole !== 'ADMIN') {
+    if (
+      booking.guestId !== userId &&
+      booking.hostId !== userId &&
+      userRole !== 'ADMIN'
+    ) {
       throw new ForbiddenException();
     }
     return this.formatBooking(booking);
@@ -559,7 +704,16 @@ export class BookingsService {
     const bookings = await this.prisma.booking.findMany({
       where,
       include: {
-        property: { include: { host: { select: { name: true, hostProfile: { select: { businessName: true } } } } } },
+        property: {
+          include: {
+            host: {
+              select: {
+                name: true,
+                hostProfile: { select: { businessName: true } },
+              },
+            },
+          },
+        },
         stayBooking: true,
         experienceBooking: true,
         transportBooking: true,
@@ -575,19 +729,29 @@ export class BookingsService {
       where: {
         OR: [{ id: idOrBookingRef }, { bookingRef: idOrBookingRef }],
       },
-      include: { property: true, stayBooking: true, payment: true },
+      include: {
+        property: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
+        payment: true,
+      },
     });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.guestId !== userId && booking.hostId !== userId) {
       throw new ForbiddenException();
     }
-    if (booking.status === 'CANCELLED') throw new BadRequestException('Booking already cancelled');
-    if (booking.status === 'COMPLETED') throw new BadRequestException('Cannot cancel completed booking');
+    if (booking.status === 'CANCELLED')
+      throw new BadRequestException('Booking already cancelled');
+    if (booking.status === 'COMPLETED')
+      throw new BadRequestException('Cannot cancel completed booking');
 
     // Calculate refund based on cancellation policy
     const policy = 'MODERATE';
     let refundAmount = 0;
-    const checkInTime = booking.stayBooking?.checkIn ? new Date(booking.stayBooking.checkIn).getTime() : 0;
+    const checkInTime = booking.stayBooking?.checkIn
+      ? new Date(booking.stayBooking.checkIn).getTime()
+      : 0;
     const daysUntilCheckIn = checkInTime
       ? Math.ceil((checkInTime - Date.now()) / (1000 * 60 * 60 * 24))
       : 0;
@@ -597,25 +761,43 @@ export class BookingsService {
         refundAmount = daysUntilCheckIn >= 1 ? booking.amount : 0;
         break;
       case 'MODERATE':
-        refundAmount = daysUntilCheckIn >= 5 ? booking.amount : booking.amount * 0.5;
+        refundAmount =
+          daysUntilCheckIn >= 5 ? booking.amount : booking.amount * 0.5;
         break;
       case 'STRICT':
         refundAmount = 0;
         break;
     }
 
-    const updated = await this.prisma.booking.update({
-      where: { id: booking.id },
-      data: {
-        status: 'CANCELLED',
-        expiresAt: null,
-        refundAmount: Math.round(refundAmount),
-        paymentStatus: refundAmount > 0 ? 'REFUNDED' : booking.paymentStatus,
-      },
-      include: { property: true, stayBooking: true, experienceBooking: true, transportBooking: true, guest: true },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const upd = await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: 'CANCELLED',
+          expiresAt: null,
+          refundAmount: Math.round(refundAmount),
+          paymentStatus: refundAmount > 0 ? 'REFUNDED' : booking.paymentStatus,
+        },
+        include: {
+          property: true,
+          stayBooking: true,
+          experienceBooking: true,
+          transportBooking: true,
+          guest: true,
+        },
+      });
+
+      await this.restoreInventoryForBooking(tx, upd);
+      await this.syncPropertyStatus(tx, booking.propertyId);
+      return upd;
     });
 
-    const cancelledBy = userId === booking.guestId ? 'guest' : userId === booking.hostId ? 'host' : 'admin';
+    const cancelledBy =
+      userId === booking.guestId
+        ? 'guest'
+        : userId === booking.hostId
+          ? 'host'
+          : 'admin';
 
     const [guestForCancel, hostForCancel] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: booking.guestId } }),
@@ -623,16 +805,21 @@ export class BookingsService {
     ]);
     const cancelListingName = updated.property?.name || booking.bookingRef;
 
+    await this.readStore.enqueueSync(booking.propertyId).catch(() => null);
+
     await this.notifications.onBookingCancelled({
-      guestUserId:  booking.guestId,
-      guestEmail:   guestForCancel!.email,
-      guestName:    guestForCancel!.name || 'Guest',
-      hostUserId:   booking.hostId,
-      hostEmail:    hostForCancel!.email,
-      hostName:     (hostForCancel as any)?.hostProfile?.businessName || hostForCancel!.name || 'Host',
-      bookingRef:   booking.bookingRef,
-      listingId:    booking.propertyId,
-      listingName:  cancelListingName,
+      guestUserId: booking.guestId,
+      guestEmail: guestForCancel!.email,
+      guestName: guestForCancel!.name || 'Guest',
+      hostUserId: booking.hostId,
+      hostEmail: hostForCancel!.email,
+      hostName:
+        (hostForCancel as any)?.hostProfile?.businessName ||
+        hostForCancel!.name ||
+        'Host',
+      bookingRef: booking.bookingRef,
+      listingId: booking.propertyId,
+      listingName: cancelListingName,
       refundAmountNgwee: Math.round(refundAmount),
       cancelledBy,
     });
@@ -642,9 +829,10 @@ export class BookingsService {
       refundEligible: refundAmount > 0,
       refundAmount: Math.round(refundAmount),
       policy: policy.toLowerCase(),
-      message: refundAmount > 0
-        ? `Refund of ZMW ${(refundAmount / 100).toFixed(2)} processed. Amount will reflect in 5-7 business days.`
-        : 'No refund applicable based on the cancellation policy.',
+      message:
+        refundAmount > 0
+          ? `Refund of ZMW ${(refundAmount / 100).toFixed(2)} processed. Amount will reflect in 5-7 business days.`
+          : 'No refund applicable based on the cancellation policy.',
     };
   }
 
@@ -670,8 +858,14 @@ export class BookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
 
     const user = await this.prisma.user.findUnique({ where: { id: hostId } });
-    if (booking.hostId !== hostId && booking.property.hostId !== hostId && user?.role !== 'ADMIN') {
-      throw new ForbiddenException('Only the host of this property can perform this cancellation');
+    if (
+      booking.hostId !== hostId &&
+      booking.property.hostId !== hostId &&
+      user?.role !== 'ADMIN'
+    ) {
+      throw new ForbiddenException(
+        'Only the host of this property can perform this cancellation',
+      );
     }
 
     if (booking.status === 'CANCELLED') {
@@ -686,9 +880,13 @@ export class BookingsService {
 
     let penaltyFeeNgwee = 0;
     const now = new Date();
-    const checkInDate = booking.stayBooking?.checkIn || booking.experienceBooking?.date || booking.transportBooking?.date;
+    const checkInDate =
+      booking.stayBooking?.checkIn ||
+      booking.experienceBooking?.date ||
+      booking.transportBooking?.date;
     if (checkInDate) {
-      const diffHours = (new Date(checkInDate).getTime() - now.getTime()) / (1000 * 60 * 60);
+      const diffHours =
+        (new Date(checkInDate).getTime() - now.getTime()) / (1000 * 60 * 60);
       if (diffHours < 48) {
         penaltyFeeNgwee = Math.round(booking.amount * 0.1);
       }
@@ -696,58 +894,73 @@ export class BookingsService {
 
     const cancellationDate = now.toISOString();
 
-    // ── Reopen Inventory ───────────────────────────────────────────────────────
-    if (booking.stayBooking) {
-      await this.prisma.stayInventory.update({
-        where: { id: booking.stayBooking.stayInventoryId },
-        data: { booked: { decrement: 1 }, available: { increment: 1 } },
-      }).catch(() => null);
-    } else if (booking.experienceBooking) {
-      await this.prisma.experienceSlot.update({
-        where: { id: booking.experienceBooking.experienceSlotId },
-        data: { booked: { decrement: booking.experienceBooking.guests }, available: { increment: booking.experienceBooking.guests } },
-      }).catch(() => null);
-    } else if (booking.transportBooking) {
-      await this.prisma.transportInventory.update({
-        where: { id: booking.transportBooking.transportInventoryId },
-        data: { booked: { decrement: booking.transportBooking.seats }, available: { increment: booking.transportBooking.seats } },
-      }).catch(() => null);
-    }
+    // ── Reopen Inventory, Cancel Booking, and Sync Property Status ────────────────
+    await this.prisma.$transaction(async (tx) => {
+      if (booking.stayBooking) {
+        await tx.stayInventory.update({
+          where: { id: booking.stayBooking.stayInventoryId },
+          data: { booked: { decrement: 1 }, available: { increment: 1 } },
+        });
+      } else if (booking.experienceBooking) {
+        await tx.experienceSlot.update({
+          where: { id: booking.experienceBooking.experienceSlotId },
+          data: {
+            booked: { decrement: booking.experienceBooking.guests },
+            available: { increment: booking.experienceBooking.guests },
+          },
+        });
+      } else if (booking.transportBooking) {
+        await tx.transportInventory.update({
+          where: { id: booking.transportBooking.transportInventoryId },
+          data: {
+            booked: { decrement: booking.transportBooking.seats },
+            available: { increment: booking.transportBooking.seats },
+          },
+        });
+      }
 
-    // 2. Set booking status to CANCELLED and clear hold expiration
-    await this.prisma.booking.update({
-      where: { id: booking.id },
-      data: {
-        status: 'CANCELLED',
-        expiresAt: null,
-        refundAmount: refundAmountNgwee,
-        specialRequests: booking.specialRequests
-          ? `${booking.specialRequests} | Host Cancelled: ${cancellationReason}`
-          : `Host Cancelled: ${cancellationReason}`,
-      },
+      // 2. Set booking status to CANCELLED and clear hold expiration
+      await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: 'CANCELLED',
+          expiresAt: null,
+          refundAmount: refundAmountNgwee,
+          specialRequests: booking.specialRequests
+            ? `${booking.specialRequests} | Host Cancelled: ${cancellationReason}`
+            : `Host Cancelled: ${cancellationReason}`,
+        },
+      });
+
+      // 2.5 Sync property status based on restored inventory
+      await this.syncPropertyStatus(tx, booking.propertyId);
     });
 
     // 3. Sync read-store index so search and calendar availability reflect reopened inventory immediately
     await this.readStore.enqueueSync(booking.propertyId).catch(() => null);
 
     // 4. Send cancellation notifications to guest and host
-    await this.prisma.notification.create({
-      data: {
-        userId: booking.guestId,
-        type: 'BOOKING_CANCELLED',
-        title: 'Reservation Cancelled by Host',
-        description: `Your booking ${booking.bookingRef} for ${booking.property.name} was cancelled by the host. A full refund of ZMW ${(refundAmountNgwee / 100).toFixed(2)} has been issued.${reason ? ` Reason: ${reason}` : ''}`,
-      },
-    }).catch(() => null);
+    await this.prisma.notification
+      .create({
+        data: {
+          userId: booking.guestId,
+          type: 'BOOKING_CANCELLED',
+          title: 'Reservation Cancelled by Host',
+          description: `Your booking ${booking.bookingRef} for ${booking.property.name} was cancelled by the host. A full refund of ZMW ${(refundAmountNgwee / 100).toFixed(2)} has been issued.${reason ? ` Reason: ${reason}` : ''}`,
+        },
+      })
+      .catch(() => null);
 
-    await this.prisma.notification.create({
-      data: {
-        userId: booking.hostId,
-        type: 'BOOKING_CANCELLED',
-        title: 'Reservation Cancelled',
-        description: `You cancelled booking ${booking.bookingRef}. Inventory has been reopened and the guest has received a full refund.${penaltyFeeNgwee > 0 ? ` Penalty fee: ZMW ${(penaltyFeeNgwee / 100).toFixed(2)}.` : ''}`,
-      },
-    }).catch(() => null);
+    await this.prisma.notification
+      .create({
+        data: {
+          userId: booking.hostId,
+          type: 'BOOKING_CANCELLED',
+          title: 'Reservation Cancelled',
+          description: `You cancelled booking ${booking.bookingRef}. Inventory has been reopened and the guest has received a full refund.${penaltyFeeNgwee > 0 ? ` Penalty fee: ZMW ${(penaltyFeeNgwee / 100).toFixed(2)}.` : ''}`,
+        },
+      })
+      .catch(() => null);
 
     return {
       bookingId: booking.id,
@@ -775,13 +988,28 @@ export class BookingsService {
 
     const updated = await this.prisma.booking.update({
       where: { id },
-      data: { status, expiresAt: status === 'CONFIRMED' ? null : booking.expiresAt },
-      include: { property: true, stayBooking: true, experienceBooking: true, transportBooking: true, guest: true, payout: true },
+      data: {
+        status,
+        expiresAt: status === 'CONFIRMED' ? null : booking.expiresAt,
+      },
+      include: {
+        property: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
+        guest: true,
+        payout: true,
+      },
     });
 
-    const guest = await this.prisma.user.findUnique({ where: { id: booking.guestId } });
+    const guest = await this.prisma.user.findUnique({
+      where: { id: booking.guestId },
+    });
     await this.notifications.sendBookingStatusUpdate(
-      guest!.email, guest!.name, booking.bookingRef, status,
+      guest!.email,
+      guest!.name,
+      booking.bookingRef,
+      status,
     );
 
     return this.formatBooking(updated);
@@ -806,12 +1034,20 @@ export class BookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (booking.hostId !== userId && booking.property.hostId !== userId && user?.role !== 'ADMIN') {
-      throw new ForbiddenException('Only the host of this property can perform check-in');
+    if (
+      booking.hostId !== userId &&
+      booking.property.hostId !== userId &&
+      user?.role !== 'ADMIN'
+    ) {
+      throw new ForbiddenException(
+        'Only the host of this property can perform check-in',
+      );
     }
 
     if (booking.status === 'CANCELLED' || booking.status === 'EXPIRED') {
-      throw new BadRequestException('Cannot check in a cancelled or expired booking');
+      throw new BadRequestException(
+        'Cannot check in a cancelled or expired booking',
+      );
     }
 
     if (booking.stayBooking?.checkedInAt || booking.status === 'CHECKED_IN') {
@@ -823,23 +1059,28 @@ export class BookingsService {
     }
 
     if (booking.paymentStatus !== 'PAID' && booking.status !== 'CONFIRMED') {
-      throw new BadRequestException('Booking cannot be checked in until payment is confirmed');
+      throw new BadRequestException(
+        'Booking cannot be checked in until payment is confirmed',
+      );
     }
 
     // Step 1: Notify Guest to confirm check-in
-    await this.prisma.notification.create({
-      data: {
-        userId: booking.guestId,
-        type: 'CHECKED_IN',
-        title: 'Check-in Confirmation Requested',
-        description: `Host for ${booking.property.name} requested check-in for booking ${booking.bookingRef}. Please confirm your check-in. If not confirmed, it will auto-confirm in 24 hours.`,
-        actionUrl: `/bookings/${booking.id}/confirm-check-in`,
-        actionLabel: 'Confirm Check-In',
-      },
-    }).catch(() => null);
+    await this.prisma.notification
+      .create({
+        data: {
+          userId: booking.guestId,
+          type: 'CHECKED_IN',
+          title: 'Check-in Confirmation Requested',
+          description: `Host for ${booking.property.name} requested check-in for booking ${booking.bookingRef}. Please confirm your check-in. If not confirmed, it will auto-confirm in 24 hours.`,
+          actionUrl: `/bookings/${booking.id}/confirm-check-in`,
+          actionLabel: 'Confirm Check-In',
+        },
+      })
+      .catch(() => null);
 
     return {
-      message: 'Check-in initiated. Waiting for guest confirmation. Auto-confirm scheduled in 24 hours.',
+      message:
+        'Check-in initiated. Waiting for guest confirmation. Auto-confirm scheduled in 24 hours.',
       bookingId: booking.id,
       bookingRef: booking.bookingRef,
       checkInPending: true,
@@ -847,7 +1088,11 @@ export class BookingsService {
     };
   }
 
-  async confirmCheckIn(idOrBookingRef: string, userId?: string, isAutoConfirm: boolean = false) {
+  async confirmCheckIn(
+    idOrBookingRef: string,
+    userId?: string,
+    isAutoConfirm: boolean = false,
+  ) {
     const booking = await this.prisma.booking.findFirst({
       where: {
         OR: [{ id: idOrBookingRef }, { bookingRef: idOrBookingRef }],
@@ -865,8 +1110,14 @@ export class BookingsService {
 
     if (userId) {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (booking.guestId !== userId && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
-        throw new ForbiddenException('Only the guest of this booking can confirm check-in');
+      if (
+        booking.guestId !== userId &&
+        user?.role !== 'ADMIN' &&
+        user?.role !== 'SUPER_ADMIN'
+      ) {
+        throw new ForbiddenException(
+          'Only the guest of this booking can confirm check-in',
+        );
       }
     }
 
@@ -892,7 +1143,8 @@ export class BookingsService {
           commission,
           netAmount,
           status: 'PROCESSING',
-          method: (booking.host as any)?.hostProfile?.payoutMethod || 'BANK_TRANSFER',
+          method:
+            (booking.host as any)?.hostProfile?.payoutMethod || 'BANK_TRANSFER',
           bookingRefs: [booking.bookingRef],
           processedAt: new Date(),
         },
@@ -922,24 +1174,28 @@ export class BookingsService {
     });
 
     // Notify Host about payout release
-    await this.prisma.notification.create({
-      data: {
-        userId: booking.hostId,
-        type: 'PAYOUT',
-        title: 'Payout Released',
-        description: `Check-in confirmed for booking ${booking.bookingRef}${isAutoConfirm ? ' (24h auto-confirm)' : ''}. Funds of ZMW ${(netAmount / 100).toFixed(2)} have been released.`,
-      },
-    }).catch(() => null);
+    await this.prisma.notification
+      .create({
+        data: {
+          userId: booking.hostId,
+          type: 'PAYOUT',
+          title: 'Payout Released',
+          description: `Check-in confirmed for booking ${booking.bookingRef}${isAutoConfirm ? ' (24h auto-confirm)' : ''}. Funds of ZMW ${(netAmount / 100).toFixed(2)} have been released.`,
+        },
+      })
+      .catch(() => null);
 
     // Notify Guest about check-in completion
-    await this.prisma.notification.create({
-      data: {
-        userId: booking.guestId,
-        type: 'CHECKED_IN',
-        title: 'Check-in Complete',
-        description: `You are confirmed checked in to ${booking.property.name}. Enjoy your stay!`,
-      },
-    }).catch(() => null);
+    await this.prisma.notification
+      .create({
+        data: {
+          userId: booking.guestId,
+          type: 'CHECKED_IN',
+          title: 'Check-in Complete',
+          description: `You are confirmed checked in to ${booking.property.name}. Enjoy your stay!`,
+        },
+      })
+      .catch(() => null);
 
     return {
       message: isAutoConfirm
@@ -974,58 +1230,269 @@ export class BookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (booking.hostId !== userId && booking.property.hostId !== userId && user?.role !== 'ADMIN') {
-      throw new ForbiddenException('Only the host of this property can perform check-out');
+    if (
+      booking.hostId !== userId &&
+      booking.property.hostId !== userId &&
+      user?.role !== 'ADMIN'
+    ) {
+      throw new ForbiddenException(
+        'Only the host of this property can perform check-out',
+      );
     }
 
     if (booking.status === 'COMPLETED' || booking.stayBooking?.checkedOutAt) {
-      throw new BadRequestException('This booking has already been checked out');
+      throw new BadRequestException(
+        'This booking has already been checked out',
+      );
     }
 
     if (!booking.stayBooking?.checkedInAt && booking.status !== 'CHECKED_IN') {
-      throw new BadRequestException('Booking must be checked in before checkout');
+      throw new BadRequestException(
+        'Booking must be checked in before checkout',
+      );
     }
 
     const checkedOutAt = new Date();
 
-    if (booking.stayBooking) {
-      await this.prisma.stayBooking.update({
-        where: { bookingId: booking.id },
-        data: { checkedOutAt },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (booking.stayBooking) {
+        await tx.stayBooking.update({
+          where: { bookingId: booking.id },
+          data: { checkedOutAt },
+        });
+      }
+
+      const upd = await tx.booking.update({
+        where: { id: booking.id },
+        data: { status: 'COMPLETED' },
+        include: {
+          property: true,
+          stayBooking: true,
+          experienceBooking: true,
+          transportBooking: true,
+          guest: true,
+          payout: true,
+        },
       });
-    }
 
-    const updateData: any = {
-      status: 'COMPLETED',
-    };
-
-    const updated = await this.prisma.booking.update({
-      where: { id: booking.id },
-      data: updateData,
-      include: {
-        property: true,
-        stayBooking: true,
-        experienceBooking: true,
-        transportBooking: true,
-        guest: true,
-        payout: true,
-      },
+      // Restore inventory since the unit is now free after checkout
+      await this.restoreInventoryForBooking(tx, upd);
+      await this.syncPropertyStatus(tx, booking.propertyId);
+      return upd;
     });
 
     // Notify Guest
-    await this.prisma.notification.create({
-      data: {
-        userId: booking.guestId,
-        type: 'CHECKED_OUT',
-        title: 'Check-out Completed',
-        description: `Thank you for staying at ${booking.property.name}. Your checkout has been completed.`,
-      },
-    }).catch(() => null);
+    await this.prisma.notification
+      .create({
+        data: {
+          userId: booking.guestId,
+          type: 'CHECKED_OUT',
+          title: 'Check-out Completed',
+          description: `Thank you for staying at ${booking.property.name}. Your checkout has been completed.`,
+        },
+      })
+      .catch(() => null);
+
+    await this.readStore.enqueueSync(booking.propertyId).catch(() => null);
 
     return {
-      message: 'Check-out completed successfully. Inventory has been reopened and is immediately available.',
+      message:
+        'Check-out completed successfully. Inventory has been reopened and is immediately available.',
       booking: this.formatBooking(updated),
     };
+  }
+
+  // ─── Inventory Restoration & Property Status Sync Helpers ───────────────────
+
+  /**
+   * Restores inventory for a booking based on its type (stay, experience, transport).
+   * Must be called within a $transaction (tx) so the restore + status sync are atomic.
+   */
+  private async restoreInventoryForBooking(
+    tx: any,
+    booking: any,
+  ): Promise<void> {
+    if (booking.stayBooking) {
+      const sb = await tx.stayBooking.findUnique({
+        where: { bookingId: booking.id },
+        include: { stayInventory: true },
+      });
+      if (sb && sb.stayInventory) {
+        await tx.stayInventory.update({
+          where: { id: sb.stayInventory.id },
+          data: { booked: { decrement: 1 }, available: { increment: 1 } },
+        });
+      }
+    } else if (booking.experienceBooking) {
+      const eb = await tx.experienceBooking.findUnique({
+        where: { bookingId: booking.id },
+        include: { experienceSlot: true },
+      });
+      if (eb && eb.experienceSlot) {
+        await tx.experienceSlot.update({
+          where: { id: eb.experienceSlot.id },
+          data: {
+            booked: { decrement: eb.guests },
+            available: { increment: eb.guests },
+          },
+        });
+      }
+    } else if (booking.transportBooking) {
+      const tb = await tx.transportBooking.findUnique({
+        where: { bookingId: booking.id },
+        include: { transportInventory: true },
+      });
+      if (tb && tb.transportInventory) {
+        await tx.transportInventory.update({
+          where: { id: tb.transportInventory.id },
+          data: {
+            booked: { decrement: tb.seats },
+            available: { increment: tb.seats },
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Syncs the property status based on remaining available inventory.
+   * - If all inventory units have 0 available → BOOKED
+   * - If at least one unit has available > 0 → ACTIVE
+   * Must be called within a $transaction (tx).
+   */
+  private async syncPropertyStatus(tx: any, propertyId: string): Promise<void> {
+    const property = await tx.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        stays: {
+          where: { deletedAt: null },
+          include: { inventory: true },
+        },
+        experiences: {
+          where: { deletedAt: null },
+          include: { slots: true },
+        },
+        transports: {
+          where: { deletedAt: null },
+          include: { inventory: true },
+        },
+      },
+    });
+
+    if (!property || property.deletedAt) return;
+
+    let totalAvailable = 0;
+    let totalUnits = 0;
+
+    if (property.type === 'STAY') {
+      for (const stay of property.stays) {
+        const inventories = stay.inventory || [];
+        for (const inv of inventories) {
+          totalUnits++;
+          totalAvailable += inv.available;
+        }
+      }
+    } else if (property.type === 'EXPERIENCE') {
+      for (const exp of property.experiences) {
+        const slots = exp.slots || [];
+        for (const slot of slots) {
+          totalUnits++;
+          totalAvailable += slot.available;
+        }
+      }
+    } else if (property.type === 'TRANSPORT') {
+      for (const trans of property.transports) {
+        const inventories = trans.inventory || [];
+        for (const inv of inventories) {
+          totalUnits++;
+          totalAvailable += inv.available;
+        }
+      }
+    }
+
+    if (
+      totalUnits > 0 &&
+      totalAvailable === 0 &&
+      property.status !== PropertyStatus.BOOKED
+    ) {
+      await tx.property.update({
+        where: { id: propertyId },
+        data: { status: PropertyStatus.BOOKED },
+      });
+    } else if (
+      totalAvailable > 0 &&
+      property.status === PropertyStatus.BOOKED
+    ) {
+      await tx.property.update({
+        where: { id: propertyId },
+        data: { status: PropertyStatus.ACTIVE },
+      });
+    }
+  }
+
+  // ─── Scheduled Job: Auto-Expire PENDING Holds ──────────────────────────────────
+
+  /**
+   * Runs every minute to find PENDING bookings whose 10-minute hold has expired,
+   * marks them as EXPIRED, restores inventory, and syncs property status.
+   */
+  @Cron('*/60 * * * * *', {
+    name: 'expire-pending-holds',
+  })
+  async handleExpiredHolds() {
+    this.logger.log('⏰ Checking for expired PENDING holds...');
+    const now = new Date();
+
+    const expiredBookings = await this.prisma.booking.findMany({
+      where: {
+        status: 'PENDING',
+        expiresAt: { lt: now },
+      },
+      include: {
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
+      },
+    });
+
+    if (expiredBookings.length === 0) {
+      this.logger.log('✅ No expired holds found.');
+      return;
+    }
+
+    this.logger.log(
+      `⏳ Found ${expiredBookings.length} expired hold(s). Processing...`,
+    );
+
+    const processed: string[] = [];
+    const errored: string[] = [];
+
+    for (const booking of expiredBookings) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.booking.update({
+            where: { id: booking.id },
+            data: { status: 'EXPIRED', expiresAt: null },
+          });
+
+          await this.restoreInventoryForBooking(tx, booking);
+          await this.syncPropertyStatus(tx, booking.propertyId);
+        });
+
+        await this.readStore.enqueueSync(booking.propertyId).catch(() => null);
+        processed.push(booking.bookingRef);
+      } catch (err: any) {
+        this.logger.error(
+          `Failed to expire hold for booking ${booking.bookingRef}: ${err.message}`,
+          err.stack,
+        );
+        errored.push(booking.bookingRef);
+      }
+    }
+
+    this.logger.log(
+      `✅ Expired ${processed.length} hold(s). Failures: ${errored.length}.`,
+    );
   }
 
   private formatBooking(booking: any) {
@@ -1035,16 +1502,28 @@ export class BookingsService {
 
     const now = Date.now();
     const expiresAt = booking.expiresAt ? new Date(booking.expiresAt) : null;
-    const isHoldActive = booking.status === 'PENDING' && expiresAt && expiresAt.getTime() > now;
+    const isHoldActive =
+      booking.status === 'PENDING' && expiresAt && expiresAt.getTime() > now;
     const holdExpiresInSeconds = isHoldActive
       ? Math.max(0, Math.floor((expiresAt.getTime() - now) / 1000))
       : 0;
 
-    const checkInDate = booking.stayBooking?.checkIn ? new Date(booking.stayBooking.checkIn) : null;
-    const checkOutDate = booking.stayBooking?.checkOut ? new Date(booking.stayBooking.checkOut) : null;
-    const nights = checkInDate && checkOutDate
-      ? Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)))
-      : 1;
+    const checkInDate = booking.stayBooking?.checkIn
+      ? new Date(booking.stayBooking.checkIn)
+      : null;
+    const checkOutDate = booking.stayBooking?.checkOut
+      ? new Date(booking.stayBooking.checkOut)
+      : null;
+    const nights =
+      checkInDate && checkOutDate
+        ? Math.max(
+            1,
+            Math.round(
+              (checkOutDate.getTime() - checkInDate.getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          )
+        : 1;
 
     const nightlyRateNgwee = Math.round(booking.amount / nights);
     const accommodationTotalNgwee = nightlyRateNgwee * nights;
@@ -1062,17 +1541,26 @@ export class BookingsService {
         vertical: (property?.type || 'stay').toLowerCase(),
         location: property?.location || 'Zambia',
         address: property?.location || 'Plot 45, Riverfront Road, Livingstone',
-        image: property?.images?.[0]?.url || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
+        image:
+          property?.images?.[0]?.url ||
+          'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
       },
       host: {
         id: property?.host?.id || booking.hostId,
-        name: (property?.host as any)?.hostProfile?.businessName || property?.host?.name || 'Mwamba Chali',
+        name:
+          property?.host?.hostProfile?.businessName ||
+          property?.host?.name ||
+          'Mwamba Chali',
         phone: property?.host?.phone || '+260 97 1234567',
         whatsapp: property?.host?.phone || '+260 97 1234567',
       },
       dates: {
-        checkIn: checkInDate ? checkInDate.toISOString() : new Date().toISOString(),
-        checkOut: checkOutDate ? checkOutDate.toISOString() : new Date().toISOString(),
+        checkIn: checkInDate
+          ? checkInDate.toISOString()
+          : new Date().toISOString(),
+        checkOut: checkOutDate
+          ? checkOutDate.toISOString()
+          : new Date().toISOString(),
         nights,
       },
       guests: {
@@ -1088,11 +1576,18 @@ export class BookingsService {
         serviceFeeNgwee,
         taxesNgwee: 0,
         grandTotalNgwee,
-        paymentStatus: (booking.payment?.status || booking.paymentStatus || 'PAID').toUpperCase(),
+        paymentStatus: (
+          booking.payment?.status ||
+          booking.paymentStatus ||
+          'PAID'
+        ).toUpperCase(),
       },
       instructions: {
-        checkInProcedure: 'Self check-in with keypad. Code will be sent on morning of arrival.',
-        directions: property?.location ? `Follow road to ${property.location}. Gate is on the left.` : 'Follow main road to gate.',
+        checkInProcedure:
+          'Self check-in with keypad. Code will be sent on morning of arrival.',
+        directions: property?.location
+          ? `Follow road to ${property.location}. Gate is on the left.`
+          : 'Follow main road to gate.',
         houseRules: ['No smoking inside chalets', 'Quiet hours after 22:00'],
       },
       propertyId: booking.propertyId,
@@ -1110,28 +1605,51 @@ export class BookingsService {
       amount: booking.amount,
       amountFormatted: `K${(booking.amount / 100).toFixed(2)}`,
       currency: booking.currency,
-      paymentStatus: booking.payment?.status?.toLowerCase() || booking.paymentStatus?.toLowerCase() || 'unpaid',
+      paymentStatus:
+        booking.payment?.status?.toLowerCase() ||
+        booking.paymentStatus?.toLowerCase() ||
+        'unpaid',
       hold: {
         isHoldActive: !!isHoldActive,
         expiresAt: expiresAt?.toISOString() || null,
         expiresInSeconds: holdExpiresInSeconds,
       },
       details: {
-        checkIn: booking.stayBooking?.checkIn ? new Date(booking.stayBooking.checkIn).toISOString().split('T')[0] : null,
-        checkOut: booking.stayBooking?.checkOut ? new Date(booking.stayBooking.checkOut).toISOString().split('T')[0] : null,
-        date: booking.experienceBooking?.date ? new Date(booking.experienceBooking.date).toISOString().split('T')[0] : booking.transportBooking?.date ? new Date(booking.transportBooking.date).toISOString().split('T')[0] : null,
+        checkIn: booking.stayBooking?.checkIn
+          ? new Date(booking.stayBooking.checkIn).toISOString().split('T')[0]
+          : null,
+        checkOut: booking.stayBooking?.checkOut
+          ? new Date(booking.stayBooking.checkOut).toISOString().split('T')[0]
+          : null,
+        date: booking.experienceBooking?.date
+          ? new Date(booking.experienceBooking.date).toISOString().split('T')[0]
+          : booking.transportBooking?.date
+            ? new Date(booking.transportBooking.date)
+                .toISOString()
+                .split('T')[0]
+            : null,
         timeSlot: null,
-        guests: booking.stayBooking?.guests || booking.experienceBooking?.guests || booking.transportBooking?.seats || 1,
+        guests:
+          booking.stayBooking?.guests ||
+          booking.experienceBooking?.guests ||
+          booking.transportBooking?.seats ||
+          1,
       },
-      checkedInAt: booking.stayBooking?.checkedInAt ? new Date(booking.stayBooking.checkedInAt).toISOString() : null,
-      checkedOutAt: booking.stayBooking?.checkedOutAt ? new Date(booking.stayBooking.checkedOutAt).toISOString() : null,
-      payout: booking.payout ? {
-        id: booking.payout.id,
-        amount: booking.payout.amount,
-        commission: booking.payout.commission,
-        netAmount: booking.payout.netAmount,
-        status: booking.payout.status?.toLowerCase(),
-      } : null,
+      checkedInAt: booking.stayBooking?.checkedInAt
+        ? new Date(booking.stayBooking.checkedInAt).toISOString()
+        : null,
+      checkedOutAt: booking.stayBooking?.checkedOutAt
+        ? new Date(booking.stayBooking.checkedOutAt).toISOString()
+        : null,
+      payout: booking.payout
+        ? {
+            id: booking.payout.id,
+            amount: booking.payout.amount,
+            commission: booking.payout.commission,
+            netAmount: booking.payout.netAmount,
+            status: booking.payout.status?.toLowerCase(),
+          }
+        : null,
       customer: {
         name: booking.customerName || guest?.name || null,
         phone: booking.customerPhone || guest?.phone || null,

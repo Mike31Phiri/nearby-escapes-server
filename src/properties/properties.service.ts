@@ -1,5 +1,14 @@
-import { UpdatePropertyPoliciesDto, CancellationTier } from '../policies/dto/policy.dto';
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  UpdatePropertyPoliciesDto,
+  CancellationTier,
+} from '../policies/dto/policy.dto';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import {
@@ -8,8 +17,14 @@ import {
   UpdatePropertyPricingResponseDto,
 } from './dto/update-property.dto';
 import { CreateStayDto, UpdateStayDto } from './dto/create-stay.dto';
-import { CreateExperienceDto, UpdateExperienceDto } from './dto/create-experience.dto';
-import { CreateTransportDto, UpdateTransportDto } from './dto/create-transport.dto';
+import {
+  CreateExperienceDto,
+  UpdateExperienceDto,
+} from './dto/create-experience.dto';
+import {
+  CreateTransportDto,
+  UpdateTransportDto,
+} from './dto/create-transport.dto';
 import {
   CreateListingPolicyDto,
   UpdateListingPolicyDto,
@@ -23,7 +38,14 @@ import {
   TagCategoryEnum,
   RecommendationAudienceEnum,
 } from './dto/listing-tag-recommendation.dto';
-import { ListingPolicyCategory, TagCategory, RecommendationAudience, PropertyStatus, PropertyType, CancellationPolicy } from '@prisma/client';
+import {
+  ListingPolicyCategory,
+  TagCategory,
+  RecommendationAudience,
+  PropertyStatus,
+  PropertyType,
+  CancellationPolicy,
+} from '@prisma/client';
 import {
   CreateUnifiedListingDto,
   CreateUnifiedListingResponseDto,
@@ -34,14 +56,28 @@ import {
 } from './dto/create-listing-unified.dto';
 
 export function toTagSlug(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
-function parseTagsData(tags: any[], foreignKey: { propertyId?: string; stayId?: string; experienceId?: string; transportId?: string }) {
+function parseTagsData(
+  tags: any[],
+  foreignKey: {
+    propertyId?: string;
+    stayId?: string;
+    experienceId?: string;
+    transportId?: string;
+  },
+) {
   return tags.map((t) => {
     const isObj = typeof t === 'object' && t !== null;
     const name = (isObj ? t.name : String(t)).trim();
-    const category = (isObj && t.category ? t.category : TagCategory.CATEGORY) as TagCategory;
+    const category = (
+      isObj && t.category ? t.category : TagCategory.CATEGORY
+    ) as TagCategory;
     const icon = isObj && t.icon ? t.icon : null;
     const slug = toTagSlug(name);
     return {
@@ -54,10 +90,19 @@ function parseTagsData(tags: any[], foreignKey: { propertyId?: string; stayId?: 
   });
 }
 
-function parseRecsData(recs: any[], foreignKey: { propertyId?: string; stayId?: string; experienceId?: string; transportId?: string }) {
+function parseRecsData(
+  recs: any[],
+  foreignKey: {
+    propertyId?: string;
+    stayId?: string;
+    experienceId?: string;
+    transportId?: string;
+  },
+) {
   return recs.map((r, i) => ({
     ...foreignKey,
-    audience: (r.audience || RecommendationAudience.GENERAL) as RecommendationAudience,
+    audience: (r.audience ||
+      RecommendationAudience.GENERAL) as RecommendationAudience,
     title: r.title,
     reason: r.reason || null,
     badge: r.badge || null,
@@ -74,10 +119,23 @@ export class PropertiesService {
   // ── Full include helper ──────────────────────────────────────────────────────
 
   private readonly fullInclude = {
-    host: { select: { id: true, name: true, avatar: true, hostProfile: { select: { businessName: true, defaultCheckInTime: true, defaultCheckOutTime: true } } } },
+    host: {
+      select: {
+        id: true,
+        name: true,
+        avatar: true,
+        hostProfile: {
+          select: {
+            businessName: true,
+            defaultCheckInTime: true,
+            defaultCheckOutTime: true,
+          },
+        },
+      },
+    },
     stays: {
       where: { deletedAt: null },
-      orderBy: { sortOrder: 'asc' as const },
+      orderBy: { rate: 'asc' as const },
       include: {
         policies: { orderBy: { sortOrder: 'asc' as const } },
         tags: { orderBy: { createdAt: 'asc' as const } },
@@ -86,9 +144,9 @@ export class PropertiesService {
     },
     experiences: {
       where: { deletedAt: null },
-      orderBy: { sortOrder: 'asc' as const },
+      orderBy: { rate: 'asc' as const },
       include: {
-        timeSlots: { orderBy: { slot: 'asc' as const } },
+        slots: { orderBy: { startTime: 'asc' as const } },
         inclusions: true,
         policies: { orderBy: { sortOrder: 'asc' as const } },
         tags: { orderBy: { createdAt: 'asc' as const } },
@@ -97,7 +155,7 @@ export class PropertiesService {
     },
     transports: {
       where: { deletedAt: null },
-      orderBy: { sortOrder: 'asc' as const },
+      orderBy: { rate: 'asc' as const },
       include: {
         policies: { orderBy: { sortOrder: 'asc' as const } },
         tags: { orderBy: { createdAt: 'asc' as const } },
@@ -116,9 +174,10 @@ export class PropertiesService {
   // ── Property (Business level) CRUD ──────────────────────────────────────────
 
   async createProperty(hostId: string, dto: CreatePropertyDto) {
-    const status = dto.isDraft || dto.status === PropertyStatus.DRAFT
-      ? PropertyStatus.DRAFT
-      : (dto.status || PropertyStatus.ACTIVE);
+    const status =
+      dto.isDraft || dto.status === PropertyStatus.DRAFT
+        ? PropertyStatus.DRAFT
+        : dto.status || PropertyStatus.ACTIVE;
 
     const property = await this.prisma.$transaction(async (tx) => {
       const p = await tx.property.create({
@@ -130,10 +189,17 @@ export class PropertiesService {
           description: dto.description || '',
           location: dto.location || '',
           currency: dto.currency || 'ZMW',
-          draftStep: dto.draftStep || (status === PropertyStatus.DRAFT ? 1 : null),
-          draftData: dto.draftData ? JSON.parse(JSON.stringify(dto.draftData)) : undefined,
+          draftStep:
+            dto.draftStep || (status === PropertyStatus.DRAFT ? 1 : null),
+          draftData: dto.draftData
+            ? JSON.parse(JSON.stringify(dto.draftData))
+            : undefined,
           images: dto.images?.length
-            ? { createMany: { data: dto.images.map((url, i) => ({ url, sortOrder: i })) } }
+            ? {
+                createMany: {
+                  data: dto.images.map((url, i) => ({ url, sortOrder: i })),
+                },
+              }
             : undefined,
           amenities: dto.amenities?.length
             ? { createMany: { data: dto.amenities.map((name) => ({ name })) } }
@@ -174,7 +240,10 @@ export class PropertiesService {
     if (dto.location !== undefined) data.location = dto.location;
     if (dto.currency !== undefined) data.currency = dto.currency;
     if (dto.draftStep !== undefined) data.draftStep = dto.draftStep;
-    if (dto.draftData !== undefined) data.draftData = dto.draftData ? JSON.parse(JSON.stringify(dto.draftData)) : null;
+    if (dto.draftData !== undefined)
+      data.draftData = dto.draftData
+        ? JSON.parse(JSON.stringify(dto.draftData))
+        : null;
 
     if (dto.isDraft !== undefined) {
       data.status = dto.isDraft ? PropertyStatus.DRAFT : PropertyStatus.ACTIVE;
@@ -205,7 +274,9 @@ export class PropertiesService {
   async addStay(propertyId: string, hostId: string, dto: CreateStayDto) {
     const property = await this.assertOwnership(propertyId, hostId);
     if (property.type !== 'STAY') {
-      throw new BadRequestException('Cannot add a stay unit to a non-stay property');
+      throw new BadRequestException(
+        'Cannot add a stay unit to a non-stay property',
+      );
     }
 
     const stay = await this.prisma.$transaction(async (tx) => {
@@ -215,9 +286,9 @@ export class PropertiesService {
           name: dto.name,
           description: dto.description || null,
           rate: (dto as any).rate || (dto as any).price || 0,
-          unitType: ((dto as any).unitType || (dto as any).roomType || 'STANDARD_ROOM') as any,
+          unitType:
+            (dto as any).unitType || (dto as any).roomType || 'STANDARD_ROOM',
           isActive: dto.isActive ?? true,
-          sortOrder: dto.sortOrder ?? 0,
         },
       });
 
@@ -267,13 +338,20 @@ export class PropertiesService {
   async listStays(propertyId: string) {
     return this.prisma.stay.findMany({
       where: { propertyId, deletedAt: null },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { rate: 'asc' },
     });
   }
 
-  async updateStay(propertyId: string, stayId: string, hostId: string, dto: UpdateStayDto) {
+  async updateStay(
+    propertyId: string,
+    stayId: string,
+    hostId: string,
+    dto: UpdateStayDto,
+  ) {
     await this.assertOwnership(propertyId, hostId);
-    const stay = await this.prisma.stay.findFirst({ where: { id: stayId, propertyId } });
+    const stay = await this.prisma.stay.findFirst({
+      where: { id: stayId, propertyId },
+    });
     if (!stay) throw new NotFoundException('Stay unit not found');
 
     const updated = await this.prisma.stay.update({
@@ -284,7 +362,6 @@ export class PropertiesService {
         rate: (dto as any).rate || (dto as any).price,
         unitType: (dto as any).unitType || (dto as any).roomType,
         isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
       },
     });
 
@@ -302,18 +379,33 @@ export class PropertiesService {
 
   // ── Experiences Unit CRUD ────────────────────────────────────────────────────
 
-  async addExperience(propertyId: string, hostId: string, dto: CreateExperienceDto) {
+  async addExperience(
+    propertyId: string,
+    hostId: string,
+    dto: CreateExperienceDto,
+  ) {
     const property = await this.assertOwnership(propertyId, hostId);
     if (property.type !== 'EXPERIENCE') {
-      throw new BadRequestException('Cannot add an experience unit to a non-experience property');
+      throw new BadRequestException(
+        'Cannot add an experience unit to a non-experience property',
+      );
     }
 
-    const inclusions = dto.inclusions?.length ? dto.inclusions : dto.whatsIncluded?.length ? dto.whatsIncluded : [];
-    const timeSlots = dto.timeSlots?.length ? dto.timeSlots : dto.slots?.length ? dto.slots : [];
+    const inclusions = dto.inclusions?.length
+      ? dto.inclusions
+      : dto.whatsIncluded?.length
+        ? dto.whatsIncluded
+        : [];
+    const timeSlots = dto.timeSlots?.length
+      ? dto.timeSlots
+      : dto.slots?.length
+        ? dto.slots
+        : [];
     const whatsNotIncluded = dto.whatsNotIncluded || dto.exclusions || [];
     const whatToBring = dto.whatToBring || dto.whatToCarry || [];
     const whatNotToBring = dto.whatNotToBring || [];
-    const importantInformation = dto.importantInformation || dto.guidelines || [];
+    const importantInformation =
+      dto.importantInformation || dto.guidelines || [];
     const notSuitableFor = dto.notSuitableFor || dto.suitability || [];
 
     const exp = await this.prisma.$transaction(async (tx) => {
@@ -323,17 +415,17 @@ export class PropertiesService {
           name: dto.name,
           description: dto.description || null,
           rate: (dto as any).rate || (dto as any).price || 0,
-          experienceType: ((dto as any).experienceType || (dto as any).activityType || 'OTHER') as any,
-          duration: dto.duration || null,
+          experienceType:
+            (dto as any).experienceType || (dto as any).activityType || 'OTHER',
           meetingPoint: dto.meetingPoint || null,
-          meetingPointAddress: dto.meetingPointAddress || dto.meetingPoint || null,
+          meetingPointAddress:
+            dto.meetingPointAddress || dto.meetingPoint || null,
           whatsNotIncluded,
           whatToBring,
           whatNotToBring,
           importantInformation,
           notSuitableFor,
           isActive: dto.isActive ?? true,
-          sortOrder: dto.sortOrder ?? 0,
           inclusions: inclusions.length
             ? { createMany: { data: inclusions.map((item) => ({ item })) } }
             : undefined,
@@ -342,16 +434,18 @@ export class PropertiesService {
 
       // Create initial time slot (e.g., 10:00 - 13:00)
       const slotTime = timeSlots[0] || '10:00 - 13:00';
-      const parts = typeof slotTime === 'string' && slotTime.includes('-')
-        ? slotTime.split('-').map(s => s.trim())
-        : ['10:00', '13:00'];
+      const parts =
+        typeof slotTime === 'string' && slotTime.includes('-')
+          ? slotTime.split('-').map((s) => s.trim())
+          : ['10:00', '13:00'];
 
       await tx.experienceSlot.create({
         data: {
           experienceId: e.id,
           startTime: parts[0] || '10:00',
           endTime: parts[1] || '13:00',
-          label: typeof slotTime === 'string' ? slotTime : 'Morning Slot (10-13hrs)',
+          label:
+            typeof slotTime === 'string' ? slotTime : 'Morning Slot (10-13hrs)',
           maxCapacity: dto.maxParticipants || 10,
           available: dto.maxParticipants || 10,
           booked: 0,
@@ -381,7 +475,7 @@ export class PropertiesService {
       return tx.experience.findUnique({
         where: { id: e.id },
         include: {
-          timeSlots: { orderBy: { slot: 'asc' } },
+          slots: { orderBy: { startTime: 'asc' } },
           inclusions: true,
           policies: { orderBy: { sortOrder: 'asc' } },
           tags: { orderBy: { createdAt: 'asc' } },
@@ -397,26 +491,50 @@ export class PropertiesService {
     return this.prisma.experience.findMany({
       where: { propertyId, deletedAt: null },
       include: {
-        timeSlots: { orderBy: { slot: 'asc' } },
+        slots: { orderBy: { startTime: 'asc' } },
         inclusions: true,
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { rate: 'asc' },
     });
   }
 
-  async updateExperience(propertyId: string, experienceId: string, hostId: string, dto: UpdateExperienceDto) {
+  async updateExperience(
+    propertyId: string,
+    experienceId: string,
+    hostId: string,
+    dto: UpdateExperienceDto,
+  ) {
     await this.assertOwnership(propertyId, hostId);
-    const exp = await this.prisma.experience.findFirst({ where: { id: experienceId, propertyId } });
+    const exp = await this.prisma.experience.findFirst({
+      where: { id: experienceId, propertyId },
+    });
     if (!exp) throw new NotFoundException('Experience unit not found');
 
     const { timeSlots, inclusions, ...data } = dto;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (timeSlots) {
-        await tx.experienceTimeSlot.deleteMany({ where: { experienceId } });
+        await tx.experienceSlot.deleteMany({ where: { experienceId } });
         if (timeSlots.length) {
-          await tx.experienceTimeSlot.createMany({
-            data: timeSlots.map((slot) => ({ experienceId, slot })),
+          await tx.experienceSlot.createMany({
+            data: timeSlots.map((slotTime) => {
+              const parts =
+                typeof slotTime === 'string' && slotTime.includes('-')
+                  ? slotTime.split('-').map((s) => s.trim())
+                  : [slotTime, '13:00'];
+              return {
+                experienceId,
+                startTime: parts[0] || '10:00',
+                endTime: parts[1] || '13:00',
+                label:
+                  typeof slotTime === 'string'
+                    ? slotTime
+                    : 'Morning Slot (10-13hrs)',
+                maxCapacity: (data as any).maxParticipants || 10,
+                available: (data as any).maxParticipants || 10,
+                booked: 0,
+              };
+            }),
           });
         }
       }
@@ -434,14 +552,13 @@ export class PropertiesService {
           name: (data as any).name,
           description: (data as any).description,
           rate: (data as any).rate || (data as any).price,
-          experienceType: (data as any).experienceType || (data as any).activityType,
-          duration: (data as any).duration,
+          experienceType:
+            (data as any).experienceType || (data as any).activityType,
           meetingPoint: (data as any).meetingPoint,
           isActive: (data as any).isActive,
-          sortOrder: (data as any).sortOrder,
         },
         include: {
-          timeSlots: { orderBy: { slot: 'asc' } },
+          slots: { orderBy: { startTime: 'asc' } },
           inclusions: true,
         },
       });
@@ -450,7 +567,11 @@ export class PropertiesService {
     return { propertyId, experience: updated };
   }
 
-  async removeExperience(propertyId: string, experienceId: string, hostId: string) {
+  async removeExperience(
+    propertyId: string,
+    experienceId: string,
+    hostId: string,
+  ) {
     await this.assertOwnership(propertyId, hostId);
     await this.prisma.experience.update({
       where: { id: experienceId },
@@ -461,10 +582,16 @@ export class PropertiesService {
 
   // ── Transport Unit CRUD ──────────────────────────────────────────────────────
 
-  async addTransport(propertyId: string, hostId: string, dto: CreateTransportDto) {
+  async addTransport(
+    propertyId: string,
+    hostId: string,
+    dto: CreateTransportDto,
+  ) {
     const property = await this.assertOwnership(propertyId, hostId);
     if (property.type !== 'TRANSPORT') {
-      throw new BadRequestException('Cannot add a transport unit to a non-transport property');
+      throw new BadRequestException(
+        'Cannot add a transport unit to a non-transport property',
+      );
     }
 
     const transport = await this.prisma.$transaction(async (tx) => {
@@ -481,7 +608,6 @@ export class PropertiesService {
           rate: (dto as any).rate || (dto as any).pricePerSeat || 0,
           tripType: (dto as any).tripType || 'ONE_WAY',
           isActive: dto.isActive ?? true,
-          sortOrder: dto.sortOrder ?? 0,
         },
       });
 
@@ -531,13 +657,20 @@ export class PropertiesService {
   async listTransports(propertyId: string) {
     return this.prisma.transport.findMany({
       where: { propertyId, deletedAt: null },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { rate: 'asc' },
     });
   }
 
-  async updateTransport(propertyId: string, transportId: string, hostId: string, dto: UpdateTransportDto) {
+  async updateTransport(
+    propertyId: string,
+    transportId: string,
+    hostId: string,
+    dto: UpdateTransportDto,
+  ) {
     await this.assertOwnership(propertyId, hostId);
-    const transport = await this.prisma.transport.findFirst({ where: { id: transportId, propertyId } });
+    const transport = await this.prisma.transport.findFirst({
+      where: { id: transportId, propertyId },
+    });
     if (!transport) throw new NotFoundException('Transport unit not found');
 
     const updated = await this.prisma.transport.update({
@@ -552,14 +685,17 @@ export class PropertiesService {
         routeType: (dto as any).routeType,
         rate: (dto as any).rate || (dto as any).pricePerSeat,
         isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
       },
     });
 
     return { propertyId, transport: updated };
   }
 
-  async removeTransport(propertyId: string, transportId: string, hostId: string) {
+  async removeTransport(
+    propertyId: string,
+    transportId: string,
+    hostId: string,
+  ) {
     await this.assertOwnership(propertyId, hostId);
     await this.prisma.transport.update({
       where: { id: transportId },
@@ -581,7 +717,11 @@ export class PropertiesService {
     const baseOrder = (maxSort?.sortOrder ?? -1) + 1;
 
     await this.prisma.propertyImage.createMany({
-      data: imageUrls.map((url, i) => ({ propertyId: id, url, sortOrder: baseOrder + i })),
+      data: imageUrls.map((url, i) => ({
+        propertyId: id,
+        url,
+        sortOrder: baseOrder + i,
+      })),
     });
 
     const images = await this.prisma.propertyImage.findMany({
@@ -589,17 +729,25 @@ export class PropertiesService {
       orderBy: { sortOrder: 'asc' },
     });
 
-    return { id, images: images.map((img) => ({ url: img.url, sortOrder: img.sortOrder })) };
+    return {
+      id,
+      images: images.map((img) => ({ url: img.url, sortOrder: img.sortOrder })),
+    };
   }
 
   async removeImage(id: string, hostId: string, imageUrl: string) {
     await this.assertOwnership(id, hostId);
-    await this.prisma.propertyImage.deleteMany({ where: { propertyId: id, url: imageUrl } });
+    await this.prisma.propertyImage.deleteMany({
+      where: { propertyId: id, url: imageUrl },
+    });
     const images = await this.prisma.propertyImage.findMany({
       where: { propertyId: id },
       orderBy: { sortOrder: 'asc' },
     });
-    return { id, images: images.map((img) => ({ url: img.url, sortOrder: img.sortOrder })) };
+    return {
+      id,
+      images: images.map((img) => ({ url: img.url, sortOrder: img.sortOrder })),
+    };
   }
 
   async addAmenity(id: string, hostId: string, name: string, icon?: string) {
@@ -668,7 +816,8 @@ export class PropertiesService {
       where: { id },
       include: this.fullInclude,
     });
-    if (!draft || draft.deletedAt) throw new NotFoundException('Draft listing not found');
+    if (!draft || draft.deletedAt)
+      throw new NotFoundException('Draft listing not found');
     return this.formatProperty(draft);
   }
 
@@ -682,7 +831,11 @@ export class PropertiesService {
   }
 
   /** Update an existing draft listing. */
-  async updateDraft(propertyId: string, hostId: string, dto: UpdatePropertyDto) {
+  async updateDraft(
+    propertyId: string,
+    hostId: string,
+    dto: UpdatePropertyDto,
+  ) {
     return this.update(propertyId, hostId, {
       ...dto,
       isDraft: true,
@@ -711,10 +864,14 @@ export class PropertiesService {
     if (!property) throw new NotFoundException('Listing not found');
 
     const errors: string[] = [];
-    if (!property.name || !property.name.trim()) errors.push('Listing name is required.');
-    if (!property.description || !property.description.trim()) errors.push('Listing description is required.');
-    if (!property.location || !property.location.trim()) errors.push('Listing location is required.');
-    if (!property.images || property.images.length === 0) errors.push('At least one photo is required to publish.');
+    if (!property.name || !property.name.trim())
+      errors.push('Listing name is required.');
+    if (!property.description || !property.description.trim())
+      errors.push('Listing description is required.');
+    if (!property.location || !property.location.trim())
+      errors.push('Listing location is required.');
+    if (!property.images || property.images.length === 0)
+      errors.push('At least one photo is required to publish.');
 
     const unitCount =
       (property.stays?.length || 0) +
@@ -722,7 +879,9 @@ export class PropertiesService {
       (property.transports?.length || 0);
 
     if (unitCount === 0) {
-      errors.push(`At least one bookable ${property.type.toLowerCase()} unit must be added before publishing.`);
+      errors.push(
+        `At least one bookable ${property.type.toLowerCase()} unit must be added before publishing.`,
+      );
     }
 
     if (errors.length > 0) {
@@ -767,11 +926,14 @@ export class PropertiesService {
     };
 
     if (payload.name !== undefined) updateData.name = payload.name;
-    if (payload.description !== undefined) updateData.description = payload.description;
+    if (payload.description !== undefined)
+      updateData.description = payload.description;
     if (payload.location !== undefined) updateData.location = payload.location;
     if (payload.currency !== undefined) updateData.currency = payload.currency;
     if (payload.draftData !== undefined) {
-      updateData.draftData = payload.draftData ? JSON.parse(JSON.stringify(payload.draftData)) : null;
+      updateData.draftData = payload.draftData
+        ? JSON.parse(JSON.stringify(payload.draftData))
+        : null;
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -800,7 +962,10 @@ export class PropertiesService {
         await tx.propertyAmenity.deleteMany({ where: { propertyId } });
         if (payload.amenities.length > 0) {
           await tx.propertyAmenity.createMany({
-            data: payload.amenities.map((name: string) => ({ propertyId, name })),
+            data: payload.amenities.map((name: string) => ({
+              propertyId,
+              name,
+            })),
           });
         }
       }
@@ -858,7 +1023,7 @@ export class PropertiesService {
                 name: s.name,
                 description: s.description || null,
                 rate: (s.rate !== undefined ? s.rate : s.price) || 0,
-                unitType: (s.unitType || s.roomType || 'STANDARD_ROOM') as any,
+                unitType: s.unitType || s.roomType || 'STANDARD_ROOM',
               },
             });
             await tx.stayInventory.create({
@@ -876,7 +1041,10 @@ export class PropertiesService {
 
       // 8. Experience Unit (if submitted in this step for EXPERIENCE type)
       let primaryExpId = property.experiences?.[0]?.id;
-      if (property.type === 'EXPERIENCE' && (payload.experience || payload.experiences)) {
+      if (
+        property.type === 'EXPERIENCE' &&
+        (payload.experience || payload.experiences)
+      ) {
         const expList = payload.experiences || [payload.experience];
         for (const e of expList) {
           if (!e) continue;
@@ -888,7 +1056,6 @@ export class PropertiesService {
                 description: e.description ?? undefined,
                 rate: (e.rate !== undefined ? e.rate : e.price) ?? undefined,
                 experienceType: e.experienceType ?? e.activityType ?? undefined,
-                duration: e.duration ?? undefined,
                 meetingPoint: e.meetingPoint ?? undefined,
               },
             });
@@ -899,8 +1066,7 @@ export class PropertiesService {
                 name: e.name,
                 description: e.description || null,
                 rate: (e.rate !== undefined ? e.rate : e.price) || 0,
-                experienceType: (e.experienceType || e.activityType || 'OTHER') as any,
-                duration: e.duration || null,
+                experienceType: e.experienceType || e.activityType || 'OTHER',
                 meetingPoint: e.meetingPoint || null,
               },
             });
@@ -922,7 +1088,10 @@ export class PropertiesService {
 
       // 9. Transport Unit (if submitted in this step for TRANSPORT type)
       let primaryTransId = property.transports?.[0]?.id;
-      if (property.type === 'TRANSPORT' && (payload.transport || payload.transports)) {
+      if (
+        property.type === 'TRANSPORT' &&
+        (payload.transport || payload.transports)
+      ) {
         const transList = payload.transports || [payload.transport];
         for (const t of transList) {
           if (!t) continue;
@@ -935,7 +1104,8 @@ export class PropertiesService {
                 from: t.from ?? undefined,
                 to: t.to ?? undefined,
                 vehicleType: t.vehicleType ?? undefined,
-                rate: (t.rate !== undefined ? t.rate : t.pricePerSeat) ?? undefined,
+                rate:
+                  (t.rate !== undefined ? t.rate : t.pricePerSeat) ?? undefined,
                 rentalType: t.rentalType ?? undefined,
                 routeType: t.routeType ?? undefined,
               },
@@ -974,7 +1144,9 @@ export class PropertiesService {
         const targetTransId = primaryTransId || property.transports?.[0]?.id;
 
         if (targetStayId) {
-          await tx.listingPolicy.deleteMany({ where: { stayId: targetStayId } });
+          await tx.listingPolicy.deleteMany({
+            where: { stayId: targetStayId },
+          });
           if (payload.policies.length > 0) {
             await tx.listingPolicy.createMany({
               data: payload.policies.map((p: any, i: number) => ({
@@ -987,7 +1159,9 @@ export class PropertiesService {
             });
           }
         } else if (targetExpId) {
-          await tx.listingPolicy.deleteMany({ where: { experienceId: targetExpId } });
+          await tx.listingPolicy.deleteMany({
+            where: { experienceId: targetExpId },
+          });
           if (payload.policies.length > 0) {
             await tx.listingPolicy.createMany({
               data: payload.policies.map((p: any, i: number) => ({
@@ -1000,7 +1174,9 @@ export class PropertiesService {
             });
           }
         } else if (targetTransId) {
-          await tx.listingPolicy.deleteMany({ where: { transportId: targetTransId } });
+          await tx.listingPolicy.deleteMany({
+            where: { transportId: targetTransId },
+          });
           if (payload.policies.length > 0) {
             await tx.listingPolicy.createMany({
               data: payload.policies.map((p: any, i: number) => ({
@@ -1033,7 +1209,8 @@ export class PropertiesService {
       where: { id },
       include: this.fullInclude,
     });
-    if (!property || property.deletedAt) throw new NotFoundException('Property not found');
+    if (!property || property.deletedAt)
+      throw new NotFoundException('Property not found');
     return this.formatProperty(property);
   }
 
@@ -1042,19 +1219,28 @@ export class PropertiesService {
   public formatProperty(property: any) {
     const ratings = property.reviews?.map((r: any) => r.rating) || [];
     const avgRating = ratings.length
-      ? Number((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1))
+      ? Number(
+          (
+            ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length
+          ).toFixed(1),
+        )
       : 0;
 
     let startingPrice = 0;
     if (property.type === 'STAY' && property.stays?.length) {
       const active = property.stays.filter((s: any) => s.isActive);
-      if (active.length) startingPrice = Math.min(...active.map((s: any) => s.price));
+      if (active.length)
+        startingPrice = Math.min(...active.map((s: any) => s.rate));
     } else if (property.type === 'EXPERIENCE' && property.experiences?.length) {
       const active = property.experiences.filter((e: any) => e.isActive);
-      if (active.length) startingPrice = Math.min(...active.map((e: any) => e.price));
+      if (active.length)
+        startingPrice = Math.min(...active.map((e: any) => e.rate));
     } else if (property.type === 'TRANSPORT' && property.transports?.length) {
-      const active = property.transports.filter((t: any) => t.isActive && t.pricePerSeat != null);
-      if (active.length) startingPrice = Math.min(...active.map((t: any) => t.pricePerSeat));
+      const active = property.transports.filter(
+        (t: any) => t.isActive && t.rate != null,
+      );
+      if (active.length)
+        startingPrice = Math.min(...active.map((t: any) => t.rate));
     }
 
     return {
@@ -1073,8 +1259,14 @@ export class PropertiesService {
       rating: avgRating,
       reviewCount: property._count?.reviews ?? ratings.length,
       thumbnailUrl: property.images?.[0]?.url || null,
-      images: (property.images || []).map((img: any) => ({ url: img.url, sortOrder: img.sortOrder })),
-      amenities: (property.amenities || []).map((a: any) => ({ name: a.name, icon: a.icon })),
+      images: (property.images || []).map((img: any) => ({
+        url: img.url,
+        sortOrder: img.sortOrder,
+      })),
+      amenities: (property.amenities || []).map((a: any) => ({
+        name: a.name,
+        icon: a.icon,
+      })),
       rules: (property.rules || []).map((r: any) => r.rule),
       tags: (property.tags || []).map((t: any) => ({
         id: t.id,
@@ -1092,7 +1284,8 @@ export class PropertiesService {
         sortOrder: r.sortOrder,
       })),
       hostId: property.hostId,
-      hostName: (property.host as any)?.hostProfile?.businessName || property.host?.name || null,
+      hostName:
+        property.host?.hostProfile?.businessName || property.host?.name || null,
       hostAvatar: property.host?.avatar || null,
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,
@@ -1115,8 +1308,21 @@ export class PropertiesService {
         cancellationPolicy: s.cancellationPolicy?.toLowerCase() || null,
         isActive: s.isActive,
         policies: s.policies || [],
-        tags: (s.tags || []).map((t: any) => ({ id: t.id, name: t.name, slug: t.slug, category: t.category, icon: t.icon })),
-        recommendations: (s.recommendations || []).map((r: any) => ({ id: r.id, audience: r.audience, title: r.title, reason: r.reason, badge: r.badge, sortOrder: r.sortOrder })),
+        tags: (s.tags || []).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          category: t.category,
+          icon: t.icon,
+        })),
+        recommendations: (s.recommendations || []).map((r: any) => ({
+          id: r.id,
+          audience: r.audience,
+          title: r.title,
+          reason: r.reason,
+          badge: r.badge,
+          sortOrder: r.sortOrder,
+        })),
       })),
 
       experiences: (property.experiences || []).map((e: any) => ({
@@ -1134,8 +1340,21 @@ export class PropertiesService {
         timeSlots: (e.timeSlots || []).map((ts: any) => ts.slot),
         inclusions: (e.inclusions || []).map((i: any) => i.item),
         policies: e.policies || [],
-        tags: (e.tags || []).map((t: any) => ({ id: t.id, name: t.name, slug: t.slug, category: t.category, icon: t.icon })),
-        recommendations: (e.recommendations || []).map((r: any) => ({ id: r.id, audience: r.audience, title: r.title, reason: r.reason, badge: r.badge, sortOrder: r.sortOrder })),
+        tags: (e.tags || []).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          category: t.category,
+          icon: t.icon,
+        })),
+        recommendations: (e.recommendations || []).map((r: any) => ({
+          id: r.id,
+          audience: r.audience,
+          title: r.title,
+          reason: r.reason,
+          badge: r.badge,
+          sortOrder: r.sortOrder,
+        })),
       })),
 
       transports: (property.transports || []).map((t: any) => ({
@@ -1147,12 +1366,28 @@ export class PropertiesService {
         vehicleType: t.vehicleType,
         capacity: t.capacity,
         pricePerSeat: t.pricePerSeat,
-        priceFormatted: t.pricePerSeat != null ? `K${(t.pricePerSeat / 100).toFixed(2)}` : 'K0.00',
+        priceFormatted:
+          t.pricePerSeat != null
+            ? `K${(t.pricePerSeat / 100).toFixed(2)}`
+            : 'K0.00',
         schedule: t.schedule,
         isActive: t.isActive,
         policies: t.policies || [],
-        tags: (t.tags || []).map((tag: any) => ({ id: tag.id, name: tag.name, slug: tag.slug, category: tag.category, icon: tag.icon })),
-        recommendations: (t.recommendations || []).map((r: any) => ({ id: r.id, audience: r.audience, title: r.title, reason: r.reason, badge: r.badge, sortOrder: r.sortOrder })),
+        tags: (t.tags || []).map((tag: any) => ({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug,
+          category: tag.category,
+          icon: tag.icon,
+        })),
+        recommendations: (t.recommendations || []).map((r: any) => ({
+          id: r.id,
+          audience: r.audience,
+          title: r.title,
+          reason: r.reason,
+          badge: r.badge,
+          sortOrder: r.sortOrder,
+        })),
       })),
     };
   }
@@ -1160,23 +1395,55 @@ export class PropertiesService {
   private async assertOwnership(id: string, hostId: string) {
     const property = await this.prisma.property.findUnique({
       where: { id },
-      include: { host: { select: { hostProfile: { select: { defaultCheckInTime: true, defaultCheckOutTime: true } } } } },
+      include: {
+        host: {
+          select: {
+            hostProfile: {
+              select: { defaultCheckInTime: true, defaultCheckOutTime: true },
+            },
+          },
+        },
+      },
     });
-    if (!property || property.deletedAt) throw new NotFoundException('Property not found');
-    if (property.hostId !== hostId) throw new NotFoundException('Property not found');
+    if (!property || property.deletedAt)
+      throw new NotFoundException('Property not found');
+    if (property.hostId !== hostId)
+      throw new NotFoundException('Property not found');
     return property;
+  }
+
+  /**
+   * Syncs property status based on active inventory units.
+   * - If no active units remain (targetCount === 0), sets status to BOOKED.
+   * - If active units exist and property was BOOKED, sets status to ACTIVE.
+   */
+  private async syncPropertyStatus(id: string, activeUnitCount: number) {
+    if (activeUnitCount === 0) {
+      await this.prisma.property.update({
+        where: { id },
+        data: { status: PropertyStatus.BOOKED },
+      });
+    } else {
+      await this.prisma.property.update({
+        where: { id },
+        data: { status: PropertyStatus.ACTIVE },
+      });
+    }
   }
 
   // ── Listing Policies ────────────────────────────────────────────────────────
   // Host-authored policies scoped to a specific Stay / Experience / Transport unit.
 
   /** Return all policies for a specific unit (public — visible on listing detail). */
-  async getListingPolicies(unitType: 'stay' | 'experience' | 'transport', unitId: string) {
+  async getListingPolicies(
+    unitType: 'stay' | 'experience' | 'transport',
+    unitId: string,
+  ) {
     return this.prisma.listingPolicy.findMany({
       where: {
-        ...(unitType === 'stay'       ? { stayId: unitId }       : {}),
+        ...(unitType === 'stay' ? { stayId: unitId } : {}),
         ...(unitType === 'experience' ? { experienceId: unitId } : {}),
-        ...(unitType === 'transport'  ? { transportId: unitId }  : {}),
+        ...(unitType === 'transport' ? { transportId: unitId } : {}),
       },
       orderBy: { sortOrder: 'asc' },
     });
@@ -1192,9 +1459,9 @@ export class PropertiesService {
     await this._assertUnitOwnership(unitType, unitId, hostId);
     return this.prisma.listingPolicy.create({
       data: {
-        ...(unitType === 'stay'       ? { stayId: unitId }       : {}),
+        ...(unitType === 'stay' ? { stayId: unitId } : {}),
         ...(unitType === 'experience' ? { experienceId: unitId } : {}),
-        ...(unitType === 'transport'  ? { transportId: unitId }  : {}),
+        ...(unitType === 'transport' ? { transportId: unitId } : {}),
         category: dto.category as unknown as ListingPolicyCategory,
         title: dto.title,
         body: dto.body,
@@ -1216,9 +1483,9 @@ export class PropertiesService {
     await this._assertUnitOwnership(unitType, unitId, hostId);
 
     const whereClause = {
-      ...(unitType === 'stay'       ? { stayId: unitId }       : {}),
+      ...(unitType === 'stay' ? { stayId: unitId } : {}),
       ...(unitType === 'experience' ? { experienceId: unitId } : {}),
-      ...(unitType === 'transport'  ? { transportId: unitId }  : {}),
+      ...(unitType === 'transport' ? { transportId: unitId } : {}),
     };
 
     await this.prisma.$transaction(async (tx) => {
@@ -1245,20 +1512,31 @@ export class PropertiesService {
     hostId: string,
     dto: UpdateListingPolicyDto,
   ) {
-    const policy = await this.prisma.listingPolicy.findUnique({ where: { id: policyId } });
+    const policy = await this.prisma.listingPolicy.findUnique({
+      where: { id: policyId },
+    });
     if (!policy) throw new NotFoundException('Listing policy not found');
 
     // Verify ownership through the linked unit
-    if (policy.stayId)       await this._assertUnitOwnership('stay',       policy.stayId,       hostId);
-    if (policy.experienceId) await this._assertUnitOwnership('experience', policy.experienceId, hostId);
-    if (policy.transportId)  await this._assertUnitOwnership('transport',  policy.transportId,  hostId);
+    if (policy.stayId)
+      await this._assertUnitOwnership('stay', policy.stayId, hostId);
+    if (policy.experienceId)
+      await this._assertUnitOwnership(
+        'experience',
+        policy.experienceId,
+        hostId,
+      );
+    if (policy.transportId)
+      await this._assertUnitOwnership('transport', policy.transportId, hostId);
 
     return this.prisma.listingPolicy.update({
       where: { id: policyId },
       data: {
-        ...(dto.category  !== undefined ? { category: dto.category as unknown as ListingPolicyCategory } : {}),
-        ...(dto.title     !== undefined ? { title: dto.title }     : {}),
-        ...(dto.body      !== undefined ? { body: dto.body }       : {}),
+        ...(dto.category !== undefined
+          ? { category: dto.category as unknown as ListingPolicyCategory }
+          : {}),
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.body !== undefined ? { body: dto.body } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
       },
     });
@@ -1266,12 +1544,21 @@ export class PropertiesService {
 
   /** Remove a single listing policy. */
   async removeListingPolicy(policyId: string, hostId: string) {
-    const policy = await this.prisma.listingPolicy.findUnique({ where: { id: policyId } });
+    const policy = await this.prisma.listingPolicy.findUnique({
+      where: { id: policyId },
+    });
     if (!policy) throw new NotFoundException('Listing policy not found');
 
-    if (policy.stayId)       await this._assertUnitOwnership('stay',       policy.stayId,       hostId);
-    if (policy.experienceId) await this._assertUnitOwnership('experience', policy.experienceId, hostId);
-    if (policy.transportId)  await this._assertUnitOwnership('transport',  policy.transportId,  hostId);
+    if (policy.stayId)
+      await this._assertUnitOwnership('stay', policy.stayId, hostId);
+    if (policy.experienceId)
+      await this._assertUnitOwnership(
+        'experience',
+        policy.experienceId,
+        hostId,
+      );
+    if (policy.transportId)
+      await this._assertUnitOwnership('transport', policy.transportId, hostId);
 
     await this.prisma.listingPolicy.delete({ where: { id: policyId } });
     return { id: policyId, deleted: true };
@@ -1300,7 +1587,9 @@ export class PropertiesService {
         include: { property: { select: { hostId: true } } },
       });
       if (!exp || exp.property.hostId !== hostId) {
-        throw new NotFoundException('Experience unit not found or access denied');
+        throw new NotFoundException(
+          'Experience unit not found or access denied',
+        );
       }
     } else {
       const trans = await this.prisma.transport.findUnique({
@@ -1308,23 +1597,35 @@ export class PropertiesService {
         include: { property: { select: { hostId: true } } },
       });
       if (!trans || trans.property.hostId !== hostId) {
-        throw new NotFoundException('Transport unit not found or access denied');
+        throw new NotFoundException(
+          'Transport unit not found or access denied',
+        );
       }
     }
   }
 
   // ── Listing Tags Management ──────────────────────────────────────────────────
 
-  private _getTagTargetClause(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string) {
+  private _getTagTargetClause(
+    targetType: 'property' | 'stay' | 'experience' | 'transport',
+    targetId: string,
+  ) {
     switch (targetType) {
-      case 'property':   return { propertyId: targetId };
-      case 'stay':       return { stayId: targetId };
-      case 'experience': return { experienceId: targetId };
-      case 'transport':  return { transportId: targetId };
+      case 'property':
+        return { propertyId: targetId };
+      case 'stay':
+        return { stayId: targetId };
+      case 'experience':
+        return { experienceId: targetId };
+      case 'transport':
+        return { transportId: targetId };
     }
   }
 
-  async getTags(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string) {
+  async getTags(
+    targetType: 'property' | 'stay' | 'experience' | 'transport',
+    targetId: string,
+  ) {
     const where = this._getTagTargetClause(targetType, targetId);
     return this.prisma.listingTag.findMany({
       where,
@@ -1404,7 +1705,9 @@ export class PropertiesService {
       tag.transport?.property?.hostId;
 
     if (ownerHostId !== hostId) {
-      throw new ForbiddenException('Access denied: You do not own this listing');
+      throw new ForbiddenException(
+        'Access denied: You do not own this listing',
+      );
     }
 
     await this.prisma.listingTag.delete({ where: { id: tagId } });
@@ -1413,7 +1716,10 @@ export class PropertiesService {
 
   // ── Listing Recommendations Management ──────────────────────────────────────
 
-  async getRecommendations(targetType: 'property' | 'stay' | 'experience' | 'transport', targetId: string) {
+  async getRecommendations(
+    targetType: 'property' | 'stay' | 'experience' | 'transport',
+    targetId: string,
+  ) {
     const where = this._getTagTargetClause(targetType, targetId);
     return this.prisma.listingRecommendation.findMany({
       where,
@@ -1464,7 +1770,8 @@ export class PropertiesService {
     return this.prisma.listingRecommendation.create({
       data: {
         ...foreignKey,
-        audience: (dto.audience || RecommendationAudience.GENERAL) as RecommendationAudience,
+        audience: (dto.audience ||
+          RecommendationAudience.GENERAL) as RecommendationAudience,
         title: dto.title.trim(),
         reason: dto.reason || null,
         badge: dto.badge || null,
@@ -1493,7 +1800,9 @@ export class PropertiesService {
       rec.transport?.property?.hostId;
 
     if (ownerHostId !== hostId) {
-      throw new ForbiddenException('Access denied: You do not own this listing');
+      throw new ForbiddenException(
+        'Access denied: You do not own this listing',
+      );
     }
 
     await this.prisma.listingRecommendation.delete({ where: { id: recId } });
@@ -1507,9 +1816,21 @@ export class PropertiesService {
       where: {
         OR: [
           { property: { status: PropertyStatus.ACTIVE, deletedAt: null } },
-          { stay: { property: { status: PropertyStatus.ACTIVE, deletedAt: null } } },
-          { experience: { property: { status: PropertyStatus.ACTIVE, deletedAt: null } } },
-          { transport: { property: { status: PropertyStatus.ACTIVE, deletedAt: null } } },
+          {
+            stay: {
+              property: { status: PropertyStatus.ACTIVE, deletedAt: null },
+            },
+          },
+          {
+            experience: {
+              property: { status: PropertyStatus.ACTIVE, deletedAt: null },
+            },
+          },
+          {
+            transport: {
+              property: { status: PropertyStatus.ACTIVE, deletedAt: null },
+            },
+          },
         ],
       },
       select: {
@@ -1522,7 +1843,10 @@ export class PropertiesService {
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     });
 
-    const grouped: Record<string, { name: string; slug: string; icon?: string | null }[]> = {
+    const grouped: Record<
+      string,
+      { name: string; slug: string; icon?: string | null }[]
+    > = {
       CATEGORY: [],
       AMENITY: [],
       ACTIVITY: [],
@@ -1550,9 +1874,27 @@ export class PropertiesService {
       tagConditions.push({
         OR: [
           { tags: { some: { category: TagCategory.CATEGORY, slug } } },
-          { stays: { some: { tags: { some: { category: TagCategory.CATEGORY, slug } } } } },
-          { experiences: { some: { tags: { some: { category: TagCategory.CATEGORY, slug } } } } },
-          { transports: { some: { tags: { some: { category: TagCategory.CATEGORY, slug } } } } },
+          {
+            stays: {
+              some: {
+                tags: { some: { category: TagCategory.CATEGORY, slug } },
+              },
+            },
+          },
+          {
+            experiences: {
+              some: {
+                tags: { some: { category: TagCategory.CATEGORY, slug } },
+              },
+            },
+          },
+          {
+            transports: {
+              some: {
+                tags: { some: { category: TagCategory.CATEGORY, slug } },
+              },
+            },
+          },
         ],
       });
     }
@@ -1562,7 +1904,13 @@ export class PropertiesService {
       tagConditions.push({
         OR: [
           { tags: { some: { category: TagCategory.ACTIVITY, slug } } },
-          { experiences: { some: { tags: { some: { category: TagCategory.ACTIVITY, slug } } } } },
+          {
+            experiences: {
+              some: {
+                tags: { some: { category: TagCategory.ACTIVITY, slug } },
+              },
+            },
+          },
         ],
       });
     }
@@ -1572,9 +1920,21 @@ export class PropertiesService {
       tagConditions.push({
         OR: [
           { tags: { some: { category: TagCategory.AMENITY, slug } } },
-          { amenities: { some: { name: { contains: query.amenity, mode: 'insensitive' } } } },
-          { stays: { some: { tags: { some: { category: TagCategory.AMENITY, slug } } } } },
-          { transports: { some: { tags: { some: { category: TagCategory.AMENITY, slug } } } } },
+          {
+            amenities: {
+              some: { name: { contains: query.amenity, mode: 'insensitive' } },
+            },
+          },
+          {
+            stays: {
+              some: { tags: { some: { category: TagCategory.AMENITY, slug } } },
+            },
+          },
+          {
+            transports: {
+              some: { tags: { some: { category: TagCategory.AMENITY, slug } } },
+            },
+          },
         ],
       });
     }
@@ -1594,7 +1954,13 @@ export class PropertiesService {
       tagConditions.push({
         OR: [
           { tags: { some: { category: TagCategory.TRIP_TYPE, slug } } },
-          { transports: { some: { tags: { some: { category: TagCategory.TRIP_TYPE, slug } } } } },
+          {
+            transports: {
+              some: {
+                tags: { some: { category: TagCategory.TRIP_TYPE, slug } },
+              },
+            },
+          },
         ],
       });
     }
@@ -1604,19 +1970,37 @@ export class PropertiesService {
       tagConditions.push({
         OR: [
           { tags: { some: { category: TagCategory.VEHICLE_TYPE, slug } } },
-          { transports: { some: { vehicleType: { contains: query.vehicleType, mode: 'insensitive' } } } },
-          { transports: { some: { tags: { some: { category: TagCategory.VEHICLE_TYPE, slug } } } } },
+          {
+            transports: {
+              some: {
+                vehicleType: {
+                  contains: query.vehicleType,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+          {
+            transports: {
+              some: {
+                tags: { some: { category: TagCategory.VEHICLE_TYPE, slug } },
+              },
+            },
+          },
         ],
       });
     }
 
     if (query.recommendation) {
-      const audience = query.recommendation.toUpperCase() as RecommendationAudience;
+      const audience =
+        query.recommendation.toUpperCase() as RecommendationAudience;
       tagConditions.push({
         OR: [
           { recommendations: { some: { audience } } },
           { stays: { some: { recommendations: { some: { audience } } } } },
-          { experiences: { some: { recommendations: { some: { audience } } } } },
+          {
+            experiences: { some: { recommendations: { some: { audience } } } },
+          },
           { transports: { some: { recommendations: { some: { audience } } } } },
         ],
       });
@@ -1679,7 +2063,9 @@ export class PropertiesService {
     dto: CreateUnifiedListingDto,
   ): Promise<CreateUnifiedListingResponseDto> {
     const propertyType = dto.vertical.toUpperCase() as PropertyType;
-    const fullLocation = [dto.address, dto.city, dto.province].filter(Boolean).join(', ');
+    const fullLocation = [dto.address, dto.city, dto.province]
+      .filter(Boolean)
+      .join(', ');
 
     const policyMap: Record<string, CancellationPolicy> = {
       flexible: CancellationPolicy.FLEXIBLE,
@@ -1687,7 +2073,8 @@ export class PropertiesService {
       strict: CancellationPolicy.STRICT,
     };
     const cancellationPolicy =
-      policyMap[dto.cancellationPolicy.toLowerCase()] || CancellationPolicy.MODERATE;
+      policyMap[dto.cancellationPolicy.toLowerCase()] ||
+      CancellationPolicy.MODERATE;
 
     const property = await this.prisma.$transaction(async (tx) => {
       const prop = await tx.property.create({
@@ -1705,7 +2092,8 @@ export class PropertiesService {
             address: dto.address,
             latitude: dto.latitude,
             longitude: dto.longitude,
-            inventoryCount: dto.inventoryCount || dto.stayDetails?.inventoryCount || 1,
+            inventoryCount:
+              dto.inventoryCount || dto.stayDetails?.inventoryCount || 1,
           },
         },
       });
@@ -1724,9 +2112,15 @@ export class PropertiesService {
       // Amenities (standard + guestFavourites + standoutAmenities + safetyAmenities)
       const allAmenities = new Set<string>();
       (dto.amenities || []).forEach((a) => allAmenities.add(a));
-      (dto.stayDetails?.guestFavourites || []).forEach((a) => allAmenities.add(a));
-      (dto.stayDetails?.standoutAmenities || []).forEach((a) => allAmenities.add(a));
-      (dto.stayDetails?.safetyAmenities || []).forEach((a) => allAmenities.add(a));
+      (dto.stayDetails?.guestFavourites || []).forEach((a) =>
+        allAmenities.add(a),
+      );
+      (dto.stayDetails?.standoutAmenities || []).forEach((a) =>
+        allAmenities.add(a),
+      );
+      (dto.stayDetails?.safetyAmenities || []).forEach((a) =>
+        allAmenities.add(a),
+      );
 
       if (allAmenities.size > 0) {
         await tx.propertyAmenity.createMany({
@@ -1752,9 +2146,13 @@ export class PropertiesService {
       if (propertyType === 'STAY') {
         const stayDetails = dto.stayDetails;
         const totalCount =
-          dto.inventoryCount || stayDetails?.inventoryCount || (stayDetails?.units?.length || 1);
+          dto.inventoryCount ||
+          stayDetails?.inventoryCount ||
+          stayDetails?.units?.length ||
+          1;
 
-        const units: Array<{ name: string; type: string; maxGuests: number }> = [];
+        const units: Array<{ name: string; type: string; maxGuests: number }> =
+          [];
 
         if (stayDetails?.units && stayDetails.units.length > 0) {
           stayDetails.units.forEach((u) => {
@@ -1795,10 +2193,11 @@ export class PropertiesService {
             data: {
               propertyId: prop.id,
               name: u.name,
-              unitType: ((u.type || stayDetails?.propertyType || 'STANDARD_ROOM').toUpperCase().replace(/\s+/g, '_')) as any,
+              unitType: (u.type || stayDetails?.propertyType || 'STANDARD_ROOM')
+                .toUpperCase()
+                .replace(/\s+/g, '_') as any,
               rate: dto.pricePerUnitNgwee,
               isActive: true,
-              sortOrder: i,
             },
           });
 
@@ -1822,16 +2221,51 @@ export class PropertiesService {
         }
       } else if (propertyType === 'EXPERIENCE') {
         const expDetails = dto.experienceDetails;
-        const meetingPoint = expDetails?.meetingPoint || dto.meetingPoint || fullLocation;
-        const meetingPointAddress = expDetails?.meetingPointAddress || dto.meetingPointAddress || meetingPoint;
-        const whatsIncluded = expDetails?.whatsIncluded || expDetails?.inclusions || dto.whatsIncluded || dto.inclusions || [];
-        const whatsNotIncluded = expDetails?.whatsNotIncluded || expDetails?.exclusions || dto.whatsNotIncluded || dto.exclusions || [];
-        const whatToBring = expDetails?.whatToBring || expDetails?.whatToCarry || dto.whatToBring || dto.whatToCarry || [];
-        const whatNotToBring = expDetails?.whatNotToBring || dto.whatNotToBring || [];
-        const importantInformation = expDetails?.importantInformation || expDetails?.guidelines || dto.importantInformation || dto.guidelines || [];
-        const notSuitableFor = expDetails?.notSuitableFor || expDetails?.suitability || dto.notSuitableFor || dto.suitability || [];
+        const meetingPoint =
+          expDetails?.meetingPoint || dto.meetingPoint || fullLocation;
+        const meetingPointAddress =
+          expDetails?.meetingPointAddress ||
+          dto.meetingPointAddress ||
+          meetingPoint;
+        const whatsIncluded =
+          expDetails?.whatsIncluded ||
+          expDetails?.inclusions ||
+          dto.whatsIncluded ||
+          dto.inclusions ||
+          [];
+        const whatsNotIncluded =
+          expDetails?.whatsNotIncluded ||
+          expDetails?.exclusions ||
+          dto.whatsNotIncluded ||
+          dto.exclusions ||
+          [];
+        const whatToBring =
+          expDetails?.whatToBring ||
+          expDetails?.whatToCarry ||
+          dto.whatToBring ||
+          dto.whatToCarry ||
+          [];
+        const whatNotToBring =
+          expDetails?.whatNotToBring || dto.whatNotToBring || [];
+        const importantInformation =
+          expDetails?.importantInformation ||
+          expDetails?.guidelines ||
+          dto.importantInformation ||
+          dto.guidelines ||
+          [];
+        const notSuitableFor =
+          expDetails?.notSuitableFor ||
+          expDetails?.suitability ||
+          dto.notSuitableFor ||
+          dto.suitability ||
+          [];
         const itinerary = expDetails?.itinerary || dto.itinerary || null;
-        const rawSlots = expDetails?.slots || expDetails?.timeSlots || dto.slots || dto.timeSlots || [];
+        const rawSlots =
+          expDetails?.slots ||
+          expDetails?.timeSlots ||
+          dto.slots ||
+          dto.timeSlots ||
+          [];
 
         const exp = await tx.experience.create({
           data: {
@@ -1839,10 +2273,14 @@ export class PropertiesService {
             name: dto.title,
             description: dto.description,
             rate: dto.pricePerUnitNgwee,
-            experienceType: ((expDetails?.activityType || expDetails?.subtype || dto.subtype || 'OTHER').toUpperCase().replace(/\s+/g, '_')) as any,
-            duration: expDetails?.durationMinutes
-              ? `${expDetails.durationMinutes} mins`
-              : '2 hours',
+            experienceType: (
+              expDetails?.activityType ||
+              expDetails?.subtype ||
+              dto.subtype ||
+              'OTHER'
+            )
+              .toUpperCase()
+              .replace(/\s+/g, '_') as any,
             meetingPoint,
             meetingPointAddress,
             whatsNotIncluded,
@@ -1876,11 +2314,28 @@ export class PropertiesService {
         }
 
         if (rawSlots && rawSlots.length > 0) {
-          await tx.experienceTimeSlot.createMany({
-            data: rawSlots.map((ts: any) => ({
-              experienceId: exp.id,
-              slot: typeof ts === 'string' ? ts : ts.timeSlot || ts.label || '09:00 AM',
-            })),
+          await tx.experienceSlot.createMany({
+            data: rawSlots.map((ts: any) => {
+              const slotStr =
+                typeof ts === 'string'
+                  ? ts
+                  : ts.timeSlot || ts.label || '10:00 - 13:00';
+              const parts =
+                typeof slotStr === 'string' && slotStr.includes('-')
+                  ? slotStr.split('-').map((s: string) => s.trim())
+                  : [slotStr, '13:00'];
+              return {
+                experienceId: exp.id,
+                startTime: parts[0] || '10:00',
+                endTime: parts[1] || '13:00',
+                label: typeof ts === 'string' ? ts : ts.label || slotStr,
+                maxCapacity:
+                  ts.maxParticipants || expDetails?.maxParticipants || 10,
+                available:
+                  ts.maxParticipants || expDetails?.maxParticipants || 10,
+                booked: 0,
+              };
+            }),
           });
         }
 
@@ -1971,13 +2426,16 @@ export class PropertiesService {
     if (property.hostId !== hostId) {
       const user = await this.prisma.user.findUnique({ where: { id: hostId } });
       if (user?.role !== 'ADMIN') {
-        throw new ForbiddenException('Only the host can update this listing status');
+        throw new ForbiddenException(
+          'Only the host can update this listing status',
+        );
       }
     }
 
     let prismaStatus: PropertyStatus = PropertyStatus.ACTIVE;
     let deletedAt: Date | null = null;
-    let returnStatus: 'active' | 'draft' | 'paused' | 'archived' | 'inactive' = 'active';
+    let returnStatus: 'active' | 'draft' | 'paused' | 'archived' | 'inactive' =
+      'active';
     let childActive = true;
 
     const s = statusStr.toLowerCase();
@@ -2049,7 +2507,10 @@ export class PropertiesService {
    * 3.3 Delete / Deactivate Listing
    * Soft-deletes the master property and cascades deactivation & deletion to all child inventory units.
    */
-  async deleteListing(id: string, hostId: string): Promise<DeleteListingResponseDto> {
+  async deleteListing(
+    id: string,
+    hostId: string,
+  ): Promise<DeleteListingResponseDto> {
     const property = await this.prisma.property.findUnique({
       where: { id },
     });
@@ -2112,9 +2573,9 @@ export class PropertiesService {
     const property = await this.prisma.property.findUnique({
       where: { id },
       include: {
-        stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
-        transports: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
-        experiences: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+        stays: { where: { deletedAt: null }, orderBy: { rate: 'asc' } },
+        transports: { where: { deletedAt: null }, orderBy: { rate: 'asc' } },
+        experiences: { where: { deletedAt: null }, orderBy: { rate: 'asc' } },
       },
     });
 
@@ -2122,7 +2583,9 @@ export class PropertiesService {
     if (property.hostId !== hostId) {
       const user = await this.prisma.user.findUnique({ where: { id: hostId } });
       if (user?.role !== 'ADMIN') {
-        throw new ForbiddenException('Only the host can adjust inventory for this listing');
+        throw new ForbiddenException(
+          'Only the host can adjust inventory for this listing',
+        );
       }
     }
 
@@ -2179,7 +2642,6 @@ export class PropertiesService {
                   unitType: template?.unitType || ('STANDARD_ROOM' as any),
                   rate: template?.rate || 100000,
                   isActive: true,
-                  sortOrder: currentTotal + i,
                 },
               });
             }
@@ -2198,6 +2660,8 @@ export class PropertiesService {
         });
       });
 
+      await this.syncPropertyStatus(property.id, targetCount);
+
       return {
         id: property.id,
         propertyName: property.name,
@@ -2208,7 +2672,10 @@ export class PropertiesService {
     }
 
     // TRANSPORT or EXPERIENCE
-    const units = property.type === 'TRANSPORT' ? property.transports : property.experiences;
+    const units =
+      property.type === 'TRANSPORT'
+        ? property.transports
+        : property.experiences;
     const activeUnits = units.filter((u) => u.isActive);
     const currentActive = activeUnits.length;
 
@@ -2226,28 +2693,50 @@ export class PropertiesService {
     await this.prisma.$transaction(async (tx) => {
       if (property.type === 'TRANSPORT') {
         if (targetCount < currentActive) {
-          const toDeactivate = activeUnits.slice(-(currentActive - targetCount));
+          const toDeactivate = activeUnits.slice(
+            -(currentActive - targetCount),
+          );
           for (const u of toDeactivate) {
-            await tx.transport.update({ where: { id: u.id }, data: { isActive: false } });
+            await tx.transport.update({
+              where: { id: u.id },
+              data: { isActive: false },
+            });
           }
         } else if (targetCount > currentActive) {
           const inactive = units.filter((u) => !u.isActive);
-          const reactivateCount = Math.min(targetCount - currentActive, inactive.length);
+          const reactivateCount = Math.min(
+            targetCount - currentActive,
+            inactive.length,
+          );
           for (const u of inactive.slice(0, reactivateCount)) {
-            await tx.transport.update({ where: { id: u.id }, data: { isActive: true } });
+            await tx.transport.update({
+              where: { id: u.id },
+              data: { isActive: true },
+            });
           }
         }
       } else {
         if (targetCount < currentActive) {
-          const toDeactivate = activeUnits.slice(-(currentActive - targetCount));
+          const toDeactivate = activeUnits.slice(
+            -(currentActive - targetCount),
+          );
           for (const u of toDeactivate) {
-            await tx.experience.update({ where: { id: u.id }, data: { isActive: false } });
+            await tx.experience.update({
+              where: { id: u.id },
+              data: { isActive: false },
+            });
           }
         } else if (targetCount > currentActive) {
           const inactive = units.filter((u) => !u.isActive);
-          const reactivateCount = Math.min(targetCount - currentActive, inactive.length);
+          const reactivateCount = Math.min(
+            targetCount - currentActive,
+            inactive.length,
+          );
           for (const u of inactive.slice(0, reactivateCount)) {
-            await tx.experience.update({ where: { id: u.id }, data: { isActive: true } });
+            await tx.experience.update({
+              where: { id: u.id },
+              data: { isActive: true },
+            });
           }
         }
       }
@@ -2263,6 +2752,8 @@ export class PropertiesService {
         },
       });
     });
+
+    await this.syncPropertyStatus(property.id, targetCount);
 
     return {
       id: property.id,
@@ -2294,7 +2785,9 @@ export class PropertiesService {
     if (property.hostId !== hostId) {
       const user = await this.prisma.user.findUnique({ where: { id: hostId } });
       if (user?.role !== 'ADMIN') {
-        throw new ForbiddenException('Only the host can update pricing for this listing');
+        throw new ForbiddenException(
+          'Only the host can update pricing for this listing',
+        );
       }
     }
 
@@ -2362,7 +2855,7 @@ export class PropertiesService {
 
     const updatedDraft = {
       ...existingDraft,
-      policies: JSON.parse(JSON.stringify(dto)) as any,
+      policies: JSON.parse(JSON.stringify(dto)),
     };
 
     // Update Property record
@@ -2393,15 +2886,24 @@ export class PropertiesService {
         where: { propertyId },
         data: {
           ...(cancellationEnum ? { cancellationPolicy: cancellationEnum } : {}),
-          ...(dto.schedule?.checkInFrom ? { checkInFrom: dto.schedule.checkInFrom } : {}),
-          ...(dto.schedule?.checkInUntil ? { checkInUntil: dto.schedule.checkInUntil } : {}),
-          ...(dto.schedule?.checkOutBefore ? { checkOutBefore: dto.schedule.checkOutBefore } : {}),
+          ...(dto.schedule?.checkInFrom
+            ? { checkInFrom: dto.schedule.checkInFrom }
+            : {}),
+          ...(dto.schedule?.checkInUntil
+            ? { checkInUntil: dto.schedule.checkInUntil }
+            : {}),
+          ...(dto.schedule?.checkOutBefore
+            ? { checkOutBefore: dto.schedule.checkOutBefore }
+            : {}),
         },
       });
     }
 
     // Cascade rules to PropertyRule
-    if (dto.houseRules?.customRules && Array.isArray(dto.houseRules.customRules)) {
+    if (
+      dto.houseRules?.customRules &&
+      Array.isArray(dto.houseRules.customRules)
+    ) {
       await this.prisma.propertyRule.deleteMany({ where: { propertyId } });
       if (dto.houseRules.customRules.length > 0) {
         await this.prisma.propertyRule.createMany({
@@ -2416,11 +2918,14 @@ export class PropertiesService {
     // Compute summary
     const tier = dto.cancellation?.tier || 'moderate';
     const tierCapitalized = tier.charAt(0).toUpperCase() + tier.slice(1);
-    const refundPercent = dto.cancellation?.refundPercentagePriorToCutOff ?? 100;
-    const cutOffDays = Math.round((dto.cancellation?.freeCancellationCutOffHours || 120) / 24);
+    const refundPercent =
+      dto.cancellation?.refundPercentagePriorToCutOff ?? 100;
+    const cutOffDays = Math.round(
+      (dto.cancellation?.freeCancellationCutOffHours || 120) / 24,
+    );
     const cancellationSummary = `${tierCapitalized} (${refundPercent}% refund up to ${cutOffDays} days before check-in)`;
 
-    let rulesCount = (dto.houseRules?.customRules?.length || 0);
+    let rulesCount = dto.houseRules?.customRules?.length || 0;
     if (dto.houseRules) {
       if (!dto.houseRules.smokingAllowed) rulesCount++;
       if (!dto.houseRules.petsAllowed) rulesCount++;
@@ -2450,7 +2955,7 @@ export class PropertiesService {
     let property = await this.prisma.property.findUnique({
       where: { id: propertyOrListingId },
       include: {
-        stays: { take: 1, orderBy: { sortOrder: 'asc' } },
+        stays: { take: 1, orderBy: { rate: 'asc' } },
         rules: true,
       },
     });
@@ -2461,7 +2966,7 @@ export class PropertiesService {
         include: {
           property: {
             include: {
-              stays: { take: 1, orderBy: { sortOrder: 'asc' } },
+              stays: { take: 1, orderBy: { rate: 'asc' } },
               rules: true,
             },
           },
@@ -2473,7 +2978,9 @@ export class PropertiesService {
     }
 
     if (!property) {
-      throw new NotFoundException(`Property or listing "${propertyOrListingId}" not found`);
+      throw new NotFoundException(
+        `Property or listing "${propertyOrListingId}" not found`,
+      );
     }
 
     const stored: any = (property.draftData as any)?.policies || {};
@@ -2481,8 +2988,11 @@ export class PropertiesService {
 
     const tier = (stored.cancellation?.tier || 'moderate') as CancellationTier;
     const tierCapitalized = tier.charAt(0).toUpperCase() + tier.slice(1);
-    const deadlineHours = stored.cancellation?.freeCancellationCutOffHours || 120;
-    const deadlineDate = new Date(Date.now() + deadlineHours * 3600 * 1000).toISOString();
+    const deadlineHours =
+      stored.cancellation?.freeCancellationCutOffHours || 120;
+    const deadlineDate = new Date(
+      Date.now() + deadlineHours * 3600 * 1000,
+    ).toISOString();
 
     const cancellation = {
       tier,
@@ -2492,8 +3002,8 @@ export class PropertiesService {
         (tier === 'flexible'
           ? 'Full refund up to 24 hours before check-in.'
           : tier === 'strict'
-          ? 'Full refund up to 7 days before check-in. No refund after cutoff.'
-          : 'Full refund up to 5 days before check-in. Cancellations made within 5 days of arrival receive a 50% refund minus transaction fees.'),
+            ? 'Full refund up to 7 days before check-in. No refund after cutoff.'
+            : 'Full refund up to 5 days before check-in. Cancellations made within 5 days of arrival receive a 50% refund minus transaction fees.'),
       freeCancellationDeadline: deadlineDate,
     };
 
@@ -2503,11 +3013,16 @@ export class PropertiesService {
 
     const houseRulesSummary: string[] = [];
     if (stored.houseRules) {
-      if (!stored.houseRules.smokingAllowed) houseRulesSummary.push('No smoking indoors');
-      if (!stored.houseRules.petsAllowed) houseRulesSummary.push('No pets allowed');
-      if (!stored.houseRules.partiesOrEventsAllowed) houseRulesSummary.push('No parties or events');
+      if (!stored.houseRules.smokingAllowed)
+        houseRulesSummary.push('No smoking indoors');
+      if (!stored.houseRules.petsAllowed)
+        houseRulesSummary.push('No pets allowed');
+      if (!stored.houseRules.partiesOrEventsAllowed)
+        houseRulesSummary.push('No parties or events');
       if (stored.houseRules.quietHours?.enabled) {
-        houseRulesSummary.push(`Quiet hours: ${stored.houseRules.quietHours.startTime} – ${stored.houseRules.quietHours.endTime}`);
+        houseRulesSummary.push(
+          `Quiet hours: ${stored.houseRules.quietHours.startTime} – ${stored.houseRules.quietHours.endTime}`,
+        );
       }
       if (Array.isArray(stored.houseRules.customRules)) {
         houseRulesSummary.push(...stored.houseRules.customRules);
@@ -2515,14 +3030,20 @@ export class PropertiesService {
     } else if (property.rules?.length) {
       houseRulesSummary.push(...property.rules.map((r) => r.rule));
     } else {
-      houseRulesSummary.push('No smoking indoors', 'No pets allowed', 'No parties or events', 'Quiet hours: 22:00 – 06:30');
+      houseRulesSummary.push(
+        'No smoking indoors',
+        'No pets allowed',
+        'No parties or events',
+        'Quiet hours: 22:00 – 06:30',
+      );
     }
 
     const depositAmount = stored.securityDeposit?.amountNgwee ?? 75000;
     const depositTimeline = stored.securityDeposit?.refundTimelineHours ?? 48;
-    const securityDepositNote = stored.securityDeposit?.required !== false
-      ? `A refundable security deposit of K${(depositAmount / 100).toFixed(2)} will be held and released within ${depositTimeline} hours of checkout.`
-      : 'No security deposit required.';
+    const securityDepositNote =
+      stored.securityDeposit?.required !== false
+        ? `A refundable security deposit of K${(depositAmount / 100).toFixed(2)} will be held and released within ${depositTimeline} hours of checkout.`
+        : 'No security deposit required.';
 
     const goodToKnow =
       stored.goodToKnow?.customPoliciesText ||
@@ -2545,5 +3066,4 @@ export class PropertiesService {
       ...responseData,
     };
   }
-
 }

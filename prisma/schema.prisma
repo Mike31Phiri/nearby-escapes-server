@@ -703,6 +703,7 @@ enum PropertyStatus {
   DRAFT
   PENDING
   ACTIVE
+  BOOKED
   INACTIVE
 }
 
