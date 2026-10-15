@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
+import { BookingReadService } from './booking-read.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('BookingsService - 2-Step Check-In Handshake', () => {
@@ -7,6 +8,7 @@ describe('BookingsService - 2-Step Check-In Handshake', () => {
   let prisma: any;
   let notifications: any;
   let readStore: any;
+  let readService: any;
 
   beforeEach(() => {
     prisma = {
@@ -30,11 +32,18 @@ describe('BookingsService - 2-Step Check-In Handshake', () => {
     readStore = {
       enqueueSync: jest.fn(),
     };
+    readService = {
+      getGuestBookingsGrouped: jest.fn(),
+      getGuestBookings: jest.fn(),
+      findOne: jest.fn(),
+      findMyBookings: jest.fn(),
+    };
 
     service = new BookingsService(
       prisma as PrismaService,
       notifications as any,
       readStore as any,
+      readService as BookingReadService,
     );
   });
 
