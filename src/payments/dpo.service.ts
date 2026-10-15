@@ -191,7 +191,22 @@ export class DpoService {
 
     const payment = await this.prisma.payment.findFirst({
       where: { providerRef: transToken },
-      include: { booking: { include: { guest: true } } },
+      include: {
+        booking: {
+          include: {
+            guest: true,
+            stayBooking: {
+              include: { stayInventory: true },
+            },
+            experienceBooking: {
+              include: { experienceSlot: true },
+            },
+            transportBooking: {
+              include: { transportInventory: true },
+            },
+          },
+        },
+      },
     });
 
     if (!payment) {
@@ -225,8 +240,67 @@ export class DpoService {
           payment.amount,
         );
       }
+    } else if (payment.booking) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.booking.update({
+          where: { id: payment.bookingId },
+          data: {
+            paymentStatus: 'UNPAID',
+            status: 'CANCELLED',
+            expiresAt: null,
+          },
+        });
+
+        await this.restoreInventoryForBooking(tx, payment.booking);
+      });
+
+      if (payment.booking.guest?.email) {
+        await this.notifications.sendPaymentFailedNotification(
+          payment.booking.guest.email,
+          payment.booking.guest.name,
+          payment.booking.bookingRef,
+        );
+      }
     }
 
     this.logger.log(`Payment ${transToken} updated to ${newStatus}`);
+  }
+
+  private async restoreInventoryForBooking(
+    tx: any,
+    booking: any,
+  ): Promise<void> {
+    if (booking.stayBooking && booking.stayBooking.stayInventory) {
+      await tx.stayInventory.update({
+        where: { id: booking.stayBooking.stayInventory.id },
+        data: {
+          booked: { decrement: 1 },
+          available: { increment: 1 },
+        },
+      });
+    } else if (
+      booking.experienceBooking &&
+      booking.experienceBooking.experienceSlot
+    ) {
+      await tx.experienceSlot.update({
+        where: { id: booking.experienceBooking.experienceSlot.id },
+        data: {
+          booked: { decrement: booking.experienceBooking.guests },
+          available: { increment: booking.experienceBooking.guests },
+        },
+      });
+    } else if (
+      booking.transportBooking &&
+      booking.transportBooking.transportInventory
+    ) {
+      const seats = booking.transportBooking.seats ?? 1;
+      await tx.transportInventory.update({
+        where: { id: booking.transportBooking.transportInventory.id },
+        data: {
+          booked: { decrement: seats },
+          available: { increment: seats },
+        },
+      });
+    }
   }
 }
