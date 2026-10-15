@@ -18,6 +18,7 @@ import { AdminModule } from './admin/admin.module';
 import { PlatformModule } from './platform/platform.module';
 import { ReadStoreModule } from './read-store/read-store.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ZohoModule } from './zoho/zoho.module';
 import { PoliciesModule } from './policies/policies.module';
 import { PopularityModule } from './popularity/popularity.module';
 import { DisputesModule } from './disputes/disputes.module';
@@ -42,10 +43,11 @@ import { DisputesModule } from './disputes/disputes.module';
     AdminModule,
     PlatformModule,
     ReadStoreModule,
+    ZohoModule,
     PoliciesModule,
     PopularityModule,
     DisputesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule { }
+export class AppModule {}
