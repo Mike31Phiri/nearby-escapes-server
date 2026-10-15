@@ -1044,6 +1044,15 @@ export class BookingsService {
       })
       .catch(() => null);
 
+    // Create Zoho invoice and email it to the guest
+    await this.notifications
+      .sendInvoiceAfterCheckout(updated)
+      .catch((err: Error) =>
+        this.logger.error(
+          `Zoho invoice dispatch failed after checkout: ${err.message}`,
+        ),
+      );
+
     await this.readStore.enqueueSync(booking.propertyId).catch(() => null);
 
     return {
