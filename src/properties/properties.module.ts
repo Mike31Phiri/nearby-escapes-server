@@ -6,9 +6,16 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ReadStoreModule } from '../read-store/read-store.module';
 import { HostsModule } from '../hosts/hosts.module';
 import { PopularityModule } from '../popularity/popularity.module';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
-  imports: [PrismaModule, ReadStoreModule, HostsModule, PopularityModule],
+  imports: [
+    PrismaModule,
+    ReadStoreModule,
+    HostsModule,
+    PopularityModule,
+    UploadsModule,
+  ],
   controllers: [PropertiesController, ListingsController],
   providers: [PropertiesService],
   exports: [PropertiesService],

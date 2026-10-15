@@ -110,15 +110,17 @@ model Stay {
   createdAt    DateTime                @default(now())
   updatedAt    DateTime                @updatedAt
   deletedAt    DateTime?
-  // Capacity inventory ledger (linked by stayId)
-  inventory    StayInventory[]
-  // Bookings
-  stayBookings StayBooking[]
-  // Metadata & Policies (bedrooms, house rules, cancellation, etc.)
-  policies        ListingPolicy[]
-  recommendations ListingRecommendation[]
-  tags            ListingTag[]
-  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   // Capacity inventory ledger (linked by stayId)
+   inventory    StayInventory[]
+   // Bookings
+   stayBookings StayBooking[]
+   // Images
+   images       StayImage[]
+   // Metadata & Policies (bedrooms, house rules, cancellation, etc.)
+   policies        ListingPolicy[]
+   recommendations ListingRecommendation[]
+   tags            ListingTag[]
+   property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId, unitType])
 }
@@ -168,16 +170,18 @@ model Experience {
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
   deletedAt            DateTime?
-  // First-class time slots (e.g. 10-13hrs, 15-17hrs)
-  slots                ExperienceSlot[]
-  // Bookings (via time slots)
-  experienceBookings   ExperienceBooking[]
-  // Metadata
-  inclusions           ExperienceInclusion[]
-  policies             ListingPolicy[]
-  recommendations      ListingRecommendation[]
-  tags                 ListingTag[]
-  property             Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   // First-class time slots (e.g. 10-13hrs, 15-17hrs)
+   slots                ExperienceSlot[]
+   // Bookings (via time slots)
+   experienceBookings   ExperienceBooking[]
+   // Images
+   images               ExperienceImage[]
+   // Metadata
+   inclusions           ExperienceInclusion[]
+   policies             ListingPolicy[]
+   recommendations      ListingRecommendation[]
+   tags                 ListingTag[]
+   property             Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId, experienceType])
 }
@@ -232,15 +236,17 @@ model Transport {
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
   deletedAt         DateTime?
-  // Capacity ledger (linked by transportId)
-  inventory         TransportInventory[]
-  // Bookings
-  transportBookings TransportBooking[]
-  // Metadata
-  policies          ListingPolicy[]
-  recommendations   ListingRecommendation[]
-  tags              ListingTag[]
-  property          Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   // Capacity ledger (linked by transportId)
+   inventory         TransportInventory[]
+   // Bookings
+   transportBookings TransportBooking[]
+   // Images
+   images            TransportImage[]
+   // Metadata
+   policies          ListingPolicy[]
+   recommendations   ListingRecommendation[]
+   tags              ListingTag[]
+   property          Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId, tripType])
 }
@@ -275,6 +281,39 @@ model PropertyImage {
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId, sortOrder])
+}
+
+model StayImage {
+  id      String @id @default(uuid())
+  stayId  String
+  url     String
+  altText String?
+  sortOrder Int  @default(0)
+  stay    Stay   @relation(fields: [stayId], references: [id], onDelete: Cascade)
+
+  @@index([stayId, sortOrder])
+}
+
+model ExperienceImage {
+  id            String     @id @default(uuid())
+  experienceId  String
+  url           String
+  altText       String?
+  sortOrder     Int        @default(0)
+  experience    Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  @@index([experienceId, sortOrder])
+}
+
+model TransportImage {
+  id          String    @id @default(uuid())
+  transportId String
+  url         String
+  altText     String?
+  sortOrder   Int       @default(0)
+  transport   Transport @relation(fields: [transportId], references: [id], onDelete: Cascade)
+
+  @@index([transportId, sortOrder])
 }
 
 model PropertyAmenity {
@@ -703,6 +742,7 @@ enum PropertyStatus {
   DRAFT
   PENDING
   ACTIVE
+  BOOKED
   INACTIVE
 }
 

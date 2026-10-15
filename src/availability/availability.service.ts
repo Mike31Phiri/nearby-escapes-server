@@ -16,7 +16,7 @@ export class AvailabilityService {
     const property = await this.prisma.property.findUnique({
       where: { id: propertyId },
       include: {
-        stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+        stays: { where: { deletedAt: null }, orderBy: { rate: 'asc' } },
         experiences: { where: { deletedAt: null } },
         transports: { where: { deletedAt: null } },
       },
