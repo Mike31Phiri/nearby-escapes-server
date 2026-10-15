@@ -97,7 +97,7 @@ export class UploadsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
+  @Roles('HOST', 'GUEST')
   @Post('avatar')
   @UseInterceptors(FileInterceptor('avatar'))
   @ApiConsumes('multipart/form-data')
