@@ -214,18 +214,20 @@ export class PropertiesService {
           propertyId,
           name: dto.name,
           description: dto.description || null,
-          price: dto.price,
-          roomType: dto.roomType || null,
-          bedrooms: dto.bedrooms ?? null,
-          beds: dto.beds ?? null,
-          baths: dto.baths ?? null,
-          maxGuests: dto.maxGuests ?? null,
-          checkInFrom: dto.checkInFrom || (property.host as any)?.hostProfile?.defaultCheckInTime || '14:00',
-          checkInUntil: dto.checkInUntil || null,
-          checkOutBefore: dto.checkOutBefore || (property.host as any)?.hostProfile?.defaultCheckOutTime || '10:00',
-          cancellationPolicy: dto.cancellationPolicy || null,
+          rate: (dto as any).rate || (dto as any).price || 0,
+          unitType: ((dto as any).unitType || (dto as any).roomType || 'STANDARD_ROOM') as any,
           isActive: dto.isActive ?? true,
           sortOrder: dto.sortOrder ?? 0,
+        },
+      });
+
+      // Automatically create the initial capacity inventory ledger
+      await tx.stayInventory.create({
+        data: {
+          stayId: s.id,
+          total: (dto as any).totalUnits || (dto as any).capacity || 1,
+          available: (dto as any).totalUnits || (dto as any).capacity || 1,
+          booked: 0,
         },
       });
       if (dto.policies?.length) {
@@ -276,7 +278,14 @@ export class PropertiesService {
 
     const updated = await this.prisma.stay.update({
       where: { id: stayId },
-      data: dto,
+      data: {
+        name: dto.name,
+        description: dto.description,
+        rate: (dto as any).rate || (dto as any).price,
+        unitType: (dto as any).unitType || (dto as any).roomType,
+        isActive: dto.isActive,
+        sortOrder: dto.sortOrder,
+      },
     });
 
     return { propertyId, stay: updated };
@@ -313,15 +322,11 @@ export class PropertiesService {
           propertyId,
           name: dto.name,
           description: dto.description || null,
-          price: dto.price,
-          activityType: dto.activityType || null,
+          rate: (dto as any).rate || (dto as any).price || 0,
+          experienceType: ((dto as any).experienceType || (dto as any).activityType || 'OTHER') as any,
           duration: dto.duration || null,
-          maxParticipants: dto.maxParticipants ?? null,
-          difficultyLevel: dto.difficultyLevel || null,
           meetingPoint: dto.meetingPoint || null,
           meetingPointAddress: dto.meetingPointAddress || dto.meetingPoint || null,
-          itinerary: dto.itinerary ? (dto.itinerary as any) : undefined,
-          slots: dto.slots?.length ? (dto.slots as any) : undefined,
           whatsNotIncluded,
           whatToBring,
           whatNotToBring,
@@ -329,22 +334,27 @@ export class PropertiesService {
           notSuitableFor,
           isActive: dto.isActive ?? true,
           sortOrder: dto.sortOrder ?? 0,
-          timeSlots: timeSlots.length
-            ? {
-                createMany: {
-                  data: timeSlots.map((ts: any) => ({
-                    slot: typeof ts === 'string' ? ts : ts.timeSlot || ts.label || 'Default Slot',
-                  })),
-                },
-              }
-            : undefined,
           inclusions: inclusions.length
             ? { createMany: { data: inclusions.map((item) => ({ item })) } }
             : undefined,
         },
-        include: {
-          timeSlots: { orderBy: { slot: 'asc' } },
-          inclusions: true,
+      });
+
+      // Create initial time slot (e.g., 10:00 - 13:00)
+      const slotTime = timeSlots[0] || '10:00 - 13:00';
+      const parts = typeof slotTime === 'string' && slotTime.includes('-')
+        ? slotTime.split('-').map(s => s.trim())
+        : ['10:00', '13:00'];
+
+      await tx.experienceSlot.create({
+        data: {
+          experienceId: e.id,
+          startTime: parts[0] || '10:00',
+          endTime: parts[1] || '13:00',
+          label: typeof slotTime === 'string' ? slotTime : 'Morning Slot (10-13hrs)',
+          maxCapacity: dto.maxParticipants || 10,
+          available: dto.maxParticipants || 10,
+          booked: 0,
         },
       });
       if (dto.policies?.length) {
@@ -420,7 +430,16 @@ export class PropertiesService {
       }
       return tx.experience.update({
         where: { id: experienceId },
-        data,
+        data: {
+          name: (data as any).name,
+          description: (data as any).description,
+          rate: (data as any).rate || (data as any).price,
+          experienceType: (data as any).experienceType || (data as any).activityType,
+          duration: (data as any).duration,
+          meetingPoint: (data as any).meetingPoint,
+          isActive: (data as any).isActive,
+          sortOrder: (data as any).sortOrder,
+        },
         include: {
           timeSlots: { orderBy: { slot: 'asc' } },
           inclusions: true,
@@ -456,12 +475,23 @@ export class PropertiesService {
           description: dto.description || null,
           from: dto.from || null,
           to: dto.to || null,
+          rentalType: (dto as any).rentalType || null,
+          routeType: (dto as any).routeType || null,
           vehicleType: dto.vehicleType || null,
-          capacity: dto.capacity ?? null,
-          pricePerSeat: dto.pricePerSeat ?? null,
-          schedule: dto.schedule ? JSON.parse(JSON.stringify(dto.schedule)) : null,
+          rate: (dto as any).rate || (dto as any).pricePerSeat || 0,
+          tripType: (dto as any).tripType || 'ONE_WAY',
           isActive: dto.isActive ?? true,
           sortOrder: dto.sortOrder ?? 0,
+        },
+      });
+
+      // Create capacity inventory
+      await tx.transportInventory.create({
+        data: {
+          transportId: t.id,
+          totalSeats: dto.capacity || 1,
+          available: dto.capacity || 1,
+          booked: 0,
         },
       });
       if (dto.policies?.length) {
@@ -513,8 +543,16 @@ export class PropertiesService {
     const updated = await this.prisma.transport.update({
       where: { id: transportId },
       data: {
-        ...dto,
-        schedule: dto.schedule ? JSON.parse(JSON.stringify(dto.schedule)) : undefined,
+        name: dto.name,
+        description: dto.description,
+        from: dto.from,
+        to: dto.to,
+        vehicleType: dto.vehicleType,
+        rentalType: (dto as any).rentalType,
+        routeType: (dto as any).routeType,
+        rate: (dto as any).rate || (dto as any).pricePerSeat,
+        isActive: dto.isActive,
+        sortOrder: dto.sortOrder,
       },
     });
 
@@ -809,34 +847,26 @@ export class PropertiesService {
               data: {
                 name: s.name ?? undefined,
                 description: s.description ?? undefined,
-                price: s.price !== undefined ? s.price : undefined,
-                roomType: s.roomType ?? undefined,
-                bedrooms: s.bedrooms ?? undefined,
-                beds: s.beds ?? undefined,
-                baths: s.baths ?? undefined,
-                maxGuests: s.maxGuests ?? undefined,
-                checkInFrom: s.checkInFrom ?? undefined,
-                checkInUntil: s.checkInUntil ?? undefined,
-                checkOutBefore: s.checkOutBefore ?? undefined,
-                cancellationPolicy: s.cancellationPolicy ?? undefined,
+                rate: (s.rate !== undefined ? s.rate : s.price) ?? undefined,
+                unitType: s.unitType ?? s.roomType ?? undefined,
               },
             });
-          } else if (s.name && s.price !== undefined) {
+          } else if (s.name) {
             const createdStay = await tx.stay.create({
               data: {
                 propertyId,
                 name: s.name,
                 description: s.description || null,
-                price: s.price,
-                roomType: s.roomType || null,
-                bedrooms: s.bedrooms ?? null,
-                beds: s.beds ?? null,
-                baths: s.baths ?? null,
-                maxGuests: s.maxGuests ?? null,
-                checkInFrom: s.checkInFrom || '14:00',
-                checkInUntil: s.checkInUntil || null,
-                checkOutBefore: s.checkOutBefore || '10:00',
-                cancellationPolicy: s.cancellationPolicy || null,
+                rate: (s.rate !== undefined ? s.rate : s.price) || 0,
+                unitType: (s.unitType || s.roomType || 'STANDARD_ROOM') as any,
+              },
+            });
+            await tx.stayInventory.create({
+              data: {
+                stayId: createdStay.id,
+                total: s.totalUnits || s.capacity || 1,
+                available: s.totalUnits || s.capacity || 1,
+                booked: 0,
               },
             });
             primaryStayId = createdStay.id;
@@ -856,26 +886,33 @@ export class PropertiesService {
               data: {
                 name: e.name ?? undefined,
                 description: e.description ?? undefined,
-                price: e.price !== undefined ? e.price : undefined,
-                activityType: e.activityType ?? undefined,
+                rate: (e.rate !== undefined ? e.rate : e.price) ?? undefined,
+                experienceType: e.experienceType ?? e.activityType ?? undefined,
                 duration: e.duration ?? undefined,
-                maxParticipants: e.maxParticipants ?? undefined,
-                difficultyLevel: e.difficultyLevel ?? undefined,
                 meetingPoint: e.meetingPoint ?? undefined,
               },
             });
-          } else if (e.name && e.price !== undefined) {
+          } else if (e.name) {
             const createdExp = await tx.experience.create({
               data: {
                 propertyId,
                 name: e.name,
                 description: e.description || null,
-                price: e.price,
-                activityType: e.activityType || null,
+                rate: (e.rate !== undefined ? e.rate : e.price) || 0,
+                experienceType: (e.experienceType || e.activityType || 'OTHER') as any,
                 duration: e.duration || null,
-                maxParticipants: e.maxParticipants ?? null,
-                difficultyLevel: e.difficultyLevel || null,
                 meetingPoint: e.meetingPoint || null,
+              },
+            });
+            await tx.experienceSlot.create({
+              data: {
+                experienceId: createdExp.id,
+                startTime: '10:00',
+                endTime: '13:00',
+                label: 'Morning Slot (10-13hrs)',
+                maxCapacity: e.maxParticipants || 10,
+                available: e.maxParticipants || 10,
+                booked: 0,
               },
             });
             primaryExpId = createdExp.id;
@@ -898,9 +935,9 @@ export class PropertiesService {
                 from: t.from ?? undefined,
                 to: t.to ?? undefined,
                 vehicleType: t.vehicleType ?? undefined,
-                capacity: t.capacity ?? undefined,
-                pricePerSeat: t.pricePerSeat !== undefined ? t.pricePerSeat : undefined,
-                schedule: t.schedule ? JSON.parse(JSON.stringify(t.schedule)) : undefined,
+                rate: (t.rate !== undefined ? t.rate : t.pricePerSeat) ?? undefined,
+                rentalType: t.rentalType ?? undefined,
+                routeType: t.routeType ?? undefined,
               },
             });
           } else if (t.name) {
@@ -912,9 +949,17 @@ export class PropertiesService {
                 from: t.from || null,
                 to: t.to || null,
                 vehicleType: t.vehicleType || null,
-                capacity: t.capacity ?? null,
-                pricePerSeat: t.pricePerSeat ?? null,
-                schedule: t.schedule ? JSON.parse(JSON.stringify(t.schedule)) : null,
+                rate: (t.rate !== undefined ? t.rate : t.pricePerSeat) || 0,
+                rentalType: t.rentalType || null,
+                routeType: t.routeType || null,
+              },
+            });
+            await tx.transportInventory.create({
+              data: {
+                transportId: createdTrans.id,
+                totalSeats: t.capacity || 1,
+                available: t.capacity || 1,
+                booked: 0,
               },
             });
             primaryTransId = createdTrans.id;
@@ -1750,18 +1795,19 @@ export class PropertiesService {
             data: {
               propertyId: prop.id,
               name: u.name,
-              roomType: u.type,
-              price: dto.pricePerUnitNgwee,
-              bedrooms: stayDetails?.bedrooms || 1,
-              beds: stayDetails?.beds || 1,
-              baths: stayDetails?.baths || 1,
-              maxGuests: u.maxGuests,
-              checkInFrom: stayDetails?.checkInFrom || '14:00',
-              checkInUntil: stayDetails?.checkInUntil || '20:00',
-              checkOutBefore: stayDetails?.checkOutBefore || '11:00',
-              cancellationPolicy,
+              unitType: ((u.type || stayDetails?.propertyType || 'STANDARD_ROOM').toUpperCase().replace(/\s+/g, '_')) as any,
+              rate: dto.pricePerUnitNgwee,
               isActive: true,
               sortOrder: i,
+            },
+          });
+
+          await tx.stayInventory.create({
+            data: {
+              stayId: stay.id,
+              total: 1,
+              available: 1,
+              booked: 0,
             },
           });
 
@@ -1792,25 +1838,31 @@ export class PropertiesService {
             propertyId: prop.id,
             name: dto.title,
             description: dto.description,
-            price: dto.pricePerUnitNgwee,
-            activityType: expDetails?.activityType || expDetails?.subtype || dto.subtype || 'Activity',
+            rate: dto.pricePerUnitNgwee,
+            experienceType: ((expDetails?.activityType || expDetails?.subtype || dto.subtype || 'OTHER').toUpperCase().replace(/\s+/g, '_')) as any,
             duration: expDetails?.durationMinutes
               ? `${expDetails.durationMinutes} mins`
               : '2 hours',
-            maxParticipants: expDetails?.maxParticipants || 10,
-            difficultyLevel: expDetails?.difficulty
-              ? expDetails.difficulty.charAt(0).toUpperCase() + expDetails.difficulty.slice(1)
-              : 'Moderate',
             meetingPoint,
             meetingPointAddress,
-            itinerary: itinerary as any,
-            slots: rawSlots.length > 0 ? (rawSlots as any) : undefined,
             whatsNotIncluded,
             whatToBring,
             whatNotToBring,
             importantInformation,
             notSuitableFor,
             isActive: true,
+          },
+        });
+
+        await tx.experienceSlot.create({
+          data: {
+            experienceId: exp.id,
+            startTime: '10:00',
+            endTime: '13:00',
+            label: 'Morning Slot (10-13hrs)',
+            maxCapacity: expDetails?.maxParticipants || 10,
+            available: expDetails?.maxParticipants || 10,
+            booked: 0,
           },
         });
 
@@ -1852,10 +1904,20 @@ export class PropertiesService {
             from: transDetails?.pickupLocation || dto.city,
             to: transDetails?.dropoffLocation || dto.city,
             vehicleType: transDetails?.vehicleType || 'Vehicle',
-            capacity: transDetails?.seatingCapacity || 14,
-            pricePerSeat: dto.pricePerUnitNgwee,
-            schedule: transDetails?.fleetUnits ? ({ fleet: transDetails.fleetUnits } as any) : undefined,
+            rate: dto.pricePerUnitNgwee,
+            rentalType: 'seat_based',
+            routeType: 'local',
+            tripType: 'ONE_WAY',
             isActive: true,
+          },
+        });
+
+        await tx.transportInventory.create({
+          data: {
+            transportId: trans.id,
+            totalSeats: transDetails?.seatingCapacity || 14,
+            available: transDetails?.seatingCapacity || 14,
+            booked: 0,
           },
         });
 
@@ -2114,16 +2176,8 @@ export class PropertiesService {
                 data: {
                   propertyId: property.id,
                   name: `${property.name} ${unitIndex}`,
-                  roomType: template?.roomType || 'Standard Room',
-                  price: template?.price || 100000,
-                  bedrooms: template?.bedrooms || 1,
-                  beds: template?.beds || 1,
-                  baths: template?.baths || 1,
-                  maxGuests: template?.maxGuests || 2,
-                  checkInFrom: template?.checkInFrom || '14:00',
-                  checkInUntil: template?.checkInUntil || '20:00',
-                  checkOutBefore: template?.checkOutBefore || '11:00',
-                  cancellationPolicy: template?.cancellationPolicy || CancellationPolicy.MODERATE,
+                  unitType: template?.unitType || ('STANDARD_ROOM' as any),
+                  rate: template?.rate || 100000,
                   isActive: true,
                   sortOrder: currentTotal + i,
                 },
@@ -2265,17 +2319,17 @@ export class PropertiesService {
       if (property.type === 'STAY') {
         await tx.stay.updateMany({
           where: { propertyId: id, deletedAt: null },
-          data: { price: newPriceNgwee },
+          data: { rate: newPriceNgwee },
         });
       } else if (property.type === 'EXPERIENCE') {
         await tx.experience.updateMany({
           where: { propertyId: id, deletedAt: null },
-          data: { price: newPriceNgwee },
+          data: { rate: newPriceNgwee },
         });
       } else if (property.type === 'TRANSPORT') {
         await tx.transport.updateMany({
           where: { propertyId: id, deletedAt: null },
-          data: { pricePerSeat: newPriceNgwee },
+          data: { rate: newPriceNgwee },
         });
       }
 
@@ -2425,7 +2479,7 @@ export class PropertiesService {
     const stored: any = (property.draftData as any)?.policies || {};
     const primaryStay = property.stays?.[0];
 
-    const tier = (stored.cancellation?.tier || primaryStay?.cancellationPolicy?.toLowerCase() || 'moderate') as CancellationTier;
+    const tier = (stored.cancellation?.tier || 'moderate') as CancellationTier;
     const tierCapitalized = tier.charAt(0).toUpperCase() + tier.slice(1);
     const deadlineHours = stored.cancellation?.freeCancellationCutOffHours || 120;
     const deadlineDate = new Date(Date.now() + deadlineHours * 3600 * 1000).toISOString();
@@ -2443,9 +2497,9 @@ export class PropertiesService {
       freeCancellationDeadline: deadlineDate,
     };
 
-    const checkInFrom = stored.schedule?.checkInFrom || primaryStay?.checkInFrom || '14:00';
-    const checkInUntil = stored.schedule?.checkInUntil || primaryStay?.checkInUntil || '21:00';
-    const checkOutBefore = stored.schedule?.checkOutBefore || primaryStay?.checkOutBefore || '10:30';
+    const checkInFrom = stored.schedule?.checkInFrom || '14:00';
+    const checkInUntil = stored.schedule?.checkInUntil || '21:00';
+    const checkOutBefore = stored.schedule?.checkOutBefore || '10:30';
 
     const houseRulesSummary: string[] = [];
     if (stored.houseRules) {

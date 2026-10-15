@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   BlockDatesDto,
   UnblockDatesDto,
-  SeasonalPricingDto,
   ExperienceSlotBlockDto,
 } from './dto/availability.dto';
 
@@ -36,59 +35,49 @@ export class AvailabilityService {
 
       const stayIds = activeStays.map((s) => s.id);
 
-      // Blocked slots for all stay units under this property
-      const slots = await this.prisma.availabilitySlot.findMany({
-        where: {
-          stayId: { in: stayIds },
-          date: { gte: startDate, lte: endDate },
-        },
-      });
-
       const now = new Date();
 
-      // Active bookings for stays under this property
-      const bookings = await this.prisma.booking.findMany({
+      // Active bookings via StayBooking detail records
+      const stayBookings = await this.prisma.stayBooking.findMany({
         where: {
-          propertyId,
-          OR: [
-            { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-            { status: 'PENDING', expiresAt: { gt: now } },
-          ],
-          AND: [
-            { checkIn: { lte: endDate } },
-            { checkOut: { gte: startDate } },
-          ],
+          stayId: { in: stayIds },
+          checkIn: { lte: endDate },
+          checkOut: { gte: startDate },
+          booking: {
+            OR: [
+              { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+              { status: 'PENDING', expiresAt: { gt: now } },
+            ],
+          },
         },
         select: {
-          id: true,
           checkIn: true,
           checkOut: true,
-          status: true,
-          expiresAt: true,
+          booking: { select: { status: true, expiresAt: true } },
         },
       });
+
+      // Blocked inventory units
+      const blockedInventory = await this.prisma.stayInventory.findMany({
+        where: { stayId: { in: stayIds }, status: 'BLOCKED' },
+      });
+      const blockedCount = blockedInventory.length;
+
+      const basePrice = activeStays[0]?.rate || draftData.pricePerUnitNgwee || 100000;
 
       const daySlots: any[] = [];
       const currentDate = new Date(startDate);
-      const basePrice = activeStays[0]?.price || draftData.pricePerUnitNgwee || 100000;
 
       while (currentDate <= endDate) {
         const dateStr = currentDate.toISOString().split('T')[0];
 
         // Active bookings covering this date
-        const dateBookings = bookings.filter((b) => {
-          if (!b.checkIn || !b.checkOut) return false;
+        const dateBookings = stayBookings.filter((b) => {
           const ci = b.checkIn.toISOString().split('T')[0];
           const co = b.checkOut.toISOString().split('T')[0];
           return dateStr >= ci && dateStr < co;
         });
         const bookedCount = dateBookings.length;
-
-        // Manually blocked units on this date
-        const blockedSlots = slots.filter(
-          (s) => s.date.toISOString().split('T')[0] === dateStr && s.status === 'blocked',
-        );
-        const blockedCount = blockedSlots.length;
 
         const availableCount = Math.max(0, totalInventory - bookedCount - blockedCount);
         const available = availableCount > 0;
@@ -98,7 +87,7 @@ export class AvailabilityService {
           status = 'blocked';
         } else if (availableCount === 0) {
           status = 'booked';
-        } else if (dateBookings.some((b) => b.status === 'PENDING')) {
+        } else if (dateBookings.some((b) => b.booking.status === 'PENDING')) {
           status = 'partially_held';
         }
 
@@ -164,51 +153,43 @@ export class AvailabilityService {
     const startDate = new Date(year || new Date().getFullYear(), (month || 1) - 1, 1);
     const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59);
 
-    // Host manually blocked slots
-    const slots = await this.prisma.availabilitySlot.findMany({
-      where: {
-        stayId,
-        date: { gte: startDate, lte: endDate },
-      },
-      orderBy: { date: 'asc' },
-    });
-
     const now = new Date();
 
-    // Query active bookings: CONFIRMED or PENDING with active 10-minute hold
-    const bookings = await this.prisma.booking.findMany({
+    // Query active stay bookings: CONFIRMED or PENDING with active 10-minute hold
+    const stayBookings = await this.prisma.stayBooking.findMany({
       where: {
         stayId,
-        OR: [
-          { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-          { status: 'PENDING', expiresAt: { gt: now } },
-        ],
-        AND: [
-          { checkIn: { lte: endDate } },
-          { checkOut: { gte: startDate } },
-        ],
+        checkIn: { lte: endDate },
+        checkOut: { gte: startDate },
+        booking: {
+          OR: [
+            { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+            { status: 'PENDING', expiresAt: { gt: now } },
+          ],
+        },
       },
       select: {
-        id: true,
         checkIn: true,
         checkOut: true,
-        status: true,
-        expiresAt: true,
+        booking: { select: { status: true, expiresAt: true } },
       },
+      orderBy: { checkIn: 'asc' },
     });
+
+    // Blocked inventory units for this stay
+    const blockedInventory = await this.prisma.stayInventory.findMany({
+      where: { stayId, status: 'BLOCKED' },
+    });
+    const isBlocked = blockedInventory.length > 0;
 
     // Build availability grid day-by-day
     const daySlots: any[] = [];
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
-      const existingSlot = slots.find(
-        (s) => s.date.toISOString().split('T')[0] === dateStr,
-      );
 
       // Find booking covering this date
-      const activeBooking = bookings.find((b) => {
-        if (!b.checkIn || !b.checkOut) return false;
+      const activeBooking = stayBookings.find((b) => {
         const ci = b.checkIn.toISOString().split('T')[0];
         const co = b.checkOut.toISOString().split('T')[0];
         return dateStr >= ci && dateStr < co;
@@ -218,17 +199,17 @@ export class AvailabilityService {
       let available = true;
       let holdExpiresAt: string | null = null;
 
-      if (existingSlot?.status === 'blocked') {
+      if (isBlocked) {
         status = 'blocked';
         available = false;
       } else if (activeBooking) {
-        if (activeBooking.status === 'CONFIRMED' || activeBooking.status === 'CHECKED_IN') {
+        if (activeBooking.booking.status === 'CONFIRMED' || activeBooking.booking.status === 'CHECKED_IN') {
           status = 'booked';
           available = false;
-        } else if (activeBooking.status === 'PENDING') {
+        } else if (activeBooking.booking.status === 'PENDING') {
           status = 'held';
           available = false;
-          holdExpiresAt = activeBooking.expiresAt ? activeBooking.expiresAt.toISOString() : null;
+          holdExpiresAt = activeBooking.booking.expiresAt ? activeBooking.booking.expiresAt.toISOString() : null;
         }
       }
 
@@ -240,7 +221,7 @@ export class AvailabilityService {
         available,
         status,
         holdExpiresAt,
-        price: existingSlot?.price || stay.price,
+        price: stay.rate,
       });
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -266,7 +247,7 @@ export class AvailabilityService {
         OR: [{ id: propertyOrExpId }, { propertyId: propertyOrExpId }],
       },
       include: {
-        timeSlots: { orderBy: { slot: 'asc' } },
+        slots: { where: { isActive: true }, orderBy: { startTime: 'asc' } },
         property: true,
       },
     });
@@ -278,39 +259,39 @@ export class AvailabilityService {
 
     const now = new Date();
 
-    // Query active bookings for this experience on this date
-    const bookings = await this.prisma.booking.findMany({
+    // Query active experience bookings on this date via ExperienceBooking
+    const experienceBookings = await this.prisma.experienceBooking.findMany({
       where: {
         experienceId: experience.id,
         date: { gte: startOfDay, lte: endOfDay },
-        OR: [
-          { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-          { status: 'PENDING', expiresAt: { gt: now } },
-        ],
+        booking: {
+          OR: [
+            { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+            { status: 'PENDING', expiresAt: { gt: now } },
+          ],
+        },
       },
       select: {
-        id: true,
-        timeSlot: true,
+        experienceSlotId: true,
         guests: true,
-        status: true,
-        expiresAt: true,
+        booking: { select: { status: true, expiresAt: true } },
       },
     });
 
-    const maxCapacity = experience.maxParticipants || 10;
     const propDraftData = (experience.property.draftData as Record<string, any>) || {};
     const blockedSlotsForDate: string[] = propDraftData.blockedSlots?.[dateStr] || [];
 
-    // Check availability for each configured time slot
-    const slots = (experience.timeSlots || []).map((slotObj) => {
-      const slotName = slotObj.slot;
-      const isManuallyBlocked = blockedSlotsForDate.includes(slotName);
+    // Check availability for each configured ExperienceSlot
+    const slots = (experience.slots || []).map((slotObj) => {
+      const slotLabel = slotObj.label || `${slotObj.startTime} - ${slotObj.endTime}`;
+      const maxCapacity = slotObj.maxCapacity;
+      const isManuallyBlocked = blockedSlotsForDate.includes(slotObj.id) || blockedSlotsForDate.includes(slotLabel);
 
-      const slotBookings = bookings.filter((b) => b.timeSlot === slotName);
+      const slotBookings = experienceBookings.filter((b) => b.experienceSlotId === slotObj.id);
       const bookedGuests = slotBookings.reduce((sum, b) => sum + b.guests, 0);
 
       const activeHold = slotBookings.find(
-        (b) => b.status === 'PENDING' && b.expiresAt && b.expiresAt > now,
+        (b) => b.booking.status === 'PENDING' && b.booking.expiresAt && b.booking.expiresAt > now,
       );
 
       const remainingSpots = Math.max(0, maxCapacity - bookedGuests);
@@ -327,7 +308,10 @@ export class AvailabilityService {
       }
 
       return {
-        slot: slotName,
+        slotId: slotObj.id,
+        startTime: slotObj.startTime,
+        endTime: slotObj.endTime,
+        label: slotLabel,
         available,
         status,
         capacity: maxCapacity,
@@ -335,9 +319,9 @@ export class AvailabilityService {
         remainingSpots: isManuallyBlocked ? 0 : remainingSpots,
         isBlocked: isManuallyBlocked,
         isHeld: !!activeHold,
-        holdExpiresAt: activeHold?.expiresAt ? activeHold.expiresAt.toISOString() : null,
-        price: experience.price,
-        priceFormatted: `K${(experience.price / 100).toFixed(2)}`,
+        holdExpiresAt: activeHold?.booking.expiresAt ? activeHold.booking.expiresAt.toISOString() : null,
+        price: experience.rate,
+        priceFormatted: `K${(experience.rate / 100).toFixed(2)}`,
       };
     });
 
@@ -449,64 +433,31 @@ export class AvailabilityService {
 
     const now = new Date();
 
-    const bookings = await this.prisma.booking.findMany({
+    // Query via TransportBooking detail records
+    const transportBookings = await this.prisma.transportBooking.findMany({
       where: {
         transportId: transport.id,
         date: { gte: startOfDay, lte: endOfDay },
-        OR: [
-          { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-          { status: 'PENDING', expiresAt: { gt: now } },
-        ],
+        booking: {
+          OR: [
+            { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+            { status: 'PENDING', expiresAt: { gt: now } },
+          ],
+        },
       },
       select: {
-        id: true,
-        guests: true,
-        status: true,
-        expiresAt: true,
+        seats: true,
+        booking: { select: { status: true, expiresAt: true } },
       },
     });
 
-    const vehicleTypeLower = (transport.vehicleType || '').toLowerCase();
-    const isRentalCar =
-      vehicleTypeLower.includes('rental') ||
-      vehicleTypeLower.includes('car') ||
-      vehicleTypeLower.includes('suv') ||
-      vehicleTypeLower.includes('sedan') ||
-      vehicleTypeLower.includes('4x4');
-
-    const fleet = (transport.schedule as any)?.fleet as any[];
-    const isFleetDefined = Array.isArray(fleet) && fleet.length > 0;
-
-    if (isRentalCar || isFleetDefined) {
-      const totalVehicles = isFleetDefined
-        ? fleet.length
-        : transport.capacity && transport.capacity <= 5
-        ? transport.capacity
-        : 1;
-      const bookedVehicles = bookings.length;
-      const availableVehicles = Math.max(0, totalVehicles - bookedVehicles);
-      const available = availableVehicles > 0;
-
-      return {
-        transportId: transport.id,
-        propertyId: transport.propertyId,
-        name: transport.name,
-        vehicleType: transport.vehicleType,
-        inventoryType: 'vehicles',
-        date: dateStr,
-        available,
-        totalVehicles,
-        bookedVehicles,
-        availableVehicles,
-        pricePerUnit: transport.pricePerSeat,
-        priceFormatted: transport.pricePerSeat ? `K${(transport.pricePerSeat / 100).toFixed(2)}` : 'K0.00',
-      };
-    }
-
-    const totalCapacity = transport.capacity || 50;
-    const bookedSeats = bookings.reduce((sum, b) => sum + b.guests, 0);
-    const remainingSeats = Math.max(0, totalCapacity - bookedSeats);
-    const available = remainingSeats > 0;
+    const inventory = await this.prisma.transportInventory.findFirst({
+      where: { transportId: transport.id },
+    });
+    const totalCapacity = inventory?.totalSeats || 50;
+    const bookedSeats = transportBookings.reduce((sum, b) => sum + b.seats, 0);
+    const availableSeats = Math.max(0, totalCapacity - bookedSeats);
+    const available = availableSeats > 0;
 
     return {
       transportId: transport.id,
@@ -519,10 +470,9 @@ export class AvailabilityService {
       capacity: totalCapacity,
       totalSeats: totalCapacity,
       bookedSeats,
-      remainingSeats,
-      pricePerSeat: transport.pricePerSeat,
-      priceFormatted: transport.pricePerSeat ? `K${(transport.pricePerSeat / 100).toFixed(2)}` : 'K0.00',
-      schedule: transport.schedule,
+      remainingSeats: availableSeats,
+      pricePerSeat: transport.rate,
+      priceFormatted: transport.rate ? `K${(transport.rate / 100).toFixed(2)}` : 'K0.00',
     };
   }
 
@@ -596,30 +546,16 @@ export class AvailabilityService {
       ? stayIds.slice(0, rawDto.count)
       : stayIds;
 
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-
     for (const stayId of targetStayIds) {
-      const current = new Date(start);
-      while (current <= end) {
-        const slotDate = new Date(current);
-        slotDate.setHours(0, 0, 0, 0);
-        await this.prisma.availabilitySlot.upsert({
-          where: { stayId_date: { stayId, date: slotDate } },
-          update: { status: 'blocked' },
-          create: {
-            stayId,
-            date: slotDate,
-            status: 'blocked',
-          },
-        });
-        current.setDate(current.getDate() + 1);
-      }
+      await this.prisma.stayInventory.updateMany({
+        where: { stayId },
+        data: { status: 'BLOCKED' },
+      });
     }
 
     return {
       success: true,
-      message: `Blocked dates from ${startDateStr} to ${endDateStr} (${targetStayIds.length} inventory units)`,
+      message: `Blocked inventory units (${targetStayIds.length} units)`,
     };
   }
 
@@ -645,54 +581,19 @@ export class AvailabilityService {
       ? stayIds.slice(0, rawDto.count)
       : stayIds;
 
-    const start = new Date(startDateStr);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDateStr);
-    end.setHours(23, 59, 59, 999);
-
-    const deleted = await this.prisma.availabilitySlot.deleteMany({
-      where: {
-        stayId: { in: targetStayIds },
-        date: { gte: start, lte: end },
-        status: 'blocked',
-      },
-    });
+    for (const stayId of targetStayIds) {
+      await this.prisma.stayInventory.updateMany({
+        where: { stayId },
+        data: { status: 'AVAILABLE' },
+      });
+    }
 
     return {
       success: true,
-      message: `Unblocked ${deleted.count} unit dates`,
+      message: `Unblocked inventory units (${targetStayIds.length} units)`,
     };
   }
 
-  async addSeasonalPricing(dto: SeasonalPricingDto, userId: string) {
-    const stayIds = await this.resolveStayUnits(
-      dto.listingId,
-      undefined,
-      dto.stayId,
-      userId,
-    );
-    const stayId = stayIds[0];
-
-    return this.prisma.seasonalPricing.create({
-      data: {
-        stayId,
-        from: new Date(dto.from),
-        to: new Date(dto.to),
-        price: dto.price,
-        label: dto.label || null,
-      },
-    });
-  }
-
-  async removeSeasonalPricing(id: string, userId: string) {
-    const pricing = await this.prisma.seasonalPricing.findUnique({
-      where: { id },
-      include: { stay: { include: { property: true } } },
-    });
-    if (!pricing) throw new NotFoundException('Seasonal pricing not found');
-    await this.resolveStayUnits(pricing.stay.propertyId, pricing.stayId, undefined, userId);
-    return this.prisma.seasonalPricing.delete({ where: { id } });
-  }
 
   private async assertStayOwnership(stayId: string, userId: string) {
     const stay = await this.prisma.stay.findUnique({

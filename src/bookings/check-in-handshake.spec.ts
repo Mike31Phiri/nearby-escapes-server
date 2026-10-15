@@ -91,8 +91,8 @@ describe('BookingsService - 2-Step Check-In Handshake', () => {
 
     const result = await service.confirmCheckIn('b_123', 'guest_1');
 
-    expect(result.payout.netAmount).toBe(85000);
-    expect(result.payout.commission).toBe(15000);
+    expect(result.payout!.netAmount).toBe(85000);
+    expect(result.payout!.commission).toBe(15000);
     expect(prisma.payout.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -124,6 +124,6 @@ describe('BookingsService - 2-Step Check-In Handshake', () => {
     const result = await service.confirmCheckIn('b_123', undefined, true);
 
     expect(result.message).toContain('auto-confirmed after 24 hours');
-    expect(result.payout.netAmount).toBe(85000);
+    expect(result.payout!.netAmount).toBe(85000);
   });
 });

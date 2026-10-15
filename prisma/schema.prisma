@@ -6,38 +6,42 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─────────────────────────────────────────────
+// USER & HOST
+// ─────────────────────────────────────────────
+
 model User {
-  id                    String             @id @default(uuid())
-  name                  String
-  email                 String             @unique
-  password              String
-  phone                 String?
-  avatar                String?
-  role                  Role               @default(GUEST)
-  isVerified            Boolean            @default(false)
-  verificationStatus    VerificationStatus @default(PENDING)
-  verificationCode      String?
+  id                     String             @id @default(uuid())
+  name                   String
+  email                  String             @unique
+  password               String
+  phone                  String?
+  avatar                 String?
+  role                   Role               @default(GUEST)
+  isVerified             Boolean            @default(false)
+  verificationStatus     VerificationStatus @default(PENDING)
+  verificationCode       String?
   verificationCodeExpiry DateTime?
-  resetToken            String?            @unique
-  resetTokenExpiry      DateTime?
-  refreshToken          String?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  deletedAt             DateTime?
-  activityLogs          ActivityLog[]
-  bookingsAsGuest       Booking[]          @relation("GuestBookings")
-  bookingsAsHost        Booking[]          @relation("HostBookings")
-  hostApplication       HostApplication?
-  hostProfile           HostProfile?
-  notifications         Notification[]
-  payments              Payment[]
-  payouts               Payout[]
-  createdPolicies       Policy[]           @relation("CreatedPolicies")
-  createdPolicyVersions PolicyVersion[]    @relation("CreatedPolicyVersions")
-  properties            Property[]
-  reviews               Review[]
-  wishlist              Wishlist?
-  raisedDisputes        Dispute[]          @relation("RaisedDisputes")
+  resetToken             String?            @unique
+  resetTokenExpiry       DateTime?
+  refreshToken           String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  deletedAt              DateTime?
+  activityLogs           ActivityLog[]
+  bookingsAsGuest        Booking[]          @relation("GuestBookings")
+  bookingsAsHost         Booking[]          @relation("HostBookings")
+  hostApplication        HostApplication?
+  hostProfile            HostProfile?
+  notifications          Notification[]
+  payments               Payment[]
+  payouts                Payout[]
+  createdPolicies        Policy[]           @relation("CreatedPolicies")
+  createdPolicyVersions  PolicyVersion[]    @relation("CreatedPolicyVersions")
+  properties             Property[]
+  reviews                Review[]
+  wishlist               Wishlist?
+  raisedDisputes         Dispute[]          @relation("RaisedDisputes")
 }
 
 model HostProfile {
@@ -88,89 +92,179 @@ model Property {
   @@index([createdAt])
 }
 
+// ─────────────────────────────────────────────
+// STAYS
+// ─────────────────────────────────────────────
+
+/// Stay — the lodging section of a Property.
+/// Stay — the lodging section of a Property.
+/// unitType (Chalet, Villa, etc.) and rate (base price per night) belong here.
 model Stay {
-  id                 String                  @id @default(uuid())
-  propertyId         String
-  name               String
-  description        String?
-  price              Int
-  roomType           String?
-  bedrooms           Int?
-  beds               Int?
-  baths              Int?
-  maxGuests          Int?
-  checkInFrom        String?
-  checkInUntil       String?
-  checkOutBefore     String?
-  cancellationPolicy CancellationPolicy?
-  isActive           Boolean                 @default(true)
-  sortOrder          Int                     @default(0)
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  deletedAt          DateTime?
-  availability       AvailabilitySlot[]
-  bookings           Booking[]               @relation("StayBookings")
-  policies           ListingPolicy[]
-  recommendations    ListingRecommendation[]
-  tags               ListingTag[]
-  seasonalPrices     SeasonalPricing[]
-  property           Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  id           String                  @id @default(uuid())
+  propertyId   String
+  name         String
+  unitType     StayUnitType            @default(STANDARD_ROOM) // CHALET | APARTMENT | VILLA | COTTAGE | SUITE …
+  rate         Int                     @default(0) // base price per night
+  description  String?
+  isActive     Boolean                 @default(true)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  deletedAt    DateTime?
+  // Capacity inventory ledger (linked by stayId)
+  inventory    StayInventory[]
+  // Bookings
+  stayBookings StayBooking[]
+  // Metadata & Policies (bedrooms, house rules, cancellation, etc.)
+  policies        ListingPolicy[]
+  recommendations ListingRecommendation[]
+  tags            ListingTag[]
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, unitType])
 }
 
+/// Capacity ledger for a Stay unit.
+/// `total` = how many units of this stay exist at the property.
+/// `booked` + `available` = `total` — kept in sync by the service layer.
+model StayInventory {
+  id           String          @id @default(uuid())
+  stayId       String
+  total        Int             // total number of this unit type
+  booked       Int             @default(0)
+  available    Int             // total - booked; kept in sync
+  status       InventoryStatus @default(AVAILABLE)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  deletedAt    DateTime?
+  stayBookings StayBooking[]
+  stay         Stay            @relation(fields: [stayId], references: [id], onDelete: Cascade)
+
+  @@index([stayId, status])
+  @@index([stayId, available])
+}
+
+// ─────────────────────────────────────────────
+// EXPERIENCES
+// ─────────────────────────────────────────────
+
+/// Experience — the experiences section of a Property.
+/// experienceType (Cultural, Adventure, etc.) and rate (base price per participant) belong here.
 model Experience {
-  id              String                  @id @default(uuid())
-  propertyId      String
-  name            String
-  description     String?
-  price           Int
-  activityType    String?
-  duration        String?
-  maxParticipants Int?
-  difficultyLevel String?
-  meetingPoint    String?
-  meetingPointAddress String?
-  itinerary       Json?
-  slots           Json?
-  whatsNotIncluded String[]                @default([])
-  whatToBring     String[]                @default([])
-  whatNotToBring  String[]                @default([])
-  importantInformation String[]           @default([])
-  notSuitableFor  String[]                @default([])
-  isActive        Boolean                 @default(true)
-  sortOrder       Int                     @default(0)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
-  deletedAt       DateTime?
-  bookings        Booking[]               @relation("ExperienceBookings")
-  property        Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  inclusions      ExperienceInclusion[]
-  timeSlots       ExperienceTimeSlot[]
-  policies        ListingPolicy[]
-  recommendations ListingRecommendation[]
-  tags            ListingTag[]
+  id                   String                  @id @default(uuid())
+  propertyId           String
+  name                 String
+  experienceType       ExperienceType          @default(ADVENTURE) // ENTERTAINMENT | CULTURAL | ADVENTURE | NATURE …
+  rate                 Int                     @default(0) // price per participant
+  description          String?
+  meetingPoint         String?
+  meetingPointAddress  String?
+  whatsNotIncluded     String[]                @default([])
+  whatToBring          String[]                @default([])
+  whatNotToBring       String[]                @default([])
+  importantInformation String[]                @default([])
+  notSuitableFor       String[]                @default([])
+  isActive             Boolean                 @default(true)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  deletedAt            DateTime?
+  // First-class time slots (e.g. 10-13hrs, 15-17hrs)
+  slots                ExperienceSlot[]
+  // Bookings (via time slots)
+  experienceBookings   ExperienceBooking[]
+  // Metadata
+  inclusions           ExperienceInclusion[]
+  policies             ListingPolicy[]
+  recommendations      ListingRecommendation[]
+  tags                 ListingTag[]
+  property             Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, experienceType])
 }
 
+/// First-class time slot for an Experience (e.g. 10-13hrs slot, 15-17hrs slot).
+/// `maxCapacity` = max participants allowed in this specific time window.
+/// `booked` + `available` = `maxCapacity` — kept in sync by the service layer.
+model ExperienceSlot {
+  id                 String              @id @default(uuid())
+  experienceId       String
+  startTime          String              // e.g. "10:00"
+  endTime            String              // e.g. "13:00"
+  label              String?             // e.g. "Morning Session (10:00 - 13:00)"
+  maxCapacity        Int                 // spots per slot (e.g. 12)
+  booked             Int                 @default(0)
+  available          Int                 // maxCapacity - booked; kept in sync
+  status             InventoryStatus     @default(AVAILABLE)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
+  experienceBookings ExperienceBooking[]
+  experience         Experience          @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  @@index([experienceId, status])
+  @@index([experienceId, available])
+}
+
+// ─────────────────────────────────────────────
+// TRANSPORT
+// ─────────────────────────────────────────────
+
+/// Transport — the transport section of a Property.
+/// routeType, tripType, and rate belong here.
 model Transport {
-  id              String                  @id @default(uuid())
-  propertyId      String
-  name            String
-  description     String?
-  from            String?
-  to              String?
-  vehicleType     String?
-  capacity        Int?
-  pricePerSeat    Int?
-  schedule        Json?
-  isActive        Boolean                 @default(true)
-  sortOrder       Int                     @default(0)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
-  deletedAt       DateTime?
-  bookings        Booking[]               @relation("TransportBookings")
-  policies        ListingPolicy[]
-  recommendations ListingRecommendation[]
-  tags            ListingTag[]
-  property        Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  id                String                  @id @default(uuid())
+  propertyId        String
+  name              String
+  rentalType        String?                 // e.g. "seat_based", "private_hire", "charter" (from API payload)
+  routeType         String?                 // e.g. "inter_city", "local", "airport_transfer" (from API payload)
+  tripType          TripType                @default(ONE_WAY) // ONE_WAY | ROUND_TRIP
+  rate              Int                     @default(0) // base rate (per seat or whole vehicle)
+  vehicleType       String?                 // e.g. "bus", "minivan", "sedan", "suv", "boat" (from API payload)
+  description       String?
+  from              String?                 // departure point
+  to                String?                 // destination
+  returnFrom        String?                 // for ROUND_TRIP: return departure point
+  returnTo          String?                 // for ROUND_TRIP: return destination
+  departureTime     String?                 // e.g. "07:00"
+  returnTime        String?                 // for ROUND_TRIP: e.g. "17:00"
+  isActive          Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  deletedAt         DateTime?
+  // Capacity ledger (linked by transportId)
+  inventory         TransportInventory[]
+  // Bookings
+  transportBookings TransportBooking[]
+  // Metadata
+  policies          ListingPolicy[]
+  recommendations   ListingRecommendation[]
+  tags              ListingTag[]
+  property          Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, tripType])
+}
+
+/// Capacity ledger for a Transport route/service.
+/// For SEAT_BASED: totalSeats = total seats on the vehicle (e.g. 50 on a bus).
+/// For PRIVATE_HIRE: totalSeats = number of vehicles available (e.g. 1 or fleet count).
+/// `booked` + `available` = `totalSeats` — kept in sync by the service layer.
+model TransportInventory {
+  id             String              @id @default(uuid())
+  transportId    String
+  totalSeats     Int                 // seat capacity (or vehicle count if PRIVATE_HIRE)
+  booked         Int                 @default(0)
+  available      Int                 // totalSeats - booked; kept in sync
+  status         InventoryStatus     @default(AVAILABLE)
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  deletedAt      DateTime?
+  transportBookings TransportBooking[]
+  transport      Transport           @relation(fields: [transportId], references: [id], onDelete: Cascade)
+
+  @@index([transportId, status])
+  @@index([transportId, available])
 }
 
 model PropertyImage {
@@ -203,14 +297,6 @@ model PropertyRule {
   @@index([propertyId])
 }
 
-model ExperienceTimeSlot {
-  id           String     @id @default(uuid())
-  experienceId String
-  slot         String
-  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-
-  @@index([experienceId])
-}
 
 model ExperienceInclusion {
   id           String     @id @default(uuid())
@@ -221,15 +307,19 @@ model ExperienceInclusion {
   @@index([experienceId])
 }
 
+// ─────────────────────────────────────────────
+// BOOKINGS  (header + type-specific detail)
+// ─────────────────────────────────────────────
+
+/// Booking header — one row per booking regardless of type.
+/// Payments, cancellations, and guest history all query this table.
 model Booking {
   id              String        @id @default(uuid())
   bookingRef      String        @unique
   propertyId      String
-  stayId          String?
-  experienceId    String?
-  transportId     String?
   guestId         String
   hostId          String
+  type            BookingType   @default(STAY) // STAY | EXPERIENCE | TRANSPORT
   status          BookingStatus @default(PENDING)
   amount          Int
   currency        String        @default("ZMW")
@@ -239,30 +329,80 @@ model Booking {
   customerPhone   String
   customerEmail   String?
   specialRequests String?
-  checkIn         DateTime?
-  checkOut        DateTime?
-  date            DateTime?
-  guests          Int           @default(1)
   refundAmount    Int?          @default(0)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   expiresAt       DateTime?
-  timeSlot        String?
-  checkedInAt     DateTime?
-  checkedOutAt    DateTime?
-  experience      Experience?   @relation("ExperienceBookings", fields: [experienceId], references: [id])
-  guest           User          @relation("GuestBookings", fields: [guestId], references: [id])
-  host            User          @relation("HostBookings", fields: [hostId], references: [id])
-  property        Property      @relation(fields: [propertyId], references: [id])
-  stay            Stay?         @relation("StayBookings", fields: [stayId], references: [id])
-  transport       Transport?    @relation("TransportBookings", fields: [transportId], references: [id])
-  payment         Payment?
-  payout          Payout?
-  disputes        Dispute[]
+  // Type-specific detail (exactly one will be set)
+  stayBooking       StayBooking?
+  experienceBooking ExperienceBooking?
+  transportBooking  TransportBooking?
+  // Relations
+  guest     User      @relation("GuestBookings", fields: [guestId], references: [id])
+  host      User      @relation("HostBookings", fields: [hostId], references: [id])
+  property  Property  @relation(fields: [propertyId], references: [id])
+  payment   Payment?
+  payout    Payout?
+  disputes  Dispute[]
 
-  @@index([stayId, status, checkIn, checkOut])
-  @@index([experienceId, status, date, timeSlot])
-  @@index([transportId, status, date])
+  @@index([guestId, status, createdAt])
+  @@index([hostId, status, createdAt])
+  @@index([propertyId, type, status])
+  @@index([type, status])
+}
+
+/// Stay-specific booking detail.
+/// Links to the exact unit type (StayInventory) booked, e.g. the Chalet or Apartment.
+model StayBooking {
+  id               String        @id @default(uuid())
+  bookingId        String        @unique
+  stayId           String        // parent Stay listing
+  stayInventoryId  String        // specific unit type booked (Chalet, Apartment, etc.)
+  checkIn          DateTime
+  checkOut         DateTime
+  guests           Int           @default(1)
+  checkedInAt      DateTime?
+  checkedOutAt     DateTime?
+  booking          Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  stay             Stay          @relation(fields: [stayId], references: [id])
+  stayInventory    StayInventory @relation(fields: [stayInventoryId], references: [id])
+
+  @@index([stayId, checkIn, checkOut])
+  @@index([stayInventoryId, checkIn, checkOut])
+}
+
+/// Experience-specific booking detail.
+/// Links to the exact time slot (ExperienceSlot, e.g. 10-13hrs) booked.
+model ExperienceBooking {
+  id               String         @id @default(uuid())
+  bookingId        String         @unique
+  experienceId     String         // parent Experience listing
+  experienceSlotId String         // specific time slot booked (10-13hrs, 15-17hrs)
+  date             DateTime
+  guests           Int            @default(1)
+  booking          Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  experience       Experience     @relation(fields: [experienceId], references: [id])
+  experienceSlot   ExperienceSlot @relation(fields: [experienceSlotId], references: [id])
+
+  @@index([experienceId, date])
+  @@index([experienceSlotId, date])
+}
+
+/// Transport-specific booking detail.
+/// Links to the exact service type (TransportInventory) booked (route + trip type).
+model TransportBooking {
+  id                   String             @id @default(uuid())
+  bookingId            String             @unique
+  transportId          String             // parent Transport listing
+  transportInventoryId String             // specific inventory ledger booked
+  date                 DateTime
+  seats                Int                @default(1)   // seats booked (or 1 if PRIVATE_HIRE)
+  booking              Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  transport            Transport          @relation(fields: [transportId], references: [id])
+  transportInventory   TransportInventory @relation(fields: [transportInventoryId], references: [id])
+
+  @@index([transportId, date])
+  @@index([transportInventoryId, date])
 }
 
 model Payment {
@@ -350,26 +490,7 @@ model WishlistItem {
   @@index([wishlistId, createdAt])
 }
 
-model AvailabilitySlot {
-  id     String   @id @default(uuid())
-  stayId String
-  date   DateTime
-  status String   @default("available")
-  price  Int?
-  stay   Stay     @relation(fields: [stayId], references: [id])
-
-  @@unique([stayId, date])
-}
-
-model SeasonalPricing {
-  id     String   @id @default(uuid())
-  stayId String
-  from   DateTime
-  to     DateTime
-  price  Int      @default(0)
-  label  String?
-  stay   Stay     @relation(fields: [stayId], references: [id])
-}
+// AvailabilitySlot removed — replaced by StayInventory (see Stay section)
 
 model ActivityLog {
   id        String   @id @default(uuid())
@@ -585,6 +706,12 @@ enum PropertyStatus {
   INACTIVE
 }
 
+enum BookingType {
+  STAY
+  EXPERIENCE
+  TRANSPORT
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -592,6 +719,12 @@ enum BookingStatus {
   COMPLETED
   EXPIRED
   CHECKED_IN
+}
+
+enum InventoryStatus {
+  AVAILABLE
+  FULLY_BOOKED
+  BLOCKED
 }
 
 enum PaymentStatus {
@@ -700,3 +833,58 @@ enum RecommendationAudience {
   LUXURY
   GENERAL
 }
+
+// ─────────────────────────────────────────────
+// INVENTORY TYPE ENUMS
+// ─────────────────────────────────────────────
+
+/// Unit types for Stay inventory (the bookable accommodation types).
+enum StayUnitType {
+  CHALET
+  APARTMENT
+  VILLA
+  COTTAGE
+  SUITE
+  STANDARD_ROOM
+  TENT
+  CABIN
+  BUNGALOW
+  LODGE
+  TREEHOUSE
+  BOAT
+  HOSTEL_DORM
+  OTHER
+}
+
+/// Experience types for Experience inventory (the bookable experience categories).
+enum ExperienceType {
+  ENTERTAINMENT   // live shows, concerts, performances
+  CULTURAL        // village tours, heritage sites, traditions
+  ADVENTURE       // hiking, zip-lining, rock climbing
+  NATURE          // bird watching, botanical tours, game walks
+  CULINARY        // cooking classes, food tours, wine tasting
+  WELLNESS        // spa, yoga, meditation retreats
+  SPORT           // kayaking, cycling, horse riding
+  EDUCATIONAL     // guided museum, historical walks
+  WILDLIFE        // safaris, game drives, animal encounters
+  PHOTOGRAPHY     // landscape, portrait, nature photography tours
+  OTHER
+}
+
+/// Route/service types for Transport inventory.
+enum TransportRouteType {
+  INTER_CITY       // e.g. Lusaka → Livingstone
+  LOCAL            // within a town or city
+  REGIONAL         // between nearby provinces/districts
+  AIRPORT_TRANSFER // airport pick-up / drop-off
+  SAFARI_GAME_DRIVE
+  TOUR             // scheduled sightseeing tour
+  OTHER
+}
+
+/// Trip direction type for transport routes.
+enum TripType {
+  ONE_WAY
+  ROUND_TRIP
+}
+

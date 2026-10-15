@@ -38,9 +38,9 @@ export class BookingsService {
       | 'stay'
       | 'experience'
       | 'transport';
-    const checkInDate = this.formatDateOnly(b.checkIn) || null;
-    const checkOutDate = this.formatDateOnly(b.checkOut) || null;
-    const date = this.formatDateOnly(b.date) || null;
+    const checkInDate = this.formatDateOnly(b.stayBooking?.checkIn) || null;
+    const checkOutDate = this.formatDateOnly(b.stayBooking?.checkOut) || null;
+    const date = this.formatDateOnly(b.experienceBooking?.date) || this.formatDateOnly(b.transportBooking?.date) || null;
 
     let category: 'upcoming' | 'active' | 'recent' | 'cancelled' = 'upcoming';
     if (b.status === 'CANCELLED' || b.status === 'EXPIRED') {
@@ -72,9 +72,9 @@ export class BookingsService {
 
     let nightsCount: number | undefined = undefined;
     let stayProgress: string | undefined = undefined;
-    if (vertical === 'stay' && b.checkIn && b.checkOut) {
-      const checkInTime = new Date(b.checkIn).getTime();
-      const checkOutTime = new Date(b.checkOut).getTime();
+    if (vertical === 'stay' && b.stayBooking?.checkIn && b.stayBooking?.checkOut) {
+      const checkInTime = new Date(b.stayBooking.checkIn).getTime();
+      const checkOutTime = new Date(b.stayBooking.checkOut).getTime();
       nightsCount = Math.max(
         1,
         Math.round((checkOutTime - checkInTime) / (1000 * 60 * 60 * 24)),
@@ -107,10 +107,10 @@ export class BookingsService {
       checkInDate,
       checkOutDate,
       date,
-      timeSlot: b.timeSlot || null,
+      timeSlot: b.experienceBooking?.experienceSlotId || null,
       nightsCount,
       stayProgress,
-      guestsCount: b.guests,
+      guestsCount: b.stayBooking?.guests ?? b.experienceBooking?.guests ?? (b.transportBooking as any)?.seats ?? 1,
       totalNgwee: b.amount,
       totalFormatted: `K${(b.amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
       currency: (b.currency === 'USD' ? 'USD' : 'ZMW') as 'ZMW' | 'USD',
@@ -133,6 +133,9 @@ export class BookingsService {
           },
         },
         payment: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -280,7 +283,7 @@ export class BookingsService {
         ? property.stays.find((s) => s.id === dto.stayId)
         : property.stays[0];
       stayId = stay?.id || null;
-      unitPrice = stay ? stay.price : 120000;
+      unitPrice = stay ? stay.rate : 120000;
 
       if (!dto.checkIn || !dto.checkOut) {
         throw new BadRequestException('checkIn and checkOut dates are required for stays');
@@ -293,34 +296,22 @@ export class BookingsService {
       }
 
       if (stayId && !isSimulated) {
-        const blockedSlot = await this.prisma.availabilitySlot.findFirst({
+        const overlapping = await this.prisma.stayBooking.findFirst({
           where: {
             stayId,
-            date: { gte: checkInDate, lt: checkOutDate },
-            status: 'blocked',
-          },
-        });
-        if (blockedSlot) {
-          throw new ConflictException('Selected dates are blocked by the host');
-        }
-
-        const overlapping = await this.prisma.booking.findFirst({
-          where: {
-            stayId,
-            OR: [
-              { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-              { status: 'PENDING', expiresAt: { gt: now } },
-            ],
             checkIn: { lt: checkOutDate },
             checkOut: { gt: checkInDate },
+            booking: {
+              OR: [
+                { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+                { status: 'PENDING', expiresAt: { gt: now } },
+              ],
+            },
           },
         });
         if (overlapping) {
-          const isHeld = overlapping.status === 'PENDING';
           throw new ConflictException(
-            isHeld
-              ? 'These dates are currently on a 10-minute hold by another customer. Please try again shortly.'
-              : 'These dates are already booked for this room/unit.',
+            'These dates are already booked or held for this room/unit.',
           );
         }
       }
@@ -329,7 +320,7 @@ export class BookingsService {
         ? property.experiences.find((e) => e.id === dto.experienceId)
         : property.experiences[0];
       experienceId = exp?.id || null;
-      unitPrice = exp ? exp.price : 85000;
+      unitPrice = exp ? exp.rate : 85000;
 
       if (!dto.date) {
         throw new BadRequestException('date is required for experience bookings');
@@ -337,25 +328,10 @@ export class BookingsService {
       const expDate = new Date(dto.date);
 
       if (experienceId && !isSimulated) {
-        const activeBookings = await this.prisma.booking.findMany({
-          where: {
-            experienceId,
-            date: expDate,
-            ...(dto.timeSlot ? { timeSlot: dto.timeSlot } : {}),
-            OR: [
-              { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-              { status: 'PENDING', expiresAt: { gt: now } },
-            ],
-          },
-          select: { guests: true, status: true },
-        });
-
-        const bookedCount = activeBookings.reduce((sum, b) => sum + b.guests, 0);
-        const capacity = exp?.maxParticipants || 10;
-
-        if (bookedCount + dto.guests > capacity) {
+        const slot = await this.prisma.experienceSlot.findFirst({ where: { experienceId } });
+        if (slot && slot.available < dto.guests) {
           throw new ConflictException(
-            `This experience slot is currently full or on a 10-minute hold. Only ${Math.max(0, capacity - bookedCount)} spots remaining.`,
+            `This experience slot is currently full. Only ${slot.available} spots remaining.`,
           );
         }
       }
@@ -364,32 +340,17 @@ export class BookingsService {
         ? property.transports.find((t) => t.id === dto.transportId)
         : property.transports[0];
       transportId = trans?.id || null;
-      unitPrice = trans ? (trans.pricePerSeat || 45000) : 45000;
+      unitPrice = trans ? trans.rate : 45000;
 
       if (!dto.date) {
         throw new BadRequestException('date is required for transport bookings');
       }
-      const transDate = new Date(dto.date);
 
       if (transportId && !isSimulated) {
-        const activeBookings = await this.prisma.booking.findMany({
-          where: {
-            transportId,
-            date: transDate,
-            OR: [
-              { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-              { status: 'PENDING', expiresAt: { gt: now } },
-            ],
-          },
-          select: { guests: true },
-        });
-
-        const bookedSeats = activeBookings.reduce((sum, b) => sum + b.guests, 0);
-        const totalCapacity = trans?.capacity || 50;
-
-        if (bookedSeats + dto.guests > totalCapacity) {
+        const inv = await this.prisma.transportInventory.findFirst({ where: { transportId } });
+        if (inv && inv.available < dto.guests) {
           throw new ConflictException(
-            `This transport route is fully booked or held for the selected date. Only ${Math.max(0, totalCapacity - bookedSeats)} seats remaining.`,
+            `This transport is fully booked. Only ${inv.available} seats remaining.`,
           );
         }
       }
@@ -400,55 +361,109 @@ export class BookingsService {
     const count = await this.prisma.booking.count();
     const bookingRef = `NE-${year}-${String(count + 1).padStart(4, '0')}`;
 
-    const booking = await this.prisma.booking.create({
-      data: {
-        bookingRef,
-        propertyId: property.id,
-        stayId,
-        experienceId,
-        transportId,
-        guestId: guestUserId!,
-        hostId: property.hostId,
-        amount: unitPrice * dto.guests,
-        checkIn: dto.checkIn ? new Date(dto.checkIn) : null,
-        checkOut: dto.checkOut ? new Date(dto.checkOut) : null,
-        date: dto.date ? new Date(dto.date) : null,
-        timeSlot: dto.timeSlot || null,
-        expiresAt: finalExpiresAt,
-        status,
-        paymentStatus,
-        guests: dto.guests,
-        customerName: dto.customerName || guestUser?.name || 'Guest',
-        customerPhone: dto.customerPhone || guestUser?.phone || '',
-        customerEmail: dto.customerEmail || guestUser?.email || null,
-        specialRequests: dto.specialRequests || null,
-        ...(isSimulated
-          ? {
-              payment: {
-                create: {
-                  userId: guestUserId!,
-                  amount: unitPrice * dto.guests,
-                  status: 'PAID',
-                  provider: 'SIMULATED',
-                  providerRef: `SIM-${Date.now()}`,
+    const booking = await this.prisma.$transaction(async (tx) => {
+      const createdBooking = await tx.booking.create({
+        data: {
+          bookingRef,
+          propertyId: property.id,
+          guestId: guestUserId!,
+          hostId: property.hostId,
+          type: property.type as any,
+          amount: unitPrice * dto.guests,
+          expiresAt: finalExpiresAt,
+          status,
+          paymentStatus,
+          customerName: dto.customerName || guestUser?.name || 'Guest',
+          customerPhone: dto.customerPhone || guestUser?.phone || '',
+          customerEmail: dto.customerEmail || guestUser?.email || null,
+          specialRequests: dto.specialRequests || null,
+          ...(isSimulated
+            ? {
+                payment: {
+                  create: {
+                    userId: guestUserId!,
+                    amount: unitPrice * dto.guests,
+                    status: 'PAID',
+                    provider: 'SIMULATED',
+                    providerRef: `SIM-${Date.now()}`,
+                  },
                 },
-              },
-            }
-          : {}),
-      },
-      include: {
-        property: true,
-        stay: true,
-        experience: true,
-        transport: true,
-        guest: true,
-        payment: true,
-      },
+              }
+            : {}),
+        },
+      });
+
+      if (property.type === 'STAY' && stayId) {
+        // Find or use first inventory
+        const stayInv = await tx.stayInventory.findFirst({ where: { stayId } });
+        if (stayInv) {
+          await tx.stayBooking.create({
+            data: {
+              bookingId: createdBooking.id,
+              stayId,
+              stayInventoryId: stayInv.id,
+              checkIn: new Date(dto.checkIn!),
+              checkOut: new Date(dto.checkOut!),
+              guests: dto.guests,
+            },
+          });
+          await tx.stayInventory.update({
+            where: { id: stayInv.id },
+            data: { booked: { increment: 1 }, available: { decrement: 1 } },
+          });
+        }
+      } else if (property.type === 'EXPERIENCE' && experienceId) {
+        const expSlot = await tx.experienceSlot.findFirst({ where: { experienceId } });
+        if (expSlot) {
+          await tx.experienceBooking.create({
+            data: {
+              bookingId: createdBooking.id,
+              experienceId,
+              experienceSlotId: expSlot.id,
+              date: new Date(dto.date!),
+              guests: dto.guests,
+            },
+          });
+          await tx.experienceSlot.update({
+            where: { id: expSlot.id },
+            data: { booked: { increment: dto.guests }, available: { decrement: dto.guests } },
+          });
+        }
+      } else if (property.type === 'TRANSPORT' && transportId) {
+        const transInv = await tx.transportInventory.findFirst({ where: { transportId } });
+        if (transInv) {
+          await tx.transportBooking.create({
+            data: {
+              bookingId: createdBooking.id,
+              transportId,
+              transportInventoryId: transInv.id,
+              date: new Date(dto.date!),
+              seats: dto.guests,
+            },
+          });
+          await tx.transportInventory.update({
+            where: { id: transInv.id },
+            data: { booked: { increment: dto.guests }, available: { decrement: dto.guests } },
+          });
+        }
+      }
+
+      return tx.booking.findUnique({
+        where: { id: createdBooking.id },
+        include: {
+          property: true,
+          guest: true,
+          payment: true,
+          stayBooking: true,
+          experienceBooking: true,
+          transportBooking: true,
+        },
+      });
     });
 
     await this.readStore.enqueueSync(property.id).catch(() => null);
 
-    const listingName = booking.stay?.name || booking.experience?.name || booking.transport?.name || property.name;
+    const listingName = property.name;
     const checkInStr  = dto.checkIn  ? new Date(dto.checkIn).toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
     const checkOutStr = dto.checkOut ? new Date(dto.checkOut).toLocaleDateString('en-ZM', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
 
@@ -519,9 +534,9 @@ export class BookingsService {
             images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           },
         },
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
         guest: { select: { name: true, email: true, phone: true } },
         payment: true,
       },
@@ -545,9 +560,9 @@ export class BookingsService {
       where,
       include: {
         property: { include: { host: { select: { name: true, hostProfile: { select: { businessName: true } } } } } },
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
         payment: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -560,7 +575,7 @@ export class BookingsService {
       where: {
         OR: [{ id: idOrBookingRef }, { bookingRef: idOrBookingRef }],
       },
-      include: { property: true, stay: true, payment: true },
+      include: { property: true, stayBooking: true, payment: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.guestId !== userId && booking.hostId !== userId) {
@@ -570,13 +585,14 @@ export class BookingsService {
     if (booking.status === 'COMPLETED') throw new BadRequestException('Cannot cancel completed booking');
 
     // Calculate refund based on cancellation policy
-    const policy = (booking.stay?.cancellationPolicy || 'MODERATE') as CancellationPolicy;
+    const policy = 'MODERATE';
     let refundAmount = 0;
-    const daysUntilCheckIn = booking.checkIn
-      ? Math.ceil((booking.checkIn.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    const checkInTime = booking.stayBooking?.checkIn ? new Date(booking.stayBooking.checkIn).getTime() : 0;
+    const daysUntilCheckIn = checkInTime
+      ? Math.ceil((checkInTime - Date.now()) / (1000 * 60 * 60 * 24))
       : 0;
 
-    switch (policy) {
+    switch (policy as string) {
       case 'FLEXIBLE':
         refundAmount = daysUntilCheckIn >= 1 ? booking.amount : 0;
         break;
@@ -596,7 +612,7 @@ export class BookingsService {
         refundAmount: Math.round(refundAmount),
         paymentStatus: refundAmount > 0 ? 'REFUNDED' : booking.paymentStatus,
       },
-      include: { property: true, stay: true, experience: true, transport: true, guest: true },
+      include: { property: true, stayBooking: true, experienceBooking: true, transportBooking: true, guest: true },
     });
 
     const cancelledBy = userId === booking.guestId ? 'guest' : userId === booking.hostId ? 'host' : 'admin';
@@ -605,7 +621,7 @@ export class BookingsService {
       this.prisma.user.findUnique({ where: { id: booking.guestId } }),
       this.prisma.user.findUnique({ where: { id: booking.hostId } }),
     ]);
-    const cancelListingName = updated.stay?.name || updated.experience?.name || updated.transport?.name || updated.property?.name || booking.bookingRef;
+    const cancelListingName = updated.property?.name || booking.bookingRef;
 
     await this.notifications.onBookingCancelled({
       guestUserId:  booking.guestId,
@@ -645,9 +661,9 @@ export class BookingsService {
       },
       include: {
         property: true,
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
         guest: true,
       },
     });
@@ -670,7 +686,7 @@ export class BookingsService {
 
     let penaltyFeeNgwee = 0;
     const now = new Date();
-    const checkInDate = booking.checkIn || booking.date;
+    const checkInDate = booking.stayBooking?.checkIn || booking.experienceBooking?.date || booking.transportBooking?.date;
     if (checkInDate) {
       const diffHours = (new Date(checkInDate).getTime() - now.getTime()) / (1000 * 60 * 60);
       if (diffHours < 48) {
@@ -681,18 +697,21 @@ export class BookingsService {
     const cancellationDate = now.toISOString();
 
     // ── Reopen Inventory ───────────────────────────────────────────────────────
-    // 1. Stays: unblock any blocked calendar slots for this unit during booking dates
-    if (booking.stayId && booking.checkIn && booking.checkOut) {
-      await this.prisma.availabilitySlot.deleteMany({
-        where: {
-          stayId: booking.stayId,
-          date: {
-            gte: booking.checkIn,
-            lt: booking.checkOut,
-          },
-          status: 'blocked',
-        },
-      });
+    if (booking.stayBooking) {
+      await this.prisma.stayInventory.update({
+        where: { id: booking.stayBooking.stayInventoryId },
+        data: { booked: { decrement: 1 }, available: { increment: 1 } },
+      }).catch(() => null);
+    } else if (booking.experienceBooking) {
+      await this.prisma.experienceSlot.update({
+        where: { id: booking.experienceBooking.experienceSlotId },
+        data: { booked: { decrement: booking.experienceBooking.guests }, available: { increment: booking.experienceBooking.guests } },
+      }).catch(() => null);
+    } else if (booking.transportBooking) {
+      await this.prisma.transportInventory.update({
+        where: { id: booking.transportBooking.transportInventoryId },
+        data: { booked: { decrement: booking.transportBooking.seats }, available: { increment: booking.transportBooking.seats } },
+      }).catch(() => null);
     }
 
     // 2. Set booking status to CANCELLED and clear hold expiration
@@ -757,7 +776,7 @@ export class BookingsService {
     const updated = await this.prisma.booking.update({
       where: { id },
       data: { status, expiresAt: status === 'CONFIRMED' ? null : booking.expiresAt },
-      include: { property: true, stay: true, experience: true, transport: true, guest: true, payout: true },
+      include: { property: true, stayBooking: true, experienceBooking: true, transportBooking: true, guest: true, payout: true },
     });
 
     const guest = await this.prisma.user.findUnique({ where: { id: booking.guestId } });
@@ -777,9 +796,9 @@ export class BookingsService {
       },
       include: {
         property: true,
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
         host: { include: { hostProfile: true } },
         payout: true,
       },
@@ -795,7 +814,7 @@ export class BookingsService {
       throw new BadRequestException('Cannot check in a cancelled or expired booking');
     }
 
-    if (booking.checkedInAt || booking.status === 'CHECKED_IN') {
+    if (booking.stayBooking?.checkedInAt || booking.status === 'CHECKED_IN') {
       throw new BadRequestException('This booking has already been checked in');
     }
 
@@ -835,9 +854,9 @@ export class BookingsService {
       },
       include: {
         property: true,
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
         host: { include: { hostProfile: true } },
         payout: true,
       },
@@ -851,7 +870,7 @@ export class BookingsService {
       }
     }
 
-    if (booking.checkedInAt || booking.status === 'CHECKED_IN') {
+    if (booking.stayBooking?.checkedInAt || booking.status === 'CHECKED_IN') {
       return {
         message: 'This booking has already been checked in',
         booking: this.formatBooking(booking),
@@ -880,17 +899,23 @@ export class BookingsService {
       });
     }
 
+    if (booking.stayBooking) {
+      await this.prisma.stayBooking.update({
+        where: { bookingId: booking.id },
+        data: { checkedInAt: new Date() },
+      });
+    }
+
     const updated = await this.prisma.booking.update({
       where: { id: booking.id },
       data: {
         status: 'CHECKED_IN',
-        checkedInAt: new Date(),
       },
       include: {
         property: true,
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
         guest: true,
         payout: true,
       },
@@ -941,9 +966,9 @@ export class BookingsService {
       },
       include: {
         property: true,
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
       },
     });
     if (!booking) throw new NotFoundException('Booking not found');
@@ -953,36 +978,35 @@ export class BookingsService {
       throw new ForbiddenException('Only the host of this property can perform check-out');
     }
 
-    if (booking.status === 'COMPLETED' || booking.checkedOutAt) {
+    if (booking.status === 'COMPLETED' || booking.stayBooking?.checkedOutAt) {
       throw new BadRequestException('This booking has already been checked out');
     }
 
-    if (!booking.checkedInAt && booking.status !== 'CHECKED_IN') {
+    if (!booking.stayBooking?.checkedInAt && booking.status !== 'CHECKED_IN') {
       throw new BadRequestException('Booking must be checked in before checkout');
     }
 
     const checkedOutAt = new Date();
 
-    // Reopen inventory:
-    // If the guest checked out earlier than the scheduled checkOut date,
-    // update checkOut to checkedOutAt so that any subsequent dates are immediately available.
+    if (booking.stayBooking) {
+      await this.prisma.stayBooking.update({
+        where: { bookingId: booking.id },
+        data: { checkedOutAt },
+      });
+    }
+
     const updateData: any = {
       status: 'COMPLETED',
-      checkedOutAt,
     };
-
-    if (booking.checkOut && checkedOutAt < booking.checkOut) {
-      updateData.checkOut = checkedOutAt;
-    }
 
     const updated = await this.prisma.booking.update({
       where: { id: booking.id },
       data: updateData,
       include: {
         property: true,
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
         guest: true,
         payout: true,
       },
@@ -1007,7 +1031,7 @@ export class BookingsService {
   private formatBooking(booking: any) {
     const property = booking.property;
     const guest = booking.guest;
-    const unitName = booking.stay?.name || booking.experience?.name || booking.transport?.name || null;
+    const unitName = property?.name || null;
 
     const now = Date.now();
     const expiresAt = booking.expiresAt ? new Date(booking.expiresAt) : null;
@@ -1016,15 +1040,15 @@ export class BookingsService {
       ? Math.max(0, Math.floor((expiresAt.getTime() - now) / 1000))
       : 0;
 
-    const checkInDate = booking.checkIn ? new Date(booking.checkIn) : null;
-    const checkOutDate = booking.checkOut ? new Date(booking.checkOut) : null;
+    const checkInDate = booking.stayBooking?.checkIn ? new Date(booking.stayBooking.checkIn) : null;
+    const checkOutDate = booking.stayBooking?.checkOut ? new Date(booking.stayBooking.checkOut) : null;
     const nights = checkInDate && checkOutDate
       ? Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)))
       : 1;
 
-    const nightlyRateNgwee = booking.stay?.price || Math.round(booking.amount / nights);
+    const nightlyRateNgwee = Math.round(booking.amount / nights);
     const accommodationTotalNgwee = nightlyRateNgwee * nights;
-    const cleaningFeeNgwee = booking.stay?.cleaningFee || 50000;
+    const cleaningFeeNgwee = 50000;
     const serviceFeeNgwee = Math.round(booking.amount * 0.1);
     const grandTotalNgwee = booking.amount;
 
@@ -1093,14 +1117,14 @@ export class BookingsService {
         expiresInSeconds: holdExpiresInSeconds,
       },
       details: {
-        checkIn: booking.checkIn?.toISOString().split('T')[0] || null,
-        checkOut: booking.checkOut?.toISOString().split('T')[0] || null,
-        date: booking.date?.toISOString().split('T')[0] || null,
-        timeSlot: booking.timeSlot || null,
-        guests: booking.guests,
+        checkIn: booking.stayBooking?.checkIn ? new Date(booking.stayBooking.checkIn).toISOString().split('T')[0] : null,
+        checkOut: booking.stayBooking?.checkOut ? new Date(booking.stayBooking.checkOut).toISOString().split('T')[0] : null,
+        date: booking.experienceBooking?.date ? new Date(booking.experienceBooking.date).toISOString().split('T')[0] : booking.transportBooking?.date ? new Date(booking.transportBooking.date).toISOString().split('T')[0] : null,
+        timeSlot: null,
+        guests: booking.stayBooking?.guests || booking.experienceBooking?.guests || booking.transportBooking?.seats || 1,
       },
-      checkedInAt: booking.checkedInAt ? new Date(booking.checkedInAt).toISOString() : null,
-      checkedOutAt: booking.checkedOutAt ? new Date(booking.checkedOutAt).toISOString() : null,
+      checkedInAt: booking.stayBooking?.checkedInAt ? new Date(booking.stayBooking.checkedInAt).toISOString() : null,
+      checkedOutAt: booking.stayBooking?.checkedOutAt ? new Date(booking.stayBooking.checkedOutAt).toISOString() : null,
       payout: booking.payout ? {
         id: booking.payout.id,
         amount: booking.payout.amount,

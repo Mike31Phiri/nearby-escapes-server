@@ -6,7 +6,6 @@ import {
   BlockDatesResponseDto,
   UnblockDatesDto,
   UnblockDatesResponseDto,
-  SeasonalPricingDto,
   ExperienceAvailabilityQueryDto,
   TransportAvailabilityQueryDto,
   ExperienceSlotBlockDto,
@@ -177,21 +176,4 @@ export class AvailabilityController {
     return this.availabilityService.unblockDates(dto, user.id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
-  @Post('seasonal-pricing')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Add seasonal pricing rule (Host)' })
-  addSeasonalPricing(@CurrentUser() user: User, @Body() dto: SeasonalPricingDto) {
-    return this.availabilityService.addSeasonalPricing(dto, user.id);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
-  @Delete('seasonal-pricing/:id')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Remove seasonal pricing rule (Host)' })
-  removeSeasonalPricing(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.availabilityService.removeSeasonalPricing(id, user.id);
-  }
 }

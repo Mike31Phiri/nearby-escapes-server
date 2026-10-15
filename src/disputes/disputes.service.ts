@@ -166,9 +166,12 @@ export class DisputesService {
             select: {
               id: true,
               bookingRef: true,
-              status: true,
-              checkIn: true,
-              checkOut: true,
+              stayBooking: {
+                select: {
+                  checkIn: true,
+                  checkOut: true,
+                },
+              },
             },
           },
           raisedByUser: {

@@ -93,6 +93,22 @@ export class AdminController {
     return this.adminService.getBookings(page, limit);
   }
 
+  @Get('bookings/:id')
+  @ApiOperation({ summary: 'Get booking full details (with stays, experiences, transport sub-entities)' })
+  getBookingById(@Param('id') id: string) {
+    return this.adminService.getBookingById(id);
+  }
+
+  @Patch('bookings/:id/status')
+  @ApiOperation({ summary: 'Admin override booking status' })
+  updateBookingStatus(
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Body('notes') notes?: string,
+  ) {
+    return this.adminService.updateBookingStatus(id, status, notes);
+  }
+
   // ─── Disputes ──────────────────────────────────────────────────────────────
 
   @Get('disputes')
@@ -199,5 +215,27 @@ export class AdminController {
   promoteToAdmin(@Param('id') id: string) {
     return this.adminService.promoteToAdmin(id);
   }
+
+  // ─── Diagnostics / Test Email ──────────────────────────────────────────────
+
+  @Post('test-email')
+  @ApiOperation({ summary: 'Send diagnostic test email to verify SMTP / Resend delivery' })
+  sendTestEmail(
+    @CurrentUser() admin: User,
+    @Body('to') to?: string,
+    @Body('message') message?: string,
+  ) {
+    return this.adminService.sendTestEmail(to, message, admin?.email);
+  }
+
+  @Get('test-email')
+  @ApiOperation({ summary: 'Quick test email dispatch using GET' })
+  quickTestEmail(
+    @CurrentUser() admin: User,
+    @Query('to') to?: string,
+  ) {
+    return this.adminService.sendTestEmail(to, 'Triggered via GET diagnostic', admin?.email);
+  }
 }
+
 

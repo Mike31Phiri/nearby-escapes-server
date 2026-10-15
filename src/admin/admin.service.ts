@@ -1,12 +1,16 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   // ─── Dashboard ─────────────────────────────────────────────────────────────
 
@@ -154,9 +158,9 @@ export class AdminService {
     return {
       data: properties.map((p) => {
         const price =
-          p.stays[0]?.price ??
-          p.experiences[0]?.price ??
-          p.transports[0]?.pricePerSeat ??
+          p.stays[0]?.rate ??
+          p.experiences[0]?.rate ??
+          p.transports[0]?.rate ??
           0;
         return {
           id: p.id,
@@ -268,8 +272,6 @@ export class AdminService {
               id: true,
               bookingRef: true,
               status: true,
-              checkIn: true,
-              checkOut: true,
             },
           },
           raisedByUser: {
@@ -662,6 +664,90 @@ export class AdminService {
       message: isApproved
         ? 'Application approved and host role granted.'
         : 'Application rejected.',
+    };
+  }
+
+  // ─── Diagnostics / Test Email ──────────────────────────────────────────────
+
+  async sendTestEmail(to?: string, customMessage?: string, adminEmail?: string) {
+    const target = to || adminEmail || process.env.MAIL_DEV_OVERRIDE || 'mike31phiri@gmail.com';
+    return this.notificationsService.sendTestEmail(target, customMessage);
+  }
+
+  // ─── Booking Admin Management ─────────────────────────────────────────────
+
+  async getBookingById(bookingId: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: {
+        OR: [{ id: bookingId }, { bookingRef: bookingId }],
+      },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            location: true,
+            hostId: true,
+            host: { select: { id: true, name: true, email: true, phone: true } },
+          },
+        },
+        guest: { select: { id: true, name: true, email: true, phone: true } },
+        payment: true,
+        stayBooking: true,
+        experienceBooking: {
+          include: {
+            experience: { select: { id: true, name: true, experienceType: true } },
+            experienceSlot: { select: { id: true, startTime: true, endTime: true, label: true } },
+          },
+        },
+        transportBooking: {
+          include: {
+            transport: { select: { id: true, name: true, vehicleType: true, routeType: true } },
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Booking "${bookingId}" not found`);
+    }
+
+    return {
+      success: true,
+      data: booking,
+    };
+  }
+
+  async updateBookingStatus(bookingId: string, status: string, notes?: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: {
+        OR: [{ id: bookingId }, { bookingRef: bookingId }],
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Booking "${bookingId}" not found`);
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: status.toUpperCase() as any,
+      },
+    });
+
+    await this.logActivity({
+      action: 'BOOKING_STATUS_OVERRIDE',
+      type: 'BOOKING',
+      target: booking.bookingRef,
+      metadata: { previousStatus: booking.status, newStatus: status, notes },
+    });
+
+    return {
+      success: true,
+      data: updated,
+      message: `Booking ${booking.bookingRef} status updated to ${status}`,
     };
   }
 }

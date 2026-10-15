@@ -63,6 +63,9 @@ export class HostDashboardService {
             phone: true,
           },
         },
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -71,7 +74,9 @@ export class HostDashboardService {
 
     return bookings.map((b) => {
       let status: 'confirmed' | 'cancelled' | 'completed' = 'confirmed';
-      if (b.status === 'COMPLETED' || b.checkedOutAt) {
+      const checkedInAt = b.stayBooking?.checkedInAt;
+      const checkedOutAt = b.stayBooking?.checkedOutAt;
+      if (b.status === 'COMPLETED' || checkedOutAt) {
         status = 'completed';
       } else if (b.status === 'CANCELLED' || b.status === 'EXPIRED') {
         status = 'cancelled';
@@ -91,10 +96,10 @@ export class HostDashboardService {
         listingTitle: b.property?.name || 'Listing',
         vertical,
         status,
-        checkIn: this.formatDateOnly(b.checkIn) || null,
-        checkOut: this.formatDateOnly(b.checkOut) || null,
-        date: this.formatDateOnly(b.date) || null,
-        guests: b.guests,
+        checkIn: this.formatDateOnly(b.stayBooking?.checkIn) || null,
+        checkOut: this.formatDateOnly(b.stayBooking?.checkOut) || null,
+        date: this.formatDateOnly(b.experienceBooking?.date) || this.formatDateOnly(b.transportBooking?.date) || null,
+        guests: b.stayBooking?.guests || b.experienceBooking?.guests || b.transportBooking?.seats || 1,
         totalNgwee: b.amount,
         guestName: b.customerName || b.guest?.name || 'Guest',
         guestPhone: b.customerPhone || b.guest?.phone || '',
@@ -312,9 +317,9 @@ export class HostDashboardService {
         guest: {
           select: { id: true, name: true, phone: true, email: true, avatar: true },
         },
-        stay: true,
-        experience: true,
-        transport: true,
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -336,8 +341,8 @@ export class HostDashboardService {
         | 'transport';
 
       const checkInDateStr =
-        this.formatDateOnly(booking.checkIn) || this.formatDateOnly(booking.date) || todayStr;
-      const checkOutDateStr = this.formatDateOnly(booking.checkOut);
+        this.formatDateOnly(booking.stayBooking?.checkIn) || this.formatDateOnly(booking.experienceBooking?.date) || this.formatDateOnly(booking.transportBooking?.date) || todayStr;
+      const checkOutDateStr = this.formatDateOnly(booking.stayBooking?.checkOut);
 
       let stayProgress: string | undefined = undefined;
       if (listingType === 'stay' && checkInDateStr && checkOutDateStr) {
@@ -356,9 +361,11 @@ export class HostDashboardService {
         stayProgress = `Night ${currentNight} of ${totalNights}${checkOutTomorrow ? ' · Check-out tomorrow' : ''}`;
       }
 
+      const checkedInAt = booking.stayBooking?.checkedInAt;
+      const checkedOutAt = booking.stayBooking?.checkedOutAt;
       const mappedStatus: 'confirmed' | 'checked_in' | 'checked_out' =
         statusMap[booking.status] ||
-        (booking.checkedOutAt ? 'checked_out' : booking.checkedInAt ? 'checked_in' : 'confirmed');
+        (checkedOutAt ? 'checked_out' : checkedInAt ? 'checked_in' : 'confirmed');
 
       const baseItem = {
         id: booking.id,
@@ -373,9 +380,9 @@ export class HostDashboardService {
         listingImage: (booking.property as any)?.images?.[0]?.url || '',
         checkInDate: checkInDateStr,
         checkOutDate: checkOutDateStr,
-        timeSlot: booking.timeSlot || undefined,
+        timeSlot: undefined,
         stayProgress,
-        guestCount: booking.guests,
+        guestCount: booking.stayBooking?.guests || booking.experienceBooking?.guests || booking.transportBooking?.seats || 1,
         totalAmountNgwee: booking.amount,
         currency: (booking.currency === 'USD' ? 'USD' : 'ZMW') as 'ZMW' | 'USD',
         status: mappedStatus,
@@ -447,7 +454,13 @@ export class HostDashboardService {
       }),
       this.prisma.booking.findMany({
         where: { hostId: userId, status: { in: ['PENDING', 'CONFIRMED'] } },
-        include: { guest: { select: { name: true } }, property: { select: { name: true, images: { take: 1 } } } },
+        include: {
+          guest: { select: { name: true } },
+          property: { select: { name: true, images: { take: 1 } } },
+          stayBooking: true,
+          experienceBooking: true,
+          transportBooking: true,
+        },
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
@@ -492,9 +505,9 @@ export class HostDashboardService {
         listingName: b.property?.name || null,
         thumbnailUrl: (b.property as any)?.images?.[0]?.url || null,
         guestName: b.guest?.name || null,
-        guests: b.guests,
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
+        guests: b.stayBooking?.guests || b.experienceBooking?.guests || b.transportBooking?.seats || 1,
+        checkIn: b.stayBooking?.checkIn || b.experienceBooking?.date || b.transportBooking?.date || null,
+        checkOut: b.stayBooking?.checkOut || null,
         status: b.status.toLowerCase(),
         amount: b.amount,
         createdAt: b.createdAt,
@@ -554,9 +567,9 @@ export class HostDashboardService {
         : 0;
 
       const price =
-        p.stays[0]?.price ??
-        p.experiences[0]?.price ??
-        p.transports[0]?.pricePerSeat ??
+        (p.stays[0] as any)?.rate ??
+        (p.experiences[0] as any)?.rate ??
+        (p.transports[0] as any)?.rate ??
         0;
 
       return {
@@ -605,6 +618,9 @@ export class HostDashboardService {
           select: { id: true, name: true, email: true, phone: true, avatar: true },
         },
         payment: { select: { status: true } },
+        stayBooking: true,
+        experienceBooking: true,
+        transportBooking: true,
       },
     });
 
@@ -618,8 +634,8 @@ export class HostDashboardService {
       | 'experience'
       | 'transport';
 
-    const checkIn = this.formatDateOnly(booking.checkIn) || this.formatDateOnly(booking.date) || null;
-    const checkOut = this.formatDateOnly(booking.checkOut) || null;
+    const checkIn = this.formatDateOnly(booking.stayBooking?.checkIn) || this.formatDateOnly(booking.experienceBooking?.date) || this.formatDateOnly(booking.transportBooking?.date) || null;
+    const checkOut = this.formatDateOnly(booking.stayBooking?.checkOut) || null;
     const todayStr = new Date().toISOString().slice(0, 10);
 
     // Compute stay progress for modal
@@ -675,10 +691,10 @@ export class HostDashboardService {
       guestName: booking.customerName || booking.guest?.name || 'Guest',
       guestEmail: booking.customerEmail || booking.guest?.email || '',
       guestPhone: booking.customerPhone || booking.guest?.phone || '',
-      guests: booking.guests,
+      guests: booking.stayBooking?.guests || booking.experienceBooking?.guests || booking.transportBooking?.seats || 1,
       checkIn,
       checkOut,
-      timeSlot: booking.timeSlot || null,
+      timeSlot: null,
       stayProgress: stayProgress || null,
       createdAt: booking.createdAt.toISOString(),
       pricing: {

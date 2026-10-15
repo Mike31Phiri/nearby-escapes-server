@@ -132,9 +132,9 @@ export class PlatformService {
       featured: {
         gems: gems.map((p) => {
           const price =
-            p.stays[0]?.price ??
-            p.experiences[0]?.price ??
-            p.transports[0]?.pricePerSeat ??
+            (p.stays[0] as any)?.rate ??
+            (p.experiences[0] as any)?.rate ??
+            (p.transports[0] as any)?.rate ??
             0;
           return {
             id: p.id,

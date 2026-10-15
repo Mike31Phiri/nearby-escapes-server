@@ -643,6 +643,45 @@ export class NotificationsService {
     }));
   }
 
+  async sendTestEmail(to: string, customMessage?: string) {
+    const timestamp = new Date().toISOString();
+    const mailHost = this.config.get('MAIL_HOST') || 'smtp.gmail.com';
+    const mailFrom = (this.config.get<string>('MAIL_FROM') || 'Nearby Escapes <onboarding@resend.dev>').trim();
+    const mailOverride = this.config.get<string>('MAIL_DEV_OVERRIDE') || process.env.MAIL_DEV_OVERRIDE;
+
+    await this.send(
+      to,
+      `[Test Email] Nearby Escapes Diagnostic — ${new Date().toLocaleTimeString()}`,
+      this.tpl({
+        name: 'Administrator',
+        heading: '🧪 Test Email Notification Delivery',
+        body: `
+          <p>This is a live diagnostic email sent from the <strong>Nearby Escapes</strong> notification system to verify email dispatch.</p>
+          <div style="background:#f4f1fb;border-left:4px solid #6b46c1;padding:14px 18px;margin:20px 0;font-family:monospace;font-size:13px;line-height:1.7;border-radius:4px;">
+            <div><strong>Target Recipient:</strong> ${to}</div>
+            <div><strong>Dev Override:</strong> ${mailOverride || 'Disabled (Sending direct)'}</div>
+            <div><strong>Mail Host:</strong> ${mailHost}</div>
+            <div><strong>Sender:</strong> ${mailFrom}</div>
+            <div><strong>Server Time:</strong> ${timestamp}</div>
+          </div>
+          ${customMessage ? `<p style="margin-top:12px;"><strong>Note:</strong> ${customMessage}</p>` : ''}
+          <p style="color:#28a745;font-weight:600;margin-top:16px;">✓ Notification transport pipeline is operational.</p>
+        `,
+        ctaLabel: 'Open Admin Dashboard',
+        ctaUrl: `${this.frontendUrl()}/admin/dashboard`,
+      }),
+    );
+
+    return {
+      success: true,
+      message: `Test email dispatched to ${to}`,
+      recipient: to,
+      timestamp,
+      mailHost,
+      mailFrom,
+    };
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   //  Email primitives
   // ────────────────────────────────────────────────────────────────────────────

@@ -144,35 +144,6 @@ export class ExperienceSlotActionResponseDto {
   message: string;
 }
 
-export class SeasonalPricingDto {
-  @ApiPropertyOptional({ example: 'uuid-stay-1' })
-  @IsOptional()
-  @IsString()
-  stayId?: string;
-
-  @ApiPropertyOptional({ example: 'uuid-listing-1' })
-  @IsOptional()
-  @IsString()
-  listingId?: string;
-
-  @ApiProperty({ example: '2026-12-01' })
-  @IsDateString()
-  from: string;
-
-  @ApiProperty({ example: '2026-12-31' })
-  @IsDateString()
-  to: string;
-
-  @ApiProperty({ example: 450000 })
-  @IsInt()
-  @Min(0)
-  price: number;
-
-  @ApiPropertyOptional({ example: 'Peak Season' })
-  @IsOptional()
-  @IsString()
-  label?: string;
-}
 
 export class ExperienceAvailabilityQueryDto {
   @ApiProperty({ example: '2026-10-01' })

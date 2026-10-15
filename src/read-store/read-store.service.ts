@@ -11,7 +11,6 @@ export class ReadStoreService {
   // ── Sync helpers (kept for backwards compatibility; writes go direct to DB) ───
 
   async enqueueSync(propertyId: string, deleted = false): Promise<void> {
-    // Writes are saved directly to PostgreSQL, so no background sync queue is needed
     return Promise.resolve();
   }
 
@@ -56,13 +55,13 @@ export class ReadStoreService {
       where: { id },
       include: {
         host: { select: { id: true, name: true, avatar: true, hostProfile: { select: { businessName: true, isApproved: true } } } },
-        stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+        stays: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' } },
         experiences: {
           where: { deletedAt: null },
-          orderBy: { sortOrder: 'asc' },
-          include: { timeSlots: { orderBy: { slot: 'asc' } }, inclusions: true },
+          orderBy: { createdAt: 'asc' },
+          include: { slots: { where: { isActive: true }, orderBy: { startTime: 'asc' } }, inclusions: true },
         },
-        transports: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+        transports: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' } },
         images: { orderBy: { sortOrder: 'asc' } },
         amenities: { orderBy: { name: 'asc' } },
         rules: true,
@@ -139,8 +138,6 @@ export class ReadStoreService {
         some: {
           isActive: true,
           deletedAt: null,
-          ...(query.guests ? { maxGuests: { gte: Number(query.guests) } } : {}),
-          ...(query.bedrooms ? { bedrooms: { gte: Number(query.bedrooms) } } : {}),
         },
       };
     }
@@ -153,13 +150,13 @@ export class ReadStoreService {
         orderBy: { createdAt: 'desc' },
         include: {
           host: { select: { id: true, name: true, avatar: true, hostProfile: { select: { businessName: true, isApproved: true } } } },
-          stays: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+          stays: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' } },
           experiences: {
             where: { deletedAt: null },
-            orderBy: { sortOrder: 'asc' },
-            include: { timeSlots: { orderBy: { slot: 'asc' } }, inclusions: true },
+            orderBy: { createdAt: 'asc' },
+            include: { slots: { where: { isActive: true }, orderBy: { startTime: 'asc' } }, inclusions: true },
           },
-          transports: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+          transports: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' } },
           images: { orderBy: { sortOrder: 'asc' } },
           amenities: { orderBy: { name: 'asc' } },
           rules: true,
@@ -206,13 +203,13 @@ export class ReadStoreService {
     let startingPrice = 0;
     if (property.type === 'STAY' && property.stays?.length) {
       const active = property.stays.filter((s: any) => s.isActive);
-      if (active.length) startingPrice = Math.min(...active.map((s: any) => s.price));
+      if (active.length) startingPrice = Math.min(...active.map((s: any) => s.rate ?? s.price ?? 0));
     } else if (property.type === 'EXPERIENCE' && property.experiences?.length) {
       const active = property.experiences.filter((e: any) => e.isActive);
-      if (active.length) startingPrice = Math.min(...active.map((e: any) => e.price));
+      if (active.length) startingPrice = Math.min(...active.map((e: any) => e.rate ?? e.price ?? 0));
     } else if (property.type === 'TRANSPORT' && property.transports?.length) {
-      const active = property.transports.filter((t: any) => t.isActive && t.pricePerSeat != null);
-      if (active.length) startingPrice = Math.min(...active.map((t: any) => t.pricePerSeat));
+      const active = property.transports.filter((t: any) => t.isActive && (t.rate != null || t.pricePerSeat != null));
+      if (active.length) startingPrice = Math.min(...active.map((t: any) => t.rate ?? t.pricePerSeat ?? 0));
     }
 
     const locationParts = (property.location || '')
@@ -226,6 +223,18 @@ export class ReadStoreService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
     const featuredImage = property.images?.[0]?.url || null;
+
+    const primaryExp = property.experiences?.[0];
+    const expSlots = (primaryExp?.slots || []).map((s: any, idx: number) => ({
+      id: s.id || `slot-${idx + 1}`,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      label: s.label || `${s.startTime} - ${s.endTime}`,
+      timeSlot: `${s.startTime} - ${s.endTime}`,
+      capacity: s.maxCapacity || 8,
+      availableTickets: s.available ?? s.maxCapacity ?? 8,
+    }));
+    const expTimeSlots = expSlots.map((s: any) => s.label);
 
     return {
       id: property.id,
@@ -265,55 +274,44 @@ export class ReadStoreService {
       },
 
       // Experience-specific top-level convenience fields (for ExperienceDetailPage)
-      meetingPoint: property.experiences?.[0]?.meetingPoint || null,
-      meetingPointAddress: property.experiences?.[0]?.meetingPointAddress || property.experiences?.[0]?.meetingPoint || null,
-      itinerary: property.experiences?.[0]?.itinerary || [],
-      slots: property.experiences?.[0]?.slots || (property.experiences?.[0]?.timeSlots || []).map((ts: any, idx: number) => ({
-        id: ts.id || `slot-${idx + 1}`,
-        label: `Session ${idx + 1}`,
-        timeSlot: ts.slot,
-        capacity: property.experiences?.[0]?.maxParticipants || 8,
-      })),
-      timeSlots: (property.experiences?.[0]?.timeSlots || []).map((ts: any) => ts.slot),
-      inclusions: (property.experiences?.[0]?.inclusions || []).map((i: any) => i.item),
-      whatsIncluded: (property.experiences?.[0]?.inclusions || []).map((i: any) => i.item),
-      whatsNotIncluded: property.experiences?.[0]?.whatsNotIncluded || [],
-      exclusions: property.experiences?.[0]?.whatsNotIncluded || [],
-      whatToBring: property.experiences?.[0]?.whatToBring || [],
-      whatToCarry: property.experiences?.[0]?.whatToBring || [],
-      whatNotToBring: property.experiences?.[0]?.whatNotToBring || [],
-      importantInformation: property.experiences?.[0]?.importantInformation || [],
-      guidelines: property.experiences?.[0]?.importantInformation || [],
-      notSuitableFor: property.experiences?.[0]?.notSuitableFor || [],
-      suitability: property.experiences?.[0]?.notSuitableFor || [],
-      experienceDetails: property.experiences?.[0]
+      meetingPoint: primaryExp?.meetingPoint || null,
+      meetingPointAddress: primaryExp?.meetingPointAddress || primaryExp?.meetingPoint || null,
+      itinerary: [],
+      slots: expSlots,
+      timeSlots: expTimeSlots,
+      inclusions: (primaryExp?.inclusions || []).map((i: any) => i.item),
+      whatsIncluded: (primaryExp?.inclusions || []).map((i: any) => i.item),
+      whatsNotIncluded: primaryExp?.whatsNotIncluded || [],
+      exclusions: primaryExp?.whatsNotIncluded || [],
+      whatToBring: primaryExp?.whatToBring || [],
+      whatToCarry: primaryExp?.whatToBring || [],
+      whatNotToBring: primaryExp?.whatNotToBring || [],
+      importantInformation: primaryExp?.importantInformation || [],
+      guidelines: primaryExp?.importantInformation || [],
+      notSuitableFor: primaryExp?.notSuitableFor || [],
+      suitability: primaryExp?.notSuitableFor || [],
+      experienceDetails: primaryExp
         ? {
-            activityType: property.experiences[0].activityType,
-            subtype: property.experiences[0].activityType,
-            duration: property.experiences[0].duration,
-            maxParticipants: property.experiences[0].maxParticipants,
-            difficulty: property.experiences[0].difficultyLevel?.toLowerCase(),
-            meetingPoint: property.experiences[0].meetingPoint,
-            meetingPointAddress: property.experiences[0].meetingPointAddress || property.experiences[0].meetingPoint,
-            itinerary: property.experiences[0].itinerary || [],
-            slots: property.experiences[0].slots || (property.experiences[0].timeSlots || []).map((ts: any, idx: number) => ({
-              id: ts.id || `slot-${idx + 1}`,
-              label: `Session ${idx + 1}`,
-              timeSlot: ts.slot,
-              capacity: property.experiences[0].maxParticipants || 8,
-            })),
-            timeSlots: (property.experiences[0].timeSlots || []).map((ts: any) => ts.slot),
-            inclusions: (property.experiences[0].inclusions || []).map((i: any) => i.item),
-            whatsIncluded: (property.experiences[0].inclusions || []).map((i: any) => i.item),
-            whatsNotIncluded: property.experiences[0].whatsNotIncluded || [],
-            exclusions: property.experiences[0].whatsNotIncluded || [],
-            whatToBring: property.experiences[0].whatToBring || [],
-            whatToCarry: property.experiences[0].whatToBring || [],
-            whatNotToBring: property.experiences[0].whatNotToBring || [],
-            importantInformation: property.experiences[0].importantInformation || [],
-            guidelines: property.experiences[0].importantInformation || [],
-            notSuitableFor: property.experiences[0].notSuitableFor || [],
-            suitability: property.experiences[0].notSuitableFor || [],
+            activityType: primaryExp.experienceType,
+            subtype: primaryExp.experienceType,
+            duration: expSlots[0] ? `${expSlots[0].startTime} - ${expSlots[0].endTime}` : null,
+            maxParticipants: expSlots[0]?.capacity || 8,
+            meetingPoint: primaryExp.meetingPoint,
+            meetingPointAddress: primaryExp.meetingPointAddress || primaryExp.meetingPoint,
+            itinerary: [],
+            slots: expSlots,
+            timeSlots: expTimeSlots,
+            inclusions: (primaryExp.inclusions || []).map((i: any) => i.item),
+            whatsIncluded: (primaryExp.inclusions || []).map((i: any) => i.item),
+            whatsNotIncluded: primaryExp.whatsNotIncluded || [],
+            exclusions: primaryExp.whatsNotIncluded || [],
+            whatToBring: primaryExp.whatToBring || [],
+            whatToCarry: primaryExp.whatToBring || [],
+            whatNotToBring: primaryExp.whatNotToBring || [],
+            importantInformation: primaryExp.importantInformation || [],
+            guidelines: primaryExp.importantInformation || [],
+            notSuitableFor: primaryExp.notSuitableFor || [],
+            suitability: primaryExp.notSuitableFor || [],
           }
         : undefined,
 
@@ -321,38 +319,42 @@ export class ReadStoreService {
         id: s.id,
         name: s.name,
         description: s.description,
-        price: s.price,
-        priceFormatted: `K${(s.price / 100).toFixed(2)}`,
-        roomType: s.roomType,
-        bedrooms: s.bedrooms,
-        beds: s.beds,
-        baths: s.baths,
-        maxGuests: s.maxGuests,
-        checkInFrom: s.checkInFrom,
-        checkInUntil: s.checkInUntil,
-        checkOutBefore: s.checkOutBefore,
+        price: s.rate ?? s.price ?? 0,
+        priceFormatted: `K${((s.rate ?? s.price ?? 0) / 100).toFixed(2)}`,
+        roomType: s.unitType?.toLowerCase() || s.roomType || null,
+        bedrooms: s.bedrooms ?? 1,
+        beds: s.beds ?? 1,
+        baths: s.baths ?? 1,
+        maxGuests: s.maxGuests ?? 2,
+        checkInFrom: s.checkInFrom || '14:00',
+        checkInUntil: s.checkInUntil || '22:00',
+        checkOutBefore: s.checkOutBefore || '10:00',
         cancellationPolicy: s.cancellationPolicy?.toLowerCase() || null,
         isActive: s.isActive,
       })),
       experiences: (property.experiences || []).map((e: any) => {
         const incs = (e.inclusions || []).map((i: any) => i.item);
-        const tSlots = (e.timeSlots || []).map((ts: any) => ts.slot);
-        const slts = e.slots || tSlots.map((slot: string, idx: number) => ({
-          id: `slot-${idx + 1}`,
-          label: `Session ${idx + 1}`,
-          timeSlot: slot,
-          capacity: e.maxParticipants || 8,
+        const slts = (e.slots || []).map((slotObj: any, idx: number) => ({
+          id: slotObj.id || `slot-${idx + 1}`,
+          startTime: slotObj.startTime,
+          endTime: slotObj.endTime,
+          interval: `${slotObj.startTime} - ${slotObj.endTime}`,
+          label: slotObj.label || `${slotObj.startTime} - ${slotObj.endTime}`,
+          timeSlot: `${slotObj.startTime} - ${slotObj.endTime}`,
+          capacity: slotObj.maxCapacity || 8,
+          availableTickets: slotObj.available ?? slotObj.maxCapacity ?? 8,
         }));
+        const tSlots = slts.map((s: any) => s.label);
         return {
           id: e.id,
           name: e.name,
           description: e.description,
-          price: e.price,
-          priceFormatted: `K${(e.price / 100).toFixed(2)}`,
-          activityType: e.activityType,
-          duration: e.duration,
-          maxParticipants: e.maxParticipants,
-          difficultyLevel: e.difficultyLevel,
+          price: e.rate ?? e.price ?? 0,
+          priceFormatted: `K${((e.rate ?? e.price ?? 0) / 100).toFixed(2)}`,
+          activityType: e.experienceType,
+          duration: slts[0] ? slts[0].interval : null,
+          maxParticipants: slts[0]?.capacity || 8,
+          difficultyLevel: 'moderate',
           meetingPoint: e.meetingPoint,
           meetingPointAddress: e.meetingPointAddress || e.meetingPoint,
           isActive: e.isActive,
@@ -369,7 +371,7 @@ export class ReadStoreService {
           guidelines: e.importantInformation || [],
           notSuitableFor: e.notSuitableFor || [],
           suitability: e.notSuitableFor || [],
-          itinerary: e.itinerary || [],
+          itinerary: [],
         };
       }),
       transports: (property.transports || []).map((t: any) => ({
@@ -379,10 +381,10 @@ export class ReadStoreService {
         from: t.from,
         to: t.to,
         vehicleType: t.vehicleType,
-        capacity: t.capacity,
-        pricePerSeat: t.pricePerSeat,
-        priceFormatted: t.pricePerSeat != null ? `K${(t.pricePerSeat / 100).toFixed(2)}` : 'K0.00',
-        schedule: t.schedule,
+        capacity: t.capacity ?? 10,
+        pricePerSeat: t.rate ?? t.pricePerSeat ?? 0,
+        priceFormatted: `K${((t.rate ?? t.pricePerSeat ?? 0) / 100).toFixed(2)}`,
+        schedule: t.departureTime || null,
         isActive: t.isActive,
       })),
       createdAt: property.createdAt.toISOString(),
