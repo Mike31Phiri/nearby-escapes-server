@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsPositive, IsNotEmpty, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsPositive,
+  IsNotEmpty,
+  IsOptional,
+} from 'class-validator';
 
 export class InitiateDpoPaymentDto {
   @IsString()

@@ -25,7 +25,9 @@ export class DpoService {
   }
 
   async createPaymentToken(user: User, dto: CreateTokenDto) {
-    const callbackUrl = dto.callbackUrl || `${this.config.get('NEXT_PUBLIC_APP_URL') || 'http://localhost:3000'}/checkout/confirmation`;
+    const callbackUrl =
+      dto.callbackUrl ||
+      `${this.config.get('NEXT_PUBLIC_APP_URL') || 'http://localhost:3000'}/checkout/confirmation`;
 
     const [firstName, ...lastNameParts] = dto.customer.name.split(' ');
     const lastName = lastNameParts.join(' ') || firstName;
@@ -48,24 +50,37 @@ export class DpoService {
     };
 
     try {
-      const response = await axios.post(`${this.dpoApiUrl}/createToken`, payload);
+      const response = await axios.post(
+        `${this.dpoApiUrl}/createToken`,
+        payload,
+      );
       const result = response.data;
 
       if (result?.transToken) {
         // Find the booking first
-        const booking = await this.prisma.booking.findUnique({ where: { bookingRef: dto.bookingRef } });
+        const booking = await this.prisma.booking.findUnique({
+          where: { bookingRef: dto.bookingRef },
+        });
         if (!booking) throw new BadRequestException('Booking not found');
 
         if (booking.status === 'CANCELLED' || booking.status === 'EXPIRED') {
-          throw new BadRequestException('This booking has been cancelled or has expired.');
+          throw new BadRequestException(
+            'This booking has been cancelled or has expired.',
+          );
         }
 
-        if (booking.status === 'PENDING' && booking.expiresAt && booking.expiresAt < new Date()) {
+        if (
+          booking.status === 'PENDING' &&
+          booking.expiresAt &&
+          booking.expiresAt < new Date()
+        ) {
           await this.prisma.booking.update({
             where: { id: booking.id },
             data: { status: 'EXPIRED' },
           });
-          throw new BadRequestException('Your 10-minute booking hold has expired. Please initiate a new booking.');
+          throw new BadRequestException(
+            'Your 10-minute booking hold has expired. Please initiate a new booking.',
+          );
         }
 
         // Update booking with transToken
@@ -100,7 +115,9 @@ export class DpoService {
       throw new Error(result?.result || 'Failed to create DPO payment token');
     } catch (err: any) {
       this.logger.error(`DPO token creation failed: ${err.message}`);
-      throw new BadRequestException(`Payment initialization failed: ${err.message}`);
+      throw new BadRequestException(
+        `Payment initialization failed: ${err.message}`,
+      );
     }
   }
 
@@ -118,7 +135,10 @@ export class DpoService {
       });
 
       let status = 'pending';
-      if (result?.result === '000' || result?.transactionStatus === 'SUCCESSFUL') {
+      if (
+        result?.result === '000' ||
+        result?.transactionStatus === 'SUCCESSFUL'
+      ) {
         status = 'completed';
         if (payment) {
           await this.prisma.payment.update({
@@ -134,10 +154,15 @@ export class DpoService {
             },
           });
           if (payment.booking) {
-            const guest = await this.prisma.user.findUnique({ where: { id: payment.userId } });
+            const guest = await this.prisma.user.findUnique({
+              where: { id: payment.userId },
+            });
             if (guest) {
               await this.notifications.sendPaymentReceipt(
-                guest.email, guest.name, payment.booking.bookingRef, payment.amount,
+                guest.email,
+                guest.name,
+                payment.booking.bookingRef,
+                payment.amount,
               );
             }
           }
