@@ -838,9 +838,30 @@ export class NotificationsService {
         body: `
         <p>Your payment of <strong>ZMW ${(amount / 100).toFixed(2)}</strong> for booking <strong>${bookingRef}</strong> was successful.</p>
         <p>Thank you for choosing Nearby Escapes! 🌍</p>
-      `,
+        `,
         ctaLabel: 'View Trip Receipt',
         ctaUrl: `${this.frontendUrl()}/trips/${bookingRef}`,
+      }),
+    );
+  }
+
+  async sendPaymentFailedNotification(
+    to: string,
+    name: string,
+    bookingRef: string,
+  ) {
+    await this.send(
+      to,
+      `Payment Failed — ${bookingRef} | Nearby Escapes`,
+      this.tpl({
+        name,
+        heading: '❌ Payment Failed',
+        body: `
+        <p>Your payment for booking <strong>${bookingRef}</strong> was not successful.</p>
+        <p>Your booking has been cancelled. Please try again with a valid payment method.</p>
+        `,
+        ctaLabel: 'Book Again',
+        ctaUrl: `${this.frontendUrl()}/bookings`,
       }),
     );
   }
