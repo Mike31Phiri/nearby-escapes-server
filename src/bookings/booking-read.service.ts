@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -132,6 +133,54 @@ export class BookingReadService {
       throw new ForbiddenException();
     }
     return formatBooking(booking);
+  }
+
+  async getReceipt(id: string, userId: string, userRole: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { OR: [{ id }, { bookingRef: id }] },
+      include: {
+        property: { select: { name: true } },
+        payment: {
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            provider: true,
+            providerRef: true,
+            receiptUrl: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (
+      booking.guestId !== userId &&
+      booking.hostId !== userId &&
+      userRole !== 'ADMIN'
+    ) {
+      throw new ForbiddenException();
+    }
+    if (!booking.payment || booking.payment.status !== 'PAID') {
+      throw new BadRequestException(
+        'A payment receipt is available after the booking is paid',
+      );
+    }
+
+    return {
+      bookingRef: booking.bookingRef,
+      propertyName: booking.property.name,
+      amount: booking.payment.amount,
+      currency: booking.currency,
+      status: booking.payment.status.toLowerCase(),
+      provider: booking.payment.provider,
+      transactionReference: booking.payment.providerRef,
+      receiptUrl: booking.payment.receiptUrl,
+      paidAt: booking.payment.updatedAt,
+      issuedAt: booking.payment.createdAt,
+    };
   }
 
   async findMyBookings(userId: string, role?: string) {

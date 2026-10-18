@@ -7,6 +7,8 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Version,
+  VERSION_NEUTRAL,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DpoService } from './dpo.service';
@@ -17,6 +19,7 @@ import type { User } from '@prisma/client';
 
 @ApiTags('Payments')
 @Controller('payments')
+@Version(['1', VERSION_NEUTRAL])
 export class PaymentsController {
   constructor(private dpoService: DpoService) {}
 
@@ -48,9 +51,10 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Verify DPO transaction status via transToken' })
   @ApiBearerAuth('access-token')
   async verifyDpoPayment(
+    @CurrentUser() user: User,
     @Body('transToken') transToken: string,
   ): Promise<Record<string, unknown>> {
-    return this.dpoService.verifyPayment(transToken) as Promise<
+    return this.dpoService.verifyPayment(transToken, user) as Promise<
       Record<string, unknown>
     >;
   }
@@ -61,9 +65,10 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Verify DPO transaction status (GET alias)' })
   @ApiBearerAuth('access-token')
   async verifyDpoPaymentGet(
+    @CurrentUser() user: User,
     @Param('transToken') transToken: string,
   ): Promise<Record<string, unknown>> {
-    return this.dpoService.verifyPayment(transToken) as Promise<
+    return this.dpoService.verifyPayment(transToken, user) as Promise<
       Record<string, unknown>
     >;
   }

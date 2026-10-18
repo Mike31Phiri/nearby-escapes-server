@@ -20,6 +20,9 @@ import { GuestBookingItemDto } from './dto/guest-bookings.dto';
 import { HostCancelReservationResponseDto } from './dto/host-cancel.dto';
 import { BookingStatus, PropertyStatus } from '@prisma/client';
 import { formatBooking } from './bookings.mapper';
+import { combineDateAndTimeInZone, dateInTimeZone } from '../common/zoned-date-time';
+
+const BOOKING_REFERENCE_LOCK_KEY = 94721531;
 
 @Injectable()
 export class BookingsService {
@@ -46,7 +49,13 @@ export class BookingsService {
             id: true,
             name: true,
             email: true,
-            hostProfile: { select: { businessName: true } },
+            hostProfile: {
+              select: {
+                businessName: true,
+                defaultCheckInTime: true,
+                defaultCheckOutTime: true,
+              },
+            },
           },
         },
         stays: { where: { deletedAt: null } },
@@ -73,7 +82,13 @@ export class BookingsService {
               id: true,
               name: true,
               email: true,
-              hostProfile: { select: { businessName: true } },
+              hostProfile: {
+                select: {
+                  businessName: true,
+                  defaultCheckInTime: true,
+                  defaultCheckOutTime: true,
+                },
+              },
             },
           },
           stays: { where: { deletedAt: null } },
@@ -90,7 +105,13 @@ export class BookingsService {
                 id: true,
                 name: true,
                 email: true,
-                hostProfile: { select: { businessName: true } },
+                hostProfile: {
+                  select: {
+                    businessName: true,
+                    defaultCheckInTime: true,
+                    defaultCheckOutTime: true,
+                  },
+                },
               },
             },
             stays: { where: { deletedAt: null } },
@@ -148,6 +169,8 @@ export class BookingsService {
     // Resolve specific unit and unit price
     let unitPrice = 0;
     let stayId: string | null = null;
+    let stayCheckInAt: Date | null = null;
+    let stayCheckOutAt: Date | null = null;
     let experienceId: string | null = null;
     let transportId: string | null = null;
 
@@ -172,26 +195,63 @@ export class BookingsService {
         );
       }
 
-      if (stayId && !isSimulated) {
-        const overlapping = await this.prisma.stayBooking.findFirst({
+      const checkInAt = dto.checkIn.includes('T')
+        ? checkInDate
+        : combineDateAndTimeInZone(
+            dto.checkIn,
+            property.host.hostProfile?.defaultCheckInTime || '14:00',
+          );
+      const checkOutAt = dto.checkOut.includes('T')
+        ? checkOutDate
+        : combineDateAndTimeInZone(
+            dto.checkOut,
+            property.host.hostProfile?.defaultCheckOutTime || '10:00',
+          );
+      if (checkInAt >= checkOutAt) {
+        throw new BadRequestException(
+          'Check-out time must be after check-in time',
+        );
+      }
+      stayCheckInAt = checkInAt;
+      stayCheckOutAt = checkOutAt;
+
+      if (stayId) {
+        const checkInDay = dateInTimeZone(checkInAt);
+        const checkOutDay = dateInTimeZone(checkOutAt);
+        const blocks = await this.prisma.stayDateBlock.findMany({
           where: {
             stayId,
-            checkIn: { lt: checkOutDate },
-            checkOut: { gt: checkInDate },
-            booking: {
-              OR: [
-                { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-                { status: 'PENDING', expiresAt: { gt: now } },
-              ],
-            },
+            status: 'ACTIVE',
+            startDate: { lte: new Date(`${checkOutDay}T00:00:00.000Z`) },
+            endDate: { gte: new Date(`${checkInDay}T00:00:00.000Z`) },
+          },
+          select: {
+            id: true,
+            reason: true,
+            startDate: true,
+            endDate: true,
+            checkInAt: true,
+            checkOutAt: true,
           },
         });
-        if (overlapping) {
+        const overlappingBlock = blocks.find((block) => {
+          if (block.checkOutAt && block.checkOutAt <= now) return false;
+          const blockStart =
+            block.checkInAt ||
+            combineDateAndTimeInZone(block.startDate, '00:00');
+          const blockEnd = block.checkOutAt || combineDateAndTimeInZone(
+            new Date(block.endDate.getTime() + 86400000),
+            '00:00',
+          );
+          return checkInAt < blockEnd && checkOutAt > blockStart;
+        });
+        if (overlappingBlock) {
           throw new ConflictException(
-            'These dates are already booked or held for this room/unit.',
+            `These dates are blocked by the host${overlappingBlock.reason ? ` (${overlappingBlock.reason})` : ''}.`,
           );
         }
       }
+
     } else if (property.type === 'EXPERIENCE') {
       const exp = dto.experienceId
         ? property.experiences.find((e) => e.id === dto.experienceId)
@@ -203,18 +263,6 @@ export class BookingsService {
         throw new BadRequestException(
           'date is required for experience bookings',
         );
-      }
-      const expDate = new Date(dto.date);
-
-      if (experienceId && !isSimulated) {
-        const slot = await this.prisma.experienceSlot.findFirst({
-          where: { experienceId },
-        });
-        if (slot && slot.available < dto.guests) {
-          throw new ConflictException(
-            `This experience slot is currently full. Only ${slot.available} spots remaining.`,
-          );
-        }
       }
     } else if (property.type === 'TRANSPORT') {
       const trans = dto.transportId
@@ -229,24 +277,122 @@ export class BookingsService {
         );
       }
 
-      if (transportId && !isSimulated) {
-        const inv = await this.prisma.transportInventory.findFirst({
-          where: { transportId },
-        });
-        if (inv && inv.available < dto.guests) {
-          throw new ConflictException(
-            `This transport is fully booked. Only ${inv.available} seats remaining.`,
-          );
-        }
-      }
     }
 
-    // Generate booking reference: NE-YYYY-NNNN
-    const year = new Date().getFullYear();
-    const count = await this.prisma.booking.count();
-    const bookingRef = `NE-${year}-${String(count + 1).padStart(4, '0')}`;
-
     const booking = await this.prisma.$transaction(async (tx) => {
+      let stayInventoryId: string | null = null;
+      let experienceSlotId: string | null = null;
+      let transportInventoryId: string | null = null;
+
+      if (property.type === 'STAY' && stayId) {
+        if (!stayCheckInAt || !stayCheckOutAt) {
+          throw new BadRequestException(
+            'Stay check-in and check-out timestamps are required',
+          );
+        }
+
+        const lockedInventories = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id"
+          FROM "StayInventory"
+          WHERE "stayId" = ${stayId}
+            AND "isActive" = true
+            AND "deletedAt" IS NULL
+          ORDER BY "id"
+          FOR UPDATE
+        `;
+        if (lockedInventories.length === 0) {
+          throw new ConflictException(
+            'No stay inventory is currently available.',
+          );
+        }
+
+        if (!isSimulated) {
+          const overlapping = await tx.stayBooking.findFirst({
+            where: {
+              stayId,
+              checkIn: { lt: stayCheckOutAt },
+              checkOut: { gt: stayCheckInAt },
+              booking: {
+                OR: [
+                  { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+                  { status: 'PENDING', expiresAt: { gt: now } },
+                ],
+              },
+            },
+          });
+          if (overlapping) {
+            throw new ConflictException(
+              'These dates are already booked or held for this room/unit.',
+            );
+          }
+        }
+
+        const stayInventories = await tx.stayInventory.findMany({
+          where: { id: { in: lockedInventories.map(({ id }) => id) } },
+          orderBy: { createdAt: 'asc' },
+        });
+        const stayInv = stayInventories.find(
+          (inventory) => inventory.available > 0,
+        );
+        if (!stayInv) {
+          throw new ConflictException(
+            'No stay inventory is currently available.',
+          );
+        }
+        stayInventoryId = stayInv.id;
+      } else if (property.type === 'EXPERIENCE' && experienceId) {
+        const lockedSlots = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id"
+          FROM "ExperienceSlot"
+          WHERE "experienceId" = ${experienceId}
+            AND "isActive" = true
+            AND "deletedAt" IS NULL
+          ORDER BY "id"
+          FOR UPDATE
+        `;
+        const slots = await tx.experienceSlot.findMany({
+          where: { id: { in: lockedSlots.map(({ id }) => id) } },
+          orderBy: { createdAt: 'asc' },
+        });
+        const expSlot = slots.find((slot) => slot.available >= dto.guests);
+        if (!expSlot) {
+          throw new ConflictException(
+            'This experience slot does not have enough available capacity.',
+          );
+        }
+        experienceSlotId = expSlot.id;
+      } else if (property.type === 'TRANSPORT' && transportId) {
+        const lockedInventories = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id"
+          FROM "TransportInventory"
+          WHERE "transportId" = ${transportId}
+            AND "isActive" = true
+            AND "deletedAt" IS NULL
+          ORDER BY "id"
+          FOR UPDATE
+        `;
+        const inventories = await tx.transportInventory.findMany({
+          where: { id: { in: lockedInventories.map(({ id }) => id) } },
+          orderBy: { createdAt: 'asc' },
+        });
+        const transInv = inventories.find(
+          (inventory) => inventory.available >= dto.guests,
+        );
+        if (!transInv) {
+          throw new ConflictException(
+            'This transport does not have enough available seats.',
+          );
+        }
+        transportInventoryId = transInv.id;
+      }
+
+      await tx.$queryRaw`
+        SELECT pg_advisory_xact_lock(${BOOKING_REFERENCE_LOCK_KEY})
+      `;
+      const year = new Date().getFullYear();
+      const count = await tx.booking.count();
+      const bookingRef = `NE-${year}-${String(count + 1).padStart(4, '0')}`;
+
       const createdBooking = await tx.booking.create({
         data: {
           bookingRef,
@@ -279,71 +425,102 @@ export class BookingsService {
       });
 
       if (property.type === 'STAY' && stayId) {
-        // Find or use first inventory
-        const stayInv = await tx.stayInventory.findFirst({ where: { stayId } });
-        if (stayInv) {
-          await tx.stayBooking.create({
-            data: {
-              bookingId: createdBooking.id,
-              stayId,
-              stayInventoryId: stayInv.id,
-              checkIn: new Date(dto.checkIn!),
-              checkOut: new Date(dto.checkOut!),
-              guests: dto.guests,
-            },
-          });
-          await tx.stayInventory.update({
-            where: { id: stayInv.id },
-            data: { booked: { increment: 1 }, available: { decrement: 1 } },
-          });
+        const inventoryId = stayInventoryId;
+        const checkInAt = stayCheckInAt;
+        const checkOutAt = stayCheckOutAt;
+        if (!inventoryId || !checkInAt || !checkOutAt) {
+          throw new BadRequestException(
+            'Stay inventory and timestamps are required',
+          );
+        }
+        await tx.stayBooking.create({
+          data: {
+            bookingId: createdBooking.id,
+            stayId,
+            stayInventoryId: inventoryId,
+            checkIn: checkInAt,
+            checkOut: checkOutAt,
+            guests: dto.guests,
+          },
+        });
+        const inventoryUpdate = await tx.stayInventory.updateMany({
+          where: { id: inventoryId, available: { gt: 0 } },
+          data: { booked: { increment: 1 }, available: { decrement: 1 } },
+        });
+        if (inventoryUpdate.count !== 1) {
+          throw new ConflictException('No stay inventory is currently available.');
         }
       } else if (property.type === 'EXPERIENCE' && experienceId) {
-        const expSlot = await tx.experienceSlot.findFirst({
-          where: { experienceId },
+        const slotId = experienceSlotId;
+        if (!slotId || !dto.date) {
+          throw new BadRequestException(
+            'Experience slot and date are required',
+          );
+        }
+        await tx.experienceBooking.create({
+          data: {
+            bookingId: createdBooking.id,
+            experienceId,
+            experienceSlotId: slotId,
+            date: new Date(dto.date),
+            guests: dto.guests,
+          },
         });
-        if (expSlot) {
-          await tx.experienceBooking.create({
-            data: {
-              bookingId: createdBooking.id,
-              experienceId,
-              experienceSlotId: expSlot.id,
-              date: new Date(dto.date!),
-              guests: dto.guests,
-            },
-          });
-          await tx.experienceSlot.update({
-            where: { id: expSlot.id },
-            data: {
-              booked: { increment: dto.guests },
-              available: { decrement: dto.guests },
-            },
-          });
+        const slotUpdate = await tx.experienceSlot.updateMany({
+          where: {
+            id: slotId,
+            available: { gte: dto.guests },
+          },
+          data: {
+            booked: { increment: dto.guests },
+            available: { decrement: dto.guests },
+          },
+        });
+        if (slotUpdate.count !== 1) {
+          throw new ConflictException(
+            'This experience slot does not have enough available capacity.',
+          );
         }
       } else if (property.type === 'TRANSPORT' && transportId) {
-        const transInv = await tx.transportInventory.findFirst({
-          where: { transportId },
+        const inventoryId = transportInventoryId;
+        if (!inventoryId || !dto.date) {
+          throw new BadRequestException(
+            'Transport inventory and date are required',
+          );
+        }
+        await tx.transportBooking.create({
+          data: {
+            bookingId: createdBooking.id,
+            transportId,
+            transportInventoryId: inventoryId,
+            date: new Date(dto.date),
+            seats: dto.guests,
+          },
         });
-        if (transInv) {
-          await tx.transportBooking.create({
-            data: {
-              bookingId: createdBooking.id,
-              transportId,
-              transportInventoryId: transInv.id,
-              date: new Date(dto.date!),
-              seats: dto.guests,
-            },
-          });
-          await tx.transportInventory.update({
-            where: { id: transInv.id },
-            data: {
-              booked: { increment: dto.guests },
-              available: { decrement: dto.guests },
-            },
-          });
+        const inventoryUpdate = await tx.transportInventory.updateMany({
+          where: {
+            id: inventoryId,
+            available: { gte: dto.guests },
+          },
+          data: {
+            booked: { increment: dto.guests },
+            available: { decrement: dto.guests },
+          },
+        });
+        if (inventoryUpdate.count !== 1) {
+          throw new ConflictException(
+            'This transport does not have enough available seats.',
+          );
         }
       }
 
-      // Sync property status: BOOKED if all inventory is now depleted
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "Property"
+        WHERE "id" = ${property.id}
+        FOR UPDATE
+      `;
+
       await this.syncPropertyStatus(tx, property.id);
 
       return tx.booking.findUnique({
@@ -469,6 +646,10 @@ export class BookingsService {
 
   async findOne(id: string, userId: string, userRole: string) {
     return this.readService.findOne(id, userId, userRole);
+  }
+
+  async getReceipt(id: string, userId: string, userRole: string) {
+    return this.readService.getReceipt(id, userId, userRole);
   }
 
   async findMyBookings(userId: string, role?: string) {

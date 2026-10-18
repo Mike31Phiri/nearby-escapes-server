@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsDateString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsInt, Min, Matches } from 'class-validator';
 
 export class BlockDatesDto {
   @ApiPropertyOptional({ description: 'Property ID (master property)', example: 'uuid-prop-1' })
@@ -33,7 +33,7 @@ export class BlockDatesDto {
   @IsDateString()
   dateFrom?: string;
 
-  @ApiPropertyOptional({ example: '2026-10-05' })
+  @ApiPropertyOptional({ description: 'Inclusive final blocked date', example: '2026-10-05' })
   @IsOptional()
   @IsDateString()
   dateTo?: string;
@@ -43,7 +43,7 @@ export class BlockDatesDto {
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ example: '2026-10-05' })
+  @ApiPropertyOptional({ description: 'Inclusive final blocked date', example: '2026-10-05' })
   @IsOptional()
   @IsDateString()
   endDate?: string;
@@ -52,6 +52,16 @@ export class BlockDatesDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @ApiPropertyOptional({ description: 'Local check-in time in Africa/Lusaka (HH:mm)', example: '14:00' })
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  checkInTime?: string;
+
+  @ApiPropertyOptional({ description: 'Local check-out time in Africa/Lusaka (HH:mm). Omit for manual-unblock maintenance blocks.', example: '10:00' })
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  checkOutTime?: string;
 }
 
 /** Rich response after blocking dates — matches spec blockedRangeId + echo */
@@ -68,11 +78,17 @@ export class BlockDatesResponseDto {
   @ApiProperty({ example: '2026-10-01' })
   startDate: string;
 
-  @ApiProperty({ example: '2026-10-05' })
+  @ApiProperty({ description: 'Inclusive final blocked date', example: '2026-10-05' })
   endDate: string;
 
   @ApiPropertyOptional({ example: 'Maintenance / Repairs' })
   reason?: string;
+
+  @ApiPropertyOptional({ description: 'Scheduled local check-in instant, returned as UTC ISO-8601' })
+  checkInAt?: string;
+
+  @ApiPropertyOptional({ description: 'Scheduled local check-out instant, returned as UTC ISO-8601' })
+  checkOutAt?: string;
 }
 
 export class UnblockDatesDto {
@@ -156,4 +172,3 @@ export class TransportAvailabilityQueryDto {
   @IsDateString()
   date: string;
 }
-

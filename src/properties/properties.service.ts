@@ -1162,6 +1162,14 @@ export class PropertiesService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
+  private async isAdmin(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role === 'ADMIN';
+  }
+
   private async assertOwnership(id: string, hostId: string) {
     const property = await this.prisma.property.findUnique({
       where: { id },
@@ -1180,8 +1188,11 @@ export class PropertiesService {
     });
     if (!property || property.deletedAt)
       throw new NotFoundException('Property not found');
-    if (property.hostId !== hostId)
-      throw new NotFoundException('Property not found');
+    if (property.hostId !== hostId) {
+      if (!(await this.isAdmin(hostId))) {
+        throw new NotFoundException('Property not found');
+      }
+    }
     return property;
   }
 
@@ -1351,7 +1362,7 @@ export class PropertiesService {
         where: { id: unitId },
         include: { property: { select: { hostId: true } } },
       });
-      if (!stay || stay.property.hostId !== hostId) {
+      if (!stay || (stay.property.hostId !== hostId && !(await this.isAdmin(hostId)))) {
         throw new NotFoundException('Stay unit not found or access denied');
       }
     } else if (unitType === 'experience') {
@@ -1359,7 +1370,7 @@ export class PropertiesService {
         where: { id: unitId },
         include: { property: { select: { hostId: true } } },
       });
-      if (!exp || exp.property.hostId !== hostId) {
+      if (!exp || (exp.property.hostId !== hostId && !(await this.isAdmin(hostId)))) {
         throw new NotFoundException(
           'Experience unit not found or access denied',
         );
@@ -1369,7 +1380,7 @@ export class PropertiesService {
         where: { id: unitId },
         include: { property: { select: { hostId: true } } },
       });
-      if (!trans || trans.property.hostId !== hostId) {
+      if (!trans || (trans.property.hostId !== hostId && !(await this.isAdmin(hostId)))) {
         throw new NotFoundException(
           'Transport unit not found or access denied',
         );

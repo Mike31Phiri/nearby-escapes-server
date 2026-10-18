@@ -1,6 +1,21 @@
 import { UpdatePropertyPoliciesDto } from '../policies/dto/policy.dto';
 import { PropertiesService } from '../properties/properties.service';
-import {  Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards , Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  Put,
+  Version,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { HostsService } from './hosts.service';
 import { HostDashboardService } from './host-dashboard.service';
@@ -77,7 +92,19 @@ export class HostController {
     return this.dashboardService.getBookingDetail(host.id, id);
   }
 
+  @Get('bookings/:id/payment')
+  @Version(['1', VERSION_NEUTRAL])
+  @ApiOperation({ summary: 'Get payment transaction for one of the host bookings' })
+  async getBookingPayment(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ) {
+    const host = await this.hostsService.findApprovedByUserId(user.id);
+    return this.dashboardService.getBookingPayment(host.id, id);
+  }
+
   @Get('finances/summary')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Get host finances and payout summary' })
   @ApiResponse({ status: 200, type: HostFinancesSummaryDto })
   async getFinancesSummary(@CurrentUser() user: User): Promise<HostFinancesSummaryDto> {
@@ -86,6 +113,7 @@ export class HostController {
   }
 
   @Patch('schedule/:bookingId/check-in')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Check-in guest via operational schedule queue' })
   @ApiResponse({ status: 200, type: HostCheckInResponseDto })
@@ -125,6 +153,7 @@ export class HostController {
   }
 
   @Get('earnings')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Monthly earnings breakdown' })
   async earnings(@CurrentUser() user: User) {
     const host = await this.hostsService.findApprovedByUserId(user.id);
@@ -151,18 +180,21 @@ export class HostController {
   }
 
   @Get('settings')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Host settings (usual check-in/out times, payout info)' })
   async getSettings(@CurrentUser() user: User) {
     return this.hostsService.getHostSettings(user.id);
   }
 
   @Patch('settings')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Update host settings (usual check-in/out times, payout info)' })
   async updateSettings(@CurrentUser() user: User, @Body() dto: UpdateHostSettingsDto) {
     return this.hostsService.updateHostSettings(user.id, dto);
   }
 
   @Post('bookings/:id/check-in')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Confirm guest check-in & trigger payout release to host' })
   async checkIn(@CurrentUser() user: User, @Param('id') id: string) {
@@ -177,6 +209,7 @@ export class HostController {
   }
 
   @Post('payout-methods')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Add or update host payout method (Bank or Mobile Money)' })
   @ApiResponse({ status: 201, description: 'Payout method saved' })
   async addPayoutMethod(@CurrentUser() user: User, @Body() dto: AddHostPayoutMethodDto) {
@@ -184,6 +217,7 @@ export class HostController {
   }
 
   @Delete('payout-methods/:id')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Remove host payout method' })
   @ApiResponse({ status: 200, description: 'Payout method removed' })
   async removePayoutMethod(@CurrentUser() user: User, @Param('id') id: string) {
@@ -191,6 +225,7 @@ export class HostController {
   }
 
   @Patch('payout-methods/:id/default')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Set primary default payout method' })
   @ApiResponse({ status: 200, description: 'Default payout method updated' })
   async setDefaultPayoutMethod(@CurrentUser() user: User, @Param('id') id: string) {

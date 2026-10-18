@@ -12,11 +12,6 @@ export class HostsService {
     if (!user) throw new NotFoundException('User not found');
     if (user.role === 'HOST') throw new BadRequestException('Already registered as a host');
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { role: 'HOST' },
-    });
-
     const profile = await this.prisma.hostProfile.upsert({
       where: { userId },
       create: {
@@ -114,7 +109,7 @@ export class HostsService {
       },
     });
 
-    if (!user || user.role !== 'HOST') {
+    if (!user) {
       return {
         hasProfile: false,
         isApproved: false,
@@ -125,12 +120,14 @@ export class HostsService {
     }
 
     const isApproved = Boolean(user.hostProfile?.isApproved);
+    const hasProfile = Boolean(user.hostProfile);
+    const role = !hasProfile ? 'guest' : isApproved ? 'host' : 'host_pending';
     return {
-      hasProfile: Boolean(user.hostProfile),
+      hasProfile,
       isApproved,
-      hostId: userId,
+      hostId: isApproved ? userId : null,
       businessName: user.hostProfile?.businessName || null,
-      role: isApproved ? ('host' as const) : ('host_pending' as const),
+      role,
     };
   }
 

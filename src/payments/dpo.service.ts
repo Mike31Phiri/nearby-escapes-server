@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -25,6 +31,34 @@ export class DpoService {
   }
 
   async createPaymentToken(user: User, dto: CreateTokenDto) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { bookingRef: dto.bookingRef },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.guestId !== user.id && user.role !== 'ADMIN') {
+      throw new ForbiddenException(
+        'Only the booking guest or an admin can initiate its payment',
+      );
+    }
+    if (booking.status === 'CANCELLED' || booking.status === 'EXPIRED') {
+      throw new BadRequestException(
+        'This booking has been cancelled or has expired.',
+      );
+    }
+    if (
+      booking.status === 'PENDING' &&
+      booking.expiresAt &&
+      booking.expiresAt < new Date()
+    ) {
+      await this.prisma.booking.update({
+        where: { id: booking.id },
+        data: { status: 'EXPIRED' },
+      });
+      throw new BadRequestException(
+        'Your 10-minute booking hold has expired. Please initiate a new booking.',
+      );
+    }
+
     const callbackUrl =
       dto.callbackUrl ||
       `${this.config.get('NEXT_PUBLIC_APP_URL') || 'http://localhost:3000'}/checkout/confirmation`;
@@ -36,8 +70,8 @@ export class DpoService {
       companyToken: this.companyToken,
       accountType: 'GENERAL',
       transaction: {
-        paymentAmount: (dto.amount / 100).toFixed(2),
-        paymentCurrency: dto.currency || 'ZMW',
+        paymentAmount: (booking.amount / 100).toFixed(2),
+        paymentCurrency: booking.currency,
         companyRef: dto.bookingRef,
         customerFirstName: firstName,
         customerLastName: lastName,
@@ -57,32 +91,6 @@ export class DpoService {
       const result = response.data;
 
       if (result?.transToken) {
-        // Find the booking first
-        const booking = await this.prisma.booking.findUnique({
-          where: { bookingRef: dto.bookingRef },
-        });
-        if (!booking) throw new BadRequestException('Booking not found');
-
-        if (booking.status === 'CANCELLED' || booking.status === 'EXPIRED') {
-          throw new BadRequestException(
-            'This booking has been cancelled or has expired.',
-          );
-        }
-
-        if (
-          booking.status === 'PENDING' &&
-          booking.expiresAt &&
-          booking.expiresAt < new Date()
-        ) {
-          await this.prisma.booking.update({
-            where: { id: booking.id },
-            data: { status: 'EXPIRED' },
-          });
-          throw new BadRequestException(
-            'Your 10-minute booking hold has expired. Please initiate a new booking.',
-          );
-        }
-
         // Update booking with transToken
         await this.prisma.booking.update({
           where: { bookingRef: dto.bookingRef },
@@ -92,11 +100,11 @@ export class DpoService {
         // Upsert payment record using the booking's UUID
         await this.prisma.payment.upsert({
           where: { bookingId: booking.id },
-          update: { providerRef: result.transToken, amount: dto.amount },
+          update: { providerRef: result.transToken, amount: booking.amount },
           create: {
             bookingId: booking.id,
-            userId: user.id,
-            amount: dto.amount,
+            userId: booking.guestId,
+            amount: booking.amount,
             status: 'UNPAID' as PaymentStatus,
             provider: 'DPO',
             providerRef: result.transToken,
@@ -113,15 +121,30 @@ export class DpoService {
       }
 
       throw new Error(result?.result || 'Failed to create DPO payment token');
-    } catch (err: any) {
-      this.logger.error(`DPO token creation failed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown DPO error';
+      this.logger.error(`DPO token creation failed: ${message}`);
       throw new BadRequestException(
-        `Payment initialization failed: ${err.message}`,
+        `Payment initialization failed: ${message}`,
       );
     }
   }
 
-  async verifyPayment(transToken: string) {
+  async verifyPayment(transToken: string, user: User) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { providerRef: transToken },
+      include: { booking: true },
+    });
+    if (!payment) throw new NotFoundException('Payment transaction not found');
+    if (
+      payment.booking.guestId !== user.id &&
+      user.role !== 'ADMIN'
+    ) {
+      throw new ForbiddenException(
+        'Only the booking guest or an admin can verify this transaction',
+      );
+    }
+
     try {
       const response = await axios.post(`${this.dpoApiUrl}/verifyToken`, {
         companyToken: this.companyToken,
@@ -129,10 +152,6 @@ export class DpoService {
       });
 
       const result = response.data;
-      const payment = await this.prisma.payment.findFirst({
-        where: { providerRef: transToken },
-        include: { booking: true },
-      });
 
       let status = 'pending';
       if (

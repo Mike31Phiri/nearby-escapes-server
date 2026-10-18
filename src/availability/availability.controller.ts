@@ -113,22 +113,18 @@ export class AvailabilityController {
   @ApiResponse({ status: 200, type: BlockDatesResponseDto })
   async blockDatesEndpoint(
     @CurrentUser() user: User,
-    @Body() dto: UnblockDatesDto,
+    @Body() dto: BlockDatesDto,
   ): Promise<BlockDatesResponseDto> {
-    const listingId = (dto as any).listingId || (dto as any).propertyId || '';
-    const startDate = dto.startDate;
-    const endDate = dto.endDate;
-    const reason = (dto as any).reason;
-    await this.availabilityService.blockDates(dto as any, user.id);
-    // Generate a deterministic block ID based on listing + dates
-    const blockedRangeId = `blk-${Buffer.from(`${listingId}|${startDate}|${endDate}`).toString('base64').replace(/=/g, '').slice(0, 8)}`;
+    const result = await this.availabilityService.blockDates(dto, user.id);
     return {
-      success: true,
-      blockedRangeId,
-      listingId,
-      startDate,
-      endDate,
-      ...(reason ? { reason } : {}),
+      success: result.success,
+      blockedRangeId: result.blockedRangeId,
+      listingId: dto.listingId || dto.propertyId || dto.stayId || dto.unitId || '',
+      startDate: result.startDate,
+      endDate: result.endDate,
+      reason: result.reason,
+      ...(result.checkInAt ? { checkInAt: result.checkInAt.toISOString() } : {}),
+      ...(result.checkOutAt ? { checkOutAt: result.checkOutAt.toISOString() } : {}),
     };
   }
 

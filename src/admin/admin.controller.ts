@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Version,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -133,9 +144,21 @@ export class AdminController {
     return this.adminService.updateDispute(id, status, resolution);
   }
 
-  // ─── Payouts ───────────────────────────────────────────────────────────────
+  // ─── Payment transactions and payouts ──────────────────────────────────────
+
+  @Get('payments')
+  @Version(['1', VERSION_NEUTRAL])
+  @ApiOperation({ summary: 'All payment transactions (paginated, filterable)' })
+  getPayments(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getPayments(page, limit, status);
+  }
 
   @Get('payouts')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Monthly payout records' })
   getPayouts(
     @Query('page') page?: number,
@@ -146,6 +169,7 @@ export class AdminController {
   }
 
   @Post('payouts/process')
+  @Version(['1', VERSION_NEUTRAL])
   @ApiOperation({ summary: 'Process pending payouts' })
   processPayouts(@Body('payoutIds') payoutIds: string[]) {
     return this.adminService.processPayouts(payoutIds);
@@ -237,5 +261,3 @@ export class AdminController {
     return this.adminService.sendTestEmail(to, 'Triggered via GET diagnostic', admin?.email);
   }
 }
-
-

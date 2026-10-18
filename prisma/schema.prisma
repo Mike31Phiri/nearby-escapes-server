@@ -33,6 +33,7 @@ model User {
   bookingsAsHost         Booking[]          @relation("HostBookings")
   hostApplication        HostApplication?
   hostProfile            HostProfile?
+  stayDateBlocks         StayDateBlock[]    @relation("StayDateBlockCreator")
   notifications          Notification[]
   payments               Payment[]
   payouts                Payout[]
@@ -112,6 +113,7 @@ model Stay {
   deletedAt    DateTime?
    // Capacity inventory ledger (linked by stayId)
    inventory    StayInventory[]
+   dateBlocks   StayDateBlock[]
    // Bookings
    stayBookings StayBooking[]
    // Images
@@ -144,6 +146,27 @@ model StayInventory {
 
   @@index([stayId, status])
   @@index([stayId, available])
+}
+
+model StayDateBlock {
+  id          String                @id @default(uuid())
+  blockGroupId String                @default(uuid())
+  stayId      String
+  startDate   DateTime              @db.Date
+  endDate     DateTime              @db.Date
+  checkInAt   DateTime?
+  checkOutAt  DateTime?
+  reason      String                @default("OFFLINE_BOOKING")
+  status      StayDateBlockStatus   @default(ACTIVE)
+  createdById String?
+  createdAt   DateTime              @default(now())
+  completedAt DateTime?
+  stay        Stay                  @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  createdBy   User?                 @relation("StayDateBlockCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([stayId, status, startDate, endDate])
+  @@index([status, endDate])
+  @@index([blockGroupId])
 }
 
 // ─────────────────────────────────────────────
@@ -767,6 +790,12 @@ enum InventoryStatus {
   BLOCKED
 }
 
+enum StayDateBlockStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
 enum PaymentStatus {
   UNPAID
   PAID
@@ -927,4 +956,3 @@ enum TripType {
   ONE_WAY
   ROUND_TRIP
 }
-

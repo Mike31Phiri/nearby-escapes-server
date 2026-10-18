@@ -16,7 +16,7 @@ import type { User } from '@prisma/client';
 export class HostsController {
   constructor(private hostsService: HostsService) {}
 
-  @ApiOperation({ summary: 'Upgrade current guest to host' })
+  @ApiOperation({ summary: 'Create a host profile pending admin approval' })
   @UseGuards(RolesGuard)
   @Roles('GUEST')
   @Post()
@@ -54,4 +54,3 @@ export class HostsController {
     return this.hostsService.findById(id);
   }
 }
-

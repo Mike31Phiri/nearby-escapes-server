@@ -10,6 +10,7 @@ describe('HostsService - Onboarding validation', () => {
     prisma = {
       user: {
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
       hostApplication: {
         upsert: jest.fn(),
@@ -57,5 +58,50 @@ describe('HostsService - Onboarding validation', () => {
     const result = await service.submitApplication('user_1', dto as any);
     expect(result.applicationId).toBe('app_1');
     expect(result.status).toBe('pending_review');
+  });
+
+  it('should keep the user as a guest until an admin approves the host profile', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      name: 'Guest User',
+      role: 'GUEST',
+    });
+    prisma.hostProfile.upsert.mockResolvedValue({
+      id: 'profile_1',
+      businessName: 'Safari Lodge Ltd',
+      isApproved: false,
+    });
+
+    await service.createHost('user_1', { businessName: 'Safari Lodge Ltd' });
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.hostProfile.upsert).toHaveBeenCalledWith({
+      where: { userId: 'user_1' },
+      create: {
+        userId: 'user_1',
+        businessName: 'Safari Lodge Ltd',
+        isApproved: false,
+      },
+      update: { businessName: 'Safari Lodge Ltd' },
+    });
+  });
+
+  it('should report an unapproved profile as host_pending while the user remains a guest', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      role: 'GUEST',
+      hostProfile: {
+        id: 'profile_1',
+        businessName: 'Safari Lodge Ltd',
+        isApproved: false,
+      },
+    });
+
+    await expect(service.getHostStatus('user_1')).resolves.toEqual({
+      hasProfile: true,
+      isApproved: false,
+      hostId: null,
+      businessName: 'Safari Lodge Ltd',
+      role: 'host_pending',
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { HostOverviewDto } from './dto/host-overview.dto';
 import { HostScheduleTodayDto, HostScheduleItemDTO } from './dto/host-schedule.dto';
@@ -707,6 +707,47 @@ export class HostDashboardService {
         totalAmountNgwee,
       },
       specialRequests: booking.specialRequests || null,
+    };
+  }
+
+  async getBookingPayment(hostId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: {
+        id: bookingId,
+        OR: [{ hostId }, { property: { hostId } }],
+      },
+      select: {
+        id: true,
+        bookingRef: true,
+        currency: true,
+        payment: {
+          select: {
+            id: true,
+            amount: true,
+            commissionAmount: true,
+            hostAmount: true,
+            status: true,
+            provider: true,
+            providerRef: true,
+            receiptUrl: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    if (!booking.payment) {
+      throw new NotFoundException('Payment transaction not found');
+    }
+
+    return {
+      bookingRef: booking.bookingRef,
+      currency: booking.currency,
+      transaction: booking.payment,
     };
   }
 }

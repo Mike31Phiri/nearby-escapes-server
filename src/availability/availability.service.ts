@@ -1,5 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { combineDateAndTimeInZone, dateInTimeZone } from '../common/zoned-date-time';
 import {
   BlockDatesDto,
   UnblockDatesDto,
@@ -9,6 +12,41 @@ import {
 @Injectable()
 export class AvailabilityService {
   constructor(private prisma: PrismaService) {}
+
+  private readonly logger = new Logger(AvailabilityService.name);
+
+  @Cron('0 * * * * *', {
+    name: 'complete-expired-stay-date-blocks',
+    timeZone: 'Africa/Lusaka',
+  })
+  async completeExpiredDateBlocks() {
+    const now = new Date();
+    const result = await this.prisma.stayDateBlock.updateMany({
+      where: {
+        status: 'ACTIVE',
+        checkOutAt: { lte: now },
+      },
+      data: {
+        status: 'COMPLETED',
+        completedAt: now,
+      },
+    });
+    if (result.count > 0) {
+      this.logger.log(`Marked ${result.count} expired stay date block(s) as completed`);
+    }
+    return result.count;
+  }
+
+  private parseDateOnly(value: string, fieldName: string): Date {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new BadRequestException(`${fieldName} must use YYYY-MM-DD format`);
+    }
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+      throw new BadRequestException(`${fieldName} is not a valid calendar date`);
+    }
+    return date;
+  }
 
   // ── Property Availability (Month Grid by propertyId) ──────────────────────────
 
@@ -30,8 +68,8 @@ export class AvailabilityService {
 
       const y = year || new Date().getFullYear();
       const m = month || new Date().getMonth() + 1;
-      const startDate = new Date(y, m - 1, 1);
-      const endDate = new Date(y, m, 0, 23, 59, 59);
+      const startDate = new Date(Date.UTC(y, m - 1, 1));
+      const endDate = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
 
       const stayIds = activeStays.map((s) => s.id);
 
@@ -57,11 +95,21 @@ export class AvailabilityService {
         },
       });
 
-      // Blocked inventory units
+      // Legacy global blocks remain respected; new blocks are date-scoped.
       const blockedInventory = await this.prisma.stayInventory.findMany({
         where: { stayId: { in: stayIds }, status: 'BLOCKED' },
+        select: { stayId: true },
       });
-      const blockedCount = blockedInventory.length;
+      const dateBlocks = await this.prisma.stayDateBlock.findMany({
+        where: {
+          stayId: { in: stayIds },
+          status: 'ACTIVE',
+          startDate: { lte: endDate },
+          endDate: { gte: startDate },
+        },
+        select: { stayId: true, startDate: true, endDate: true, checkInAt: true, checkOutAt: true },
+      });
+      const legacyBlockedStayIds = new Set(blockedInventory.map((inventory) => inventory.stayId));
 
       const basePrice = activeStays[0]?.rate || draftData.pricePerUnitNgwee || 100000;
 
@@ -78,6 +126,18 @@ export class AvailabilityService {
           return dateStr >= ci && dateStr < co;
         });
         const bookedCount = dateBookings.length;
+        const blockedStayIds = new Set(legacyBlockedStayIds);
+        for (const block of dateBlocks) {
+          const blockStart = block.startDate.toISOString().slice(0, 10);
+          const blockEnd = block.endDate.toISOString().slice(0, 10);
+          const hasStarted =
+            dateStr !== dateInTimeZone(now) || !block.checkInAt || block.checkInAt <= now;
+          const hasNotExpired = !block.checkOutAt || block.checkOutAt > now;
+          if (dateStr >= blockStart && dateStr <= blockEnd && hasStarted && hasNotExpired) {
+            blockedStayIds.add(block.stayId);
+          }
+        }
+        const blockedCount = blockedStayIds.size;
 
         const availableCount = Math.max(0, totalInventory - bookedCount - blockedCount);
         const available = availableCount > 0;
@@ -105,7 +165,7 @@ export class AvailabilityService {
           priceFormatted: `K${(basePrice / 100).toFixed(2)}`,
         });
 
-        currentDate.setDate(currentDate.getDate() + 1);
+        currentDate.setUTCDate(currentDate.getUTCDate() + 1);
       }
 
       return {
@@ -150,8 +210,8 @@ export class AvailabilityService {
       throw new NotFoundException('Stay unit or Property not found');
     }
 
-    const startDate = new Date(year || new Date().getFullYear(), (month || 1) - 1, 1);
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59);
+    const startDate = new Date(Date.UTC(year || new Date().getUTCFullYear(), (month || 1) - 1, 1));
+    const endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 0, 23, 59, 59, 999));
 
     const now = new Date();
 
@@ -176,17 +236,35 @@ export class AvailabilityService {
       orderBy: { checkIn: 'asc' },
     });
 
-    // Blocked inventory units for this stay
+    // Legacy global blocks remain respected; new blocks are date-scoped.
     const blockedInventory = await this.prisma.stayInventory.findMany({
       where: { stayId, status: 'BLOCKED' },
     });
-    const isBlocked = blockedInventory.length > 0;
+    const dateBlocks = await this.prisma.stayDateBlock.findMany({
+      where: {
+        stayId,
+        status: 'ACTIVE',
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
+      },
+      select: { startDate: true, endDate: true, checkInAt: true, checkOutAt: true },
+    });
 
     // Build availability grid day-by-day
     const daySlots: any[] = [];
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
+      const isBlocked =
+        blockedInventory.length > 0 ||
+        dateBlocks.some((block) => {
+          const blockStart = block.startDate.toISOString().slice(0, 10);
+          const blockEnd = block.endDate.toISOString().slice(0, 10);
+          const hasStarted =
+            dateStr !== dateInTimeZone(now) || !block.checkInAt || block.checkInAt <= now;
+          const hasNotExpired = !block.checkOutAt || block.checkOutAt > now;
+          return dateStr >= blockStart && dateStr <= blockEnd && hasStarted && hasNotExpired;
+        });
 
       // Find booking covering this date
       const activeBooking = stayBookings.find((b) => {
@@ -224,7 +302,7 @@ export class AvailabilityService {
         price: stay.rate,
       });
 
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
 
     return daySlots;
@@ -524,73 +602,122 @@ export class AvailabilityService {
     throw new NotFoundException('Stay unit or listing not found');
   }
 
-  async blockDates(
-    dto: BlockDatesDto | UnblockDatesDto,
-    userId: string,
-  ): Promise<{ success: boolean; message: string }> {
-    const rawDto = dto as any;
-    const startDateStr = rawDto.startDate || rawDto.dateFrom;
-    const endDateStr = rawDto.endDate || rawDto.dateTo;
+  async blockDates(dto: BlockDatesDto, userId: string) {
+    const startDateStr = dto.startDate || dto.dateFrom;
+    const endDateStr = dto.endDate || dto.dateTo;
     if (!startDateStr || !endDateStr) {
       throw new BadRequestException('startDate and endDate (or dateFrom and dateTo) are required');
     }
+    const startDate = this.parseDateOnly(startDateStr, 'startDate');
+    const endDate = this.parseDateOnly(endDateStr, 'endDate');
+    if (startDate > endDate) {
+      throw new BadRequestException('endDate must be on or after startDate');
+    }
 
     const stayIds = await this.resolveStayUnits(
-      rawDto.propertyId || rawDto.listingId,
-      rawDto.unitId,
-      rawDto.stayId,
+      dto.propertyId || dto.listingId,
+      dto.unitId,
+      dto.stayId,
       userId,
     );
 
-    const targetStayIds = rawDto.count && rawDto.count > 0 && rawDto.count < stayIds.length
-      ? stayIds.slice(0, rawDto.count)
+    const targetStayIds = dto.count && dto.count < stayIds.length
+      ? stayIds.slice(0, dto.count)
       : stayIds;
-
-    for (const stayId of targetStayIds) {
-      await this.prisma.stayInventory.updateMany({
-        where: { stayId },
-        data: { status: 'BLOCKED' },
-      });
+    const blockGroupId = randomUUID();
+    const reason = dto.reason?.trim() || 'OFFLINE_BOOKING';
+    const isOfflineBooking = reason.toUpperCase().replace(/[\s-]+/g, '_') === 'OFFLINE_BOOKING';
+    const host = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        hostProfile: {
+          select: {
+            defaultCheckInTime: true,
+            defaultCheckOutTime: true,
+          },
+        },
+      },
+    });
+    const checkInTime = dto.checkInTime || (isOfflineBooking ? host?.hostProfile?.defaultCheckInTime || '14:00' : undefined);
+    const checkOutTime = dto.checkOutTime || (isOfflineBooking ? host?.hostProfile?.defaultCheckOutTime || '10:00' : undefined);
+    const checkInAt = checkInTime
+      ? combineDateAndTimeInZone(startDateStr, checkInTime)
+      : null;
+    const checkOutAt = checkOutTime
+      ? combineDateAndTimeInZone(endDateStr, checkOutTime)
+      : null;
+    if (checkInAt && checkOutAt && checkOutAt <= checkInAt) {
+      throw new BadRequestException('Checkout time must be after check-in time');
     }
+    await this.prisma.stayDateBlock.createMany({
+      data: targetStayIds.map((stayId) => ({
+        blockGroupId,
+        stayId,
+        startDate,
+        endDate,
+        checkInAt,
+        checkOutAt,
+        reason,
+        createdById: userId,
+      })),
+    });
 
     return {
       success: true,
-      message: `Blocked inventory units (${targetStayIds.length} units)`,
-    };
+      blockedRangeId: blockGroupId,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      reason,
+      checkInAt,
+      checkOutAt,
+      message: `Blocked dates for ${targetStayIds.length} stay unit(s)`,
+    }
   }
 
   async unblockDates(
     dto: UnblockDatesDto | BlockDatesDto,
     userId: string,
   ): Promise<{ success: boolean; message?: string }> {
-    const rawDto = dto as any;
-    const startDateStr = rawDto.startDate || rawDto.dateFrom;
-    const endDateStr = rawDto.endDate || rawDto.dateTo;
+    const startDateStr =
+      dto.startDate || ('dateFrom' in dto ? dto.dateFrom : undefined);
+    const endDateStr =
+      dto.endDate || ('dateTo' in dto ? dto.dateTo : undefined);
     if (!startDateStr || !endDateStr) {
       throw new BadRequestException('startDate and endDate (or dateFrom and dateTo) are required');
     }
+    const startDate = this.parseDateOnly(startDateStr, 'startDate');
+    const endDate = this.parseDateOnly(endDateStr, 'endDate');
+    if (startDate > endDate) {
+      throw new BadRequestException('endDate must be on or after startDate');
+    }
 
     const stayIds = await this.resolveStayUnits(
-      rawDto.propertyId || rawDto.listingId,
-      rawDto.unitId,
-      rawDto.stayId,
+      dto.propertyId || dto.listingId,
+      dto.unitId,
+      'stayId' in dto ? dto.stayId : undefined,
       userId,
     );
-
-    const targetStayIds = rawDto.count && rawDto.count > 0 && rawDto.count < stayIds.length
-      ? stayIds.slice(0, rawDto.count)
+    const targetStayIds = dto.count && dto.count < stayIds.length
+      ? stayIds.slice(0, dto.count)
       : stayIds;
-
-    for (const stayId of targetStayIds) {
-      await this.prisma.stayInventory.updateMany({
-        where: { stayId },
-        data: { status: 'AVAILABLE' },
-      });
+    const result = await this.prisma.stayDateBlock.updateMany({
+      where: {
+        stayId: { in: targetStayIds },
+        startDate,
+        endDate,
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('No active date block matches the selected stay and date range');
     }
 
     return {
       success: true,
-      message: `Unblocked inventory units (${targetStayIds.length} units)`,
+      message: `Unblocked ${result.count} stay date block(s)`,
     };
   }
 

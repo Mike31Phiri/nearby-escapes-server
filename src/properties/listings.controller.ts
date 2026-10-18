@@ -47,7 +47,7 @@ export class ListingsController {
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
+  @Roles('HOST', 'ADMIN')
   @Post()
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: '3.1 Create Listing (Unified Gateway)' })
@@ -57,12 +57,12 @@ export class ListingsController {
     @CurrentUser() user: User,
     @Body() dto: CreateUnifiedListingDto,
   ): Promise<CreateUnifiedListingResponseDto> {
-    const host = await this.hostsService.findApprovedByUserId(user.id);
+    const host = await this.getPropertyActor(user);
     return this.propertiesService.createUnifiedListing(host.id, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
+  @Roles('HOST', 'ADMIN')
   @Patch(':id/status')
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: '3.2 Update Listing Status (Publish / Pause / Archive / Inactive)' })
@@ -73,12 +73,12 @@ export class ListingsController {
     @Param('id') id: string,
     @Body() dto: UpdateListingStatusDto,
   ): Promise<UpdateListingStatusResponseDto> {
-    const host = await this.hostsService.findApprovedByUserId(user.id);
+    const host = await this.getPropertyActor(user);
     return this.propertiesService.updateListingStatus(id, host.id, dto.status);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
+  @Roles('HOST', 'ADMIN')
   @Patch(':id/inventory')
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Adjust property inventory count (increase / decrease / set)' })
@@ -89,12 +89,12 @@ export class ListingsController {
     @Param('id') id: string,
     @Body() dto: AdjustInventoryDto,
   ): Promise<AdjustInventoryResponseDto> {
-    const host = await this.hostsService.findApprovedByUserId(user.id);
+    const host = await this.getPropertyActor(user);
     return this.propertiesService.adjustInventoryCount(id, host.id, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
+  @Roles('HOST', 'ADMIN')
   @Patch(':id/pricing')
   @UseInterceptors(PropertySyncInterceptor)
   @ApiOperation({ summary: 'Update master property pricing table (persists historical bookings)' })
@@ -105,12 +105,12 @@ export class ListingsController {
     @Param('id') id: string,
     @Body() dto: UpdatePropertyPricingDto,
   ): Promise<UpdatePropertyPricingResponseDto> {
-    const host = await this.hostsService.findApprovedByUserId(user.id);
+    const host = await this.getPropertyActor(user);
     return this.propertiesService.updatePropertyPricing(id, host.id, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HOST')
+  @Roles('HOST', 'ADMIN')
   @Delete(':id')
   @UseInterceptors(PropertySyncInterceptor)
   @HttpCode(HttpStatus.OK)
@@ -121,8 +121,13 @@ export class ListingsController {
     @CurrentUser() user: User,
     @Param('id') id: string,
   ): Promise<DeleteListingResponseDto> {
-    const host = await this.hostsService.findApprovedByUserId(user.id);
+    const host = await this.getPropertyActor(user);
     return this.propertiesService.deleteListing(id, host.id);
+  }
+
+  private async getPropertyActor(user: User): Promise<{ id: string }> {
+    if (user.role === 'ADMIN') return user;
+    return this.hostsService.findApprovedByUserId(user.id);
   }
 
   @Get()

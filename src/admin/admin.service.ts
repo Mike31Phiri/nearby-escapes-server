@@ -311,6 +311,50 @@ export class AdminService {
     return { ...updated, status: updated.status.toLowerCase(), priority: updated.priority.toLowerCase() };
   }
 
+  // ─── Payments ──────────────────────────────────────────────────────────────
+
+  async getPayments(page = 1, limit = 20, status?: string) {
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const safeLimit = Math.max(
+      1,
+      Math.min(100, Math.floor(Number(limit) || 20)),
+    );
+    const where: Prisma.PaymentWhereInput = {};
+    if (status) where.status = status.toUpperCase() as any;
+
+    const [payments, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+        include: {
+          booking: {
+            select: {
+              bookingRef: true,
+              currency: true,
+              status: true,
+              guest: { select: { id: true, name: true, email: true } },
+              host: { select: { id: true, name: true, email: true } },
+              property: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    return {
+      data: payments,
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      },
+    };
+  }
+
   // ─── Payouts ───────────────────────────────────────────────────────────────
 
   async getPayouts(page = 1, limit = 20, status?: string) {
@@ -527,12 +571,16 @@ export class AdminService {
   // ─── Approve host ──────────────────────────────────────────────────────────
 
   async approveHost(hostId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: hostId } });
-    if (!user || user.role !== 'HOST') throw new NotFoundException('Host not found');
+    const user = await this.prisma.user.findUnique({
+      where: { id: hostId },
+      select: { id: true, hostProfile: { select: { id: true } } },
+    });
+    if (!user?.hostProfile) throw new NotFoundException('Host application not found');
 
     const updated = await this.prisma.user.update({
       where: { id: hostId },
       data: {
+        role: 'HOST',
         hostProfile: {
           upsert: {
             create: { isApproved: true },

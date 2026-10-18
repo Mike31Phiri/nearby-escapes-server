@@ -1,4 +1,17 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  Version,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto, CancelBookingDto } from './dto/create-booking.dto';
@@ -78,6 +91,14 @@ export class BookingsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get(':id/receipt')
+  @Version(['1', VERSION_NEUTRAL])
+  @ApiOperation({ summary: 'Get paid booking receipt for the guest, host, or admin' })
+  getReceipt(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.bookingsService.getReceipt(id, user.id, user.role);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '4.1 Cancel reservation by booking ID and reopen inventory' })
@@ -104,6 +125,7 @@ export class BookingsController {
   @UseGuards(RolesGuard)
   @Roles('HOST', 'ADMIN')
   @Post(':id/check-in')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Host initiates guest check-in (triggers guest confirmation request)' })
   checkIn(@CurrentUser() user: User, @Param('id') id: string) {
@@ -112,6 +134,7 @@ export class BookingsController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/confirm-check-in')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Guest confirms check-in (triggers release of funds to host)' })
   confirmCheckIn(@CurrentUser() user: User, @Param('id') id: string) {
