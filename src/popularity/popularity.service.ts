@@ -33,12 +33,12 @@ export class PopularityService implements OnApplicationBootstrap {
     name: 'calculate-popular-listings',
   })
   async handleMidnightRecalculation() {
-    this.logger.log('⏰ Starting 24h midnight popularity calculator...');
+    this.logger.log('Starting 24h midnight popularity calculator...');
     try {
       await this.recalculateAll();
-      this.logger.log('✅ Midnight popularity recalculation finished successfully.');
+      this.logger.log('Midnight popularity recalculation finished successfully.');
     } catch (err: any) {
-      this.logger.error(`❌ Midnight popularity recalculation failed: ${err.message}`, err.stack);
+      this.logger.error(`Midnight popularity recalculation failed: ${err.message}`, err.stack);
     }
   }
 

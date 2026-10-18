@@ -51,7 +51,7 @@ export class NotificationsService {
     if (resendApiKey?.startsWith('re_')) {
       this.resendClient = new Resend(resendApiKey);
       this.logger.log(
-        `Resend client initialized ✓ (${resendApiKey.substring(0, 7)}...)`,
+        `Resend client initialized (${resendApiKey.substring(0, 7)}...)`,
       );
     } else {
       this.logger.log(`Using SMTP email transporter (${host}:${port})`);
@@ -70,7 +70,7 @@ export class NotificationsService {
 
     this.transporter.verify((err) => {
       if (err) this.logger.error(`Mail transporter error: ${err.message}`);
-      else this.logger.log('Mail transporter ready ✓');
+      else this.logger.log('Mail transporter ready');
     });
   }
 
@@ -304,7 +304,7 @@ export class NotificationsService {
       `Booking Received — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name: guestName,
-        heading: '🏕️ Booking Received',
+        heading: 'Booking Received',
         body: `
         <p>Your booking request <strong>${bookingRef}</strong> for <strong>${listingName}</strong> has been received.</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -313,7 +313,7 @@ export class NotificationsService {
           <tr><td style="padding:6px 0;color:#666;">Guests</td><td style="padding:6px 0;font-weight:600;">${guests}</td></tr>
           <tr><td style="padding:6px 0;color:#666;">Amount</td><td style="padding:6px 0;font-weight:600;color:#1f1433;">ZMW ${(amountZMW / 100).toFixed(2)}</td></tr>
         </table>
-        <p>We'll notify you once the host confirms. Sit tight! 🎒</p>
+        <p>We'll notify you once the host confirms.</p>
       `,
         ctaLabel: 'View Booking',
         ctaUrl: `${this.frontendUrl()}/trips/${bookingRef}`,
@@ -326,7 +326,7 @@ export class NotificationsService {
       `New Booking Request — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name: hostName,
-        heading: '📬 New Booking Request',
+        heading: 'New Booking Request',
         body: `
         <p><strong>${guestName}</strong> wants to book <strong>${listingName}</strong>.</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -405,10 +405,10 @@ export class NotificationsService {
     // Email receipt – guest
     await this.send(
       guestEmail,
-      `Booking Confirmed ✅ — ${bookingRef} | Nearby Escapes`,
+      `Booking Confirmed — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name: guestName,
-        heading: '✅ Booking Confirmed',
+        heading: 'Booking Confirmed',
         body: `
         <p>Great news! Your booking at <strong>${listingName}</strong> is <strong>confirmed</strong>.</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -418,7 +418,7 @@ export class NotificationsService {
           <tr><td style="padding:6px 0;color:#666;">Guests</td><td style="padding:6px 0;font-weight:600;">${guests}</td></tr>
           <tr><td style="padding:6px 0;color:#666;">Total Paid</td><td style="padding:6px 0;font-weight:600;color:#1f1433;">ZMW ${(amountZMW / 100).toFixed(2)}</td></tr>
         </table>
-        <p>Get ready for your escape! 🌿</p>
+        <p>Get ready for your escape.</p>
       `,
         ctaLabel: 'View Trip Receipt',
         ctaUrl: `${this.frontendUrl()}/trips/${bookingRef}`,
@@ -431,7 +431,7 @@ export class NotificationsService {
       `New Confirmed Booking — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name: hostName,
-        heading: '📋 Confirmed Booking',
+        heading: 'Confirmed Booking',
         body: `
         <p><strong>${guestName}</strong>'s booking for <strong>${listingName}</strong> is now <strong>confirmed</strong>.</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -520,7 +520,7 @@ export class NotificationsService {
       `Booking Cancelled — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name: guestName,
-        heading: '❌ Booking Cancelled',
+        heading: 'Booking Cancelled',
         body: `
         <p>Your booking <strong>${bookingRef}</strong> at <strong>${listingName}</strong> has been cancelled by ${cancellerLabel}.</p>
         <p>${refundStr}</p>
@@ -537,7 +537,7 @@ export class NotificationsService {
       `Booking Cancelled — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name: hostName,
-        heading: '❌ Booking Cancelled',
+        heading: 'Booking Cancelled',
         body: `
         <p><strong>${guestName}</strong>'s booking <strong>${bookingRef}</strong> at <strong>${listingName}</strong> was cancelled by ${cancellerLabel}.</p>
         ${refundAmountNgwee > 0 ? `<p>A refund of ZMW ${(refundAmountNgwee / 100).toFixed(2)} has been issued to the guest.</p>` : ''}
@@ -582,10 +582,10 @@ export class NotificationsService {
 
     await this.send(
       hostEmail,
-      `Payout Cleared 💰 — ${payoutRef} | Nearby Escapes`,
+      `Payout Cleared — ${payoutRef} | Nearby Escapes`,
       this.tpl({
         name: hostName,
-        heading: '💰 Payout Cleared',
+        heading: 'Payout Cleared',
         body: `
         <p>Your payout for booking <strong>${bookingRef}</strong> has been sent.</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -621,8 +621,6 @@ export class NotificationsService {
       reviewText,
       guestName,
     } = opts;
-    const stars = '⭐'.repeat(Math.min(5, rating));
-
     await this.push(
       hostUserId,
       'REVIEW_RECEIVED',
@@ -640,7 +638,7 @@ export class NotificationsService {
       `New ${rating}-Star Review | Nearby Escapes`,
       this.tpl({
         name: hostName,
-        heading: `${stars} New Review`,
+        heading: `${rating}-Star Review`,
         body: `
         <p><strong>${guestName}</strong> left a <strong>${rating}-star</strong> review on your listing.</p>
         <blockquote style="border-left:3px solid #1f1433;padding:8px 16px;margin:16px 0;color:#444;font-style:italic;">
@@ -695,13 +693,13 @@ export class NotificationsService {
     await this.send(
       hostEmail,
       approved
-        ? `✅ Listing Approved — ${listingName} | Nearby Escapes`
-        : `⚠️ Listing Requires Correction — ${listingName} | Nearby Escapes`,
+        ? `Listing Approved — ${listingName} | Nearby Escapes`
+        : `Listing Requires Correction — ${listingName} | Nearby Escapes`,
       this.tpl({
         name: hostName,
         heading: approved
-          ? '✅ Listing Verified & Published'
-          : '⚠️ Listing Requires Corrections',
+          ? 'Listing Verified & Published'
+          : 'Listing Requires Corrections',
         body: approved
           ? `<p><strong>${listingName}</strong> has passed our compliance review and is now live in search results. Guests can start booking!</p>`
           : `<p><strong>${listingName}</strong> requires corrections before it can go live.</p>${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}<p>Please log in to your dashboard and address the issues.</p>`,
@@ -731,7 +729,7 @@ export class NotificationsService {
       'Reset Your Password — Nearby Escapes',
       this.tpl({
         name,
-        heading: '🔐 Password Reset',
+        heading: 'Password Reset',
         body: `
         <p>You requested a password reset. Click the button below — this link expires in <strong>1 hour</strong>.</p>
         <p>If you didn't request this, you can safely ignore this email.</p>
@@ -748,7 +746,7 @@ export class NotificationsService {
       `Booking Received — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name,
-        heading: '🏕️ Booking Received',
+        heading: 'Booking Received',
         body: `<p>Your booking <strong>${bookingRef}</strong> has been received and is awaiting host confirmation.</p>`,
         ctaLabel: 'View Booking',
         ctaUrl: `${this.frontendUrl()}/trips/${bookingRef}`,
@@ -764,10 +762,10 @@ export class NotificationsService {
   ) {
     const label =
       status === 'CONFIRMED'
-        ? '✅ Confirmed'
+        ? 'Confirmed'
         : status === 'PENDING'
-          ? '⏳ Pending'
-          : '❌ Rejected';
+          ? 'Pending'
+          : 'Rejected';
     await this.send(
       to,
       `Booking ${label} — ${bookingRef} | Nearby Escapes`,
@@ -792,7 +790,7 @@ export class NotificationsService {
       `New Booking Request — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name: hostName,
-        heading: '📬 New Booking Request',
+        heading: 'New Booking Request',
         body: `<p><strong>${travelerName}</strong> has requested booking <strong>${bookingRef}</strong>. Please review from your dashboard.</p>`,
         ctaLabel: 'Review Request',
         ctaUrl: `${this.frontendUrl()}/host/bookings`,
@@ -815,7 +813,7 @@ export class NotificationsService {
       `Booking Cancelled — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name,
-        heading: '❌ Booking Cancelled',
+        heading: 'Booking Cancelled',
         body: `<p>Your booking <strong>${bookingRef}</strong> has been cancelled.</p><p>${refundMsg}</p>`,
         ctaLabel: 'View Booking',
         ctaUrl: `${this.frontendUrl()}/trips/${bookingRef}`,
@@ -834,10 +832,10 @@ export class NotificationsService {
       `Payment Receipt — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name,
-        heading: '🧾 Payment Receipt',
+        heading: 'Payment Receipt',
         body: `
         <p>Your payment of <strong>ZMW ${(amount / 100).toFixed(2)}</strong> for booking <strong>${bookingRef}</strong> was successful.</p>
-        <p>Thank you for choosing Nearby Escapes! 🌍</p>
+        <p>Thank you for choosing Nearby Escapes.</p>
         `,
         ctaLabel: 'View Trip Receipt',
         ctaUrl: `${this.frontendUrl()}/trips/${bookingRef}`,
@@ -855,7 +853,7 @@ export class NotificationsService {
       `Payment Failed — ${bookingRef} | Nearby Escapes`,
       this.tpl({
         name,
-        heading: '❌ Payment Failed',
+        heading: 'Payment Failed',
         body: `
         <p>Your payment for booking <strong>${bookingRef}</strong> was not successful.</p>
         <p>Your booking has been cancelled. Please try again with a valid payment method.</p>
@@ -935,7 +933,7 @@ export class NotificationsService {
       `[Test Email] Nearby Escapes Diagnostic — ${new Date().toLocaleTimeString()}`,
       this.tpl({
         name: 'Administrator',
-        heading: '🧪 Test Email Notification Delivery',
+        heading: 'Test Email Notification Delivery',
         body: `
           <p>This is a live diagnostic email sent from the <strong>Nearby Escapes</strong> notification system to verify email dispatch.</p>
           <div style="background:#f4f1fb;border-left:4px solid #6b46c1;padding:14px 18px;margin:20px 0;font-family:monospace;font-size:13px;line-height:1.7;border-radius:4px;">
@@ -946,7 +944,7 @@ export class NotificationsService {
             <div><strong>Server Time:</strong> ${timestamp}</div>
           </div>
           ${customMessage ? `<p style="margin-top:12px;"><strong>Note:</strong> ${customMessage}</p>` : ''}
-          <p style="color:#28a745;font-weight:600;margin-top:16px;">✓ Notification transport pipeline is operational.</p>
+          <p style="color:#28a745;font-weight:600;margin-top:16px;">Notification transport pipeline is operational.</p>
         `,
         ctaLabel: 'Open Admin Dashboard',
         ctaUrl: `${this.frontendUrl()}/admin/dashboard`,
@@ -985,7 +983,7 @@ export class NotificationsService {
     <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:100%;">
       <tr><td style="background:linear-gradient(135deg,#1f1433 0%,#3b2a6b 100%);padding:36px 40px;text-align:center;">
         <p style="margin:0;color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Nearby Escapes</p>
-        <p style="margin:8px 0 0;color:rgba(255,255,255,0.75);font-size:13px;">Your gateway to Zambia's hidden gems 🇿🇲</p>
+        <p style="margin:8px 0 0;color:rgba(255,255,255,0.75);font-size:13px;">Your gateway to Zambia's hidden gems</p>
       </td></tr>
       <tr><td style="padding:40px;">
         <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1f1433;">Verify Your Email Address</h1>
@@ -1000,7 +998,7 @@ export class NotificationsService {
             ${code}
           </div>
           <p style="margin:12px 0 0;font-size:12px;color:#777;">
-            ⏱ This code expires in <strong>15 minutes</strong>
+            This code expires in <strong>15 minutes</strong>
           </p>
         </div>
 
@@ -1009,7 +1007,7 @@ export class NotificationsService {
         </p>
       </td></tr>
       <tr><td style="padding:24px 40px;border-top:1px solid #f0eef9;text-align:center;background:#faf9fc;">
-        <p style="margin:0;color:#888;font-size:12px;">© ${new Date().getFullYear()} Nearby Escapes. All rights reserved.<br>Lusaka, Zambia 🇿🇲</p>
+        <p style="margin:0;color:#888;font-size:12px;">© ${new Date().getFullYear()} Nearby Escapes. All rights reserved.<br>Lusaka, Zambia</p>
       </td></tr>
     </table>
   </td></tr>
@@ -1050,7 +1048,7 @@ export class NotificationsService {
         }
       </td></tr>
       <tr><td style="padding:24px 40px;border-top:1px solid #f0eef9;text-align:center;">
-        <p style="margin:0;color:#aaa;font-size:11px;">© ${new Date().getFullYear()} Nearby Escapes. All rights reserved.<br>Lusaka, Zambia 🇿🇲</p>
+        <p style="margin:0;color:#aaa;font-size:11px;">© ${new Date().getFullYear()} Nearby Escapes. All rights reserved.<br>Lusaka, Zambia</p>
       </td></tr>
     </table>
   </td></tr>

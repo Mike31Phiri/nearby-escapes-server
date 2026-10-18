@@ -1,4 +1,4 @@
-# Nearby Escapes Server 🌍
+# Nearby Escapes Server
 
 <p align="center">
   <img src="https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1200&q=80" alt="Nearby Escapes" width="100%" style="border-radius: 8px; max-height: 280px; object-fit: cover;" />
@@ -19,7 +19,7 @@
 
 ---
 
-## 📌 Architecture Overview
+## Architecture Overview
 
 Nearby Escapes uses a relational **Business-to-Inventory** architecture. Instead of treating listings as generic single records, the platform separates the **Business / Brand** (`Property`) from its **Bookable Inventory Units** (`Stay[]`, `Experience[]`, `Transport[]`).
 
@@ -44,7 +44,7 @@ Property (Business Brand: e.g. "Zambezi River Sun Lodge")
 
 ---
 
-## ⚡ Key Platform Systems
+## Key Platform Systems
 
 ### 1. 10-Minute Hold Race Condition System
 To eliminate booking race conditions, inventory is locked the moment a guest clicks **"Book"**, rather than when they complete payment:
@@ -87,7 +87,7 @@ Hosts can configure their operational preferences via `PATCH /api/hosts/me/setti
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -101,7 +101,7 @@ Hosts can configure their operational preferences via `PATCH /api/hosts/me/setti
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Prerequisites
 - **Node.js**: v20+
@@ -183,7 +183,7 @@ Interactive Swagger documentation: `http://localhost:3000/api/docs`
 
 ---
 
-## 📡 API Reference Overview
+## API Reference Overview
 
 ### Authentication & Users (`/api/auth`, `/api/users`)
 - `POST /api/auth/register` — Register guest account
@@ -231,7 +231,7 @@ Interactive Swagger documentation: `http://localhost:3000/api/docs`
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run unit tests
@@ -249,5 +249,5 @@ node scratch/test-checkin-checkout.js
 
 ---
 
-## 📄 License
+## License
 This project is proprietary software for **Nearby Escapes Travel Agency**. All rights reserved.

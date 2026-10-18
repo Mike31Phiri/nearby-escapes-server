@@ -523,7 +523,7 @@ export class BookingsService {
 
       await this.syncPropertyStatus(tx, property.id);
 
-      return tx.booking.findUnique({
+      return tx.booking.findUniqueOrThrow({
         where: { id: createdBooking.id },
         include: {
           property: true,
@@ -566,7 +566,7 @@ export class BookingsService {
             (property.host as any)?.hostProfile?.businessName ||
             property.host.name ||
             'Host',
-          bookingRef,
+          bookingRef: booking.bookingRef,
           listingId: property.id,
           listingName,
           checkIn: checkInStr,
@@ -587,7 +587,7 @@ export class BookingsService {
             (property.host as any)?.hostProfile?.businessName ||
             property.host.name ||
             'Host',
-          bookingRef,
+          bookingRef: booking.bookingRef,
           listingId: property.id,
           listingName,
           checkIn: checkInStr,
@@ -1381,7 +1381,6 @@ export class BookingsService {
     name: 'expire-pending-holds',
   })
   async handleExpiredHolds() {
-    this.logger.log('⏰ Checking for expired PENDING holds...');
     const now = new Date();
 
     const expiredBookings = await this.prisma.booking.findMany({
@@ -1397,12 +1396,11 @@ export class BookingsService {
     });
 
     if (expiredBookings.length === 0) {
-      this.logger.log('✅ No expired holds found.');
       return;
     }
 
     this.logger.log(
-      `⏳ Found ${expiredBookings.length} expired hold(s). Processing...`,
+      `Found ${expiredBookings.length} expired hold(s). Processing...`,
     );
 
     const processed: string[] = [];
@@ -1432,7 +1430,7 @@ export class BookingsService {
     }
 
     this.logger.log(
-      `✅ Expired ${processed.length} hold(s). Failures: ${errored.length}.`,
+      `Expired ${processed.length} hold(s). Failures: ${errored.length}.`,
     );
   }
 }

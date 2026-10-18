@@ -19,7 +19,6 @@ import type { User } from '@prisma/client';
 
 @ApiTags('Payments')
 @Controller('payments')
-@Version(['1', VERSION_NEUTRAL])
 export class PaymentsController {
   constructor(private dpoService: DpoService) {}
 
@@ -31,6 +30,7 @@ export class PaymentsController {
    */
   @UseGuards(JwtAuthGuard)
   @Post('dpo/initiate')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Initiate DPO Group PayPage token' })
   @ApiBearerAuth('access-token')
@@ -47,6 +47,7 @@ export class PaymentsController {
    */
   @UseGuards(JwtAuthGuard)
   @Post('dpo/verify')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify DPO transaction status via transToken' })
   @ApiBearerAuth('access-token')
@@ -61,6 +62,7 @@ export class PaymentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('dpo/verify/:transToken')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify DPO transaction status (GET alias)' })
   @ApiBearerAuth('access-token')
@@ -78,6 +80,7 @@ export class PaymentsController {
    * POST /api/payments/dpo/webhook
    */
   @Post('dpo/webhook')
+  @Version(['1', VERSION_NEUTRAL])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'DPO IPN server-to-server webhook callback' })
   async handleDpoWebhook(@Body() payload: any) {
